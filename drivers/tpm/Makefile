@@ -23,7 +23,9 @@ include $(TOPDIR)/config.mk
 
 LIB := $(obj)libtpm.o
 
-COBJS-$(CONFIG_GENERIC_LPC_TPM) = generic_lpc_tpm.o
+COBJS-$(CONFIG_TPM_I2C_ATMEL) = tis_i2c.o tpm.o tpm_i2c_atmel.o
+COBJS-$(CONFIG_GENERIC_LPC_TPM) = tpm_lpc_generic.o
+COBJS-$(CONFIG_INFINEON_TPM_I2C) = tis_i2c.o tpm.o tpm_i2c_infineon.o
 
 COBJS	:= $(COBJS-y)
 SRCS	:= $(COBJS:.o=.c)

@@ -115,13 +115,31 @@ struct vendor_name {
 	const struct device_name *dev_names;
 };
 
-static const struct device_name infineon_devices[] = {
-	{0xb, "SLB9635 TT 1.2"},
-	{0}
+static struct device_name atmel_devices[] = {
+	{0x3204, "AT97SC3204"},
+	{0xffff}
+};
+
+static struct device_name infineon_devices[] = {
+	{0x000b, "SLB9635 TT 1.2"},
+	{0xffff}
+};
+
+static struct device_name nuvoton_devices[] = {
+	{0x00fe, "NPCT420AA V2"},
+	{0xffff}
+};
+
+static struct device_name stmicro_devices[] = {
+	{0x0000, "ST33ZP24" },
+	{0xffff}
 };
 
 static const struct vendor_name vendor_names[] = {
+	{0x1114, "Atmel", atmel_devices},
 	{0x15d1, "Infineon", infineon_devices},
+	{0x1050, "Nuvoton", nuvoton_devices},
+	{0x104a, "ST Microelectronics", stmicro_devices},
 };
 
 /*
@@ -135,7 +153,7 @@ static u8 tpm_read_byte(const u8 *ptr)
 {
 	u8  ret = readb(ptr);
 	debug(PREFIX "Read reg 0x%4.4x returns 0x%2.2x\n",
-	      (u32)ptr - (u32)lpc_tpm_dev, ret);
+	      (u32)(uintptr_t)ptr - (u32)(uintptr_t)lpc_tpm_dev, ret);
 	return ret;
 }
 
@@ -143,21 +161,21 @@ static u32 tpm_read_word(const u32 *ptr)
 {
 	u32  ret = readl(ptr);
 	debug(PREFIX "Read reg 0x%4.4x returns 0x%8.8x\n",
-	      (u32)ptr - (u32)lpc_tpm_dev, ret);
+	      (u32)(uintptr_t)ptr - (u32)(uintptr_t)lpc_tpm_dev, ret);
 	return ret;
 }
 
 static void tpm_write_byte(u8 value, u8 *ptr)
 {
 	debug(PREFIX "Write reg 0x%4.4x with 0x%2.2x\n",
-	      (u32)ptr - (u32)lpc_tpm_dev, value);
+	      (u32)(uintptr_t)ptr - (u32)(uintptr_t)lpc_tpm_dev, value);
 	writeb(value, ptr);
 }
 
 static void tpm_write_word(u32 value, u32 *ptr)
 {
 	debug(PREFIX "Write reg 0x%4.4x with 0x%8.8x\n",
-	      (u32)ptr - (u32)lpc_tpm_dev, value);
+	      (u32)(uintptr_t)ptr - (u32)(uintptr_t)lpc_tpm_dev, value);
 	writel(value, ptr);
 }
 
@@ -196,15 +214,17 @@ static u32 tis_wait_reg(u32 *reg, u8 mask, u8 expected)
  */
 int tis_init(void)
 {
-	u32 didvid = tpm_read_word(&lpc_tpm_dev[0].did_vid);
+	u32 didvid;
 	int i;
 	const char *device_name = "unknown";
 	const char *vendor_name = device_name;
+	const struct device_name *dev;
 	u16 vid, did;
 
 	if (vendor_dev_id)
 		return 0;  /* Already probed. */
 
+	didvid = tpm_read_word(&lpc_tpm_dev[0].did_vid);
 	if (!didvid || (didvid == 0xffffffff)) {
 		printf("%s: No TPM device found\n", __func__);
 		return TPM_DRIVER_ERR;
@@ -220,11 +240,13 @@ int tis_init(void)
 
 		if (vid == vendor_names[i].vendor_id)
 			vendor_name = vendor_names[i].vendor_name;
+		else
+			continue;
 
-		while ((known_did = vendor_names[i].dev_names[j].dev_id) != 0) {
+		dev = &vendor_names[i].dev_names[j];
+		while ((known_did = dev->dev_id) != 0xffff) {
 			if (known_did == did) {
-				device_name =
-					vendor_names[i].dev_names[j].dev_name;
+				device_name = dev->dev_name;
 				break;
 			}
 			j++;
@@ -234,6 +256,46 @@ int tis_init(void)
 
 	printf("Found TPM %s by %s\n", device_name, vendor_name);
 	return 0;
+}
+
+/*
+ * PC Client Specific TPM Interface Specification section 11.2.12:
+ *
+ *  Software must be prepared to send two writes of a "1" to command ready
+ *  field: the first to indicate successful read of all the data, thus
+ *  clearing the data from the ReadFIFO and freeing the TPM's resources,
+ *  and the second to indicate to the TPM it is about to send a new command.
+ *
+ * In practice not all TPMs behave the same so it is necessary to be
+ * flexible when trying to set command ready.
+ *
+ * Returns 0 on success if the TPM is ready for transactions.
+ * Returns TPM_TIMEOUT_ERR if the command ready bit does not get set.
+ */
+static int tis_command_ready(u8 locality)
+{
+	u32 status;
+
+	/* 1st attempt to set command ready */
+	tpm_write_word(TIS_STS_COMMAND_READY,
+		       &lpc_tpm_dev[locality].tpm_status);
+
+	/* Wait for response */
+	status = tpm_read_word(&lpc_tpm_dev[locality].tpm_status);
+
+	/* Check if command ready is set yet */
+	if (status & TIS_STS_COMMAND_READY)
+		return 0;
+
+	/* 2nd attempt to set command ready */
+	tpm_write_word(TIS_STS_COMMAND_READY,
+		       &lpc_tpm_dev[locality].tpm_status);
+
+	/* Wait for command ready to get set */
+	status = tis_wait_reg(&lpc_tpm_dev[locality].tpm_status,
+			      TIS_STS_COMMAND_READY, TIS_STS_COMMAND_READY);
+
+	return (status == TPM_TIMEOUT_ERR) ? TPM_TIMEOUT_ERR : 0;
 }
 
 /*
@@ -432,8 +494,9 @@ static u32 tis_readresponse(u8 *buffer, u32 *len)
 	}
 
 	/* Tell the TPM that we are done. */
-	tpm_write_word(TIS_STS_COMMAND_READY, &lpc_tpm_dev
-		  [locality].tpm_status);
+	if (tis_command_ready(locality) == TPM_TIMEOUT_ERR)
+		return TPM_DRIVER_ERR;
+
 	*len = offset;
 	return 0;
 }
@@ -457,8 +520,12 @@ int tis_open(void)
 		return TPM_DRIVER_ERR;
 	}
 
-	tpm_write_word(TIS_STS_COMMAND_READY,
-		       &lpc_tpm_dev[locality].tpm_status);
+	/* Certain TPMs need some delay here or they hang. */
+	udelay(10);
+
+	if (tis_command_ready(locality) == TPM_TIMEOUT_ERR)
+		return TPM_DRIVER_ERR;
+
 	return 0;
 }
 
@@ -491,5 +558,5 @@ int tis_sendrecv(const u8 *sendbuf, size_t send_size,
 		return TPM_DRIVER_ERR;
 	}
 
-	return tis_readresponse(recvbuf, recv_len);
+	return tis_readresponse(recvbuf, (u32 *)recv_len);
 }

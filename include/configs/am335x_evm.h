@@ -44,18 +44,20 @@
 #define CONFIG_CMD_ASKENV
 #define CONFIG_VERSION_VARIABLE
 
+/* removed */
+
 /* set to negative value for no autoboot */
 #define CONFIG_BOOTDELAY		1
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"loadaddr=0x80200000\0" \
 	"fdtaddr=0x80F80000\0" \
 	"rdaddr=0x81000000\0" \
-	"bootfile=/boot/uImage\0" \
+	"bootfile=uImage\0" \
 	"console=ttyO0,115200n8\0" \
 	"optargs=\0" \
 	"mmcdev=0\0" \
 	"mmcroot=/dev/mmcblk0p2 ro\0" \
-	"mmcrootfstype=ext4 rootwait\0" \
+	"mmcrootfstype=ext3 rootwait\0" \
 	"ramroot=/dev/ram0 rw ramdisk_size=65536 initrd=${rdaddr},64M\0" \
 	"ramrootfstype=ext2\0" \
 	"mmcargs=setenv bootargs console=${console} " \
@@ -71,8 +73,7 @@
 		"root=${ramroot} " \
 		"rootfstype=${ramrootfstype}\0" \
 	"loadramdisk=fatload mmc ${mmcdev} ${rdaddr} ramdisk.gz\0" \
-	"loaduimagefat=fatload mmc ${mmcdev} ${loadaddr} ${bootfile}\0" \
-	"loaduimage=ext2load mmc ${mmcdev}:2 ${loadaddr} ${bootfile}\0" \
+	"loaduimage=fatload mmc ${mmcdev} ${loadaddr} ${bootfile}\0" \
 	"mmcboot=echo Booting from mmc ...; " \
 		"run mmcargs; " \
 		"bootm ${loadaddr}\0" \
@@ -253,5 +254,14 @@
 #define CONFIG_PHY_GIGE
 #define CONFIG_PHYLIB
 #define CONFIG_PHY_SMSC
+
+/* Atmel I2C TPM */
+#ifdef CONFIG_ATMEL_TPM
+#define CONFIG_TPM
+#define CONFIG_CMD_TPM
+#define CONFIG_TPM_I2C_ATMEL
+#define CONFIG_TPM_I2C_BUS 0
+#define CONFIG_TPM_I2C_ADDR 0x29
+#endif
 
 #endif	/* ! __CONFIG_AM335X_EVM_H */
