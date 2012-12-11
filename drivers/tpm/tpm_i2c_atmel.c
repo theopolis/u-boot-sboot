@@ -137,15 +137,6 @@ static int tpm_tis_i2c_send (struct tpm_chip *chip, u8 *buf, size_t count)
 {
 	int rc;
 
-	/** Write to tpm_dev.buf, size count **/
-	//struct i2c_msg msg1 = { tpm_dev.client->addr, 0, count, tpm_dev.buf };
-
-	rc = -EIO;
-	if (count > TPM_BUFSIZE) {
-		return -EINVAL;
-	}
-
-
 	/** should lock the device **/
 	/** locking is hanging the I2C bus **/
 
@@ -158,8 +149,10 @@ static int tpm_tis_i2c_send (struct tpm_chip *chip, u8 *buf, size_t count)
 	//printk(KERN_INFO "tpm_i2c_atmel: write status %i\n", rc);
 
 	/** should unlock device **/
-	if (rc <= 0)
+	if (rc < 0) {
+		printf("i2c_write return < 0\n");
 		return -EIO;
+	}
 
 	return count;
 }

@@ -47,7 +47,7 @@
 /* removed */
 
 /* set to negative value for no autoboot */
-#define CONFIG_BOOTDELAY		1
+#define CONFIG_BOOTDELAY		-1
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"loadaddr=0x80200000\0" \
 	"fdtaddr=0x80F80000\0" \
@@ -215,10 +215,10 @@
 #define CONFIG_SPL_LIBGENERIC_SUPPORT
 #define CONFIG_SPL_SERIAL_SUPPORT
 #define CONFIG_SPL_GPIO_SUPPORT
-#define CONFIG_SPL_YMODEM_SUPPORT
+/*#define CONFIG_SPL_YMODEM_SUPPORT
 #define CONFIG_SPL_NET_SUPPORT
 #define CONFIG_SPL_NET_VCI_STRING	"AM335x U-Boot SPL"
-#define CONFIG_SPL_ETH_SUPPORT
+#define CONFIG_SPL_ETH_SUPPORT*/
 #define CONFIG_SPL_LDSCRIPT		"$(CPUDIR)/omap-common/u-boot-spl.lds"
 
 /*
@@ -260,7 +260,7 @@
 #define CONFIG_TPM
 #define CONFIG_CMD_TPM
 #define CONFIG_TPM_I2C_ATMEL
-#define CONFIG_TPM_I2C_BUS 0
+#define CONFIG_TPM_I2C_BUS 1
 #define CONFIG_TPM_I2C_ADDR 0x29
 #endif
 
