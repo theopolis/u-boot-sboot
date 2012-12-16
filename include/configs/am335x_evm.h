@@ -255,13 +255,18 @@
 #define CONFIG_PHYLIB
 #define CONFIG_PHY_SMSC
 
-/* Atmel I2C TPM */
+/* Atmel I2C TPM and Chromium vboot_reference for sboot */
 #ifdef CONFIG_ATMEL_TPM
 #define CONFIG_TPM
+#define CONFIG_SPL_TPM_SUPPORT
+
 #define CONFIG_CMD_TPM
 #define CONFIG_TPM_I2C_ATMEL
 #define CONFIG_TPM_I2C_BUS 1
 #define CONFIG_TPM_I2C_ADDR 0x29
+
+#define CONFIG_SBOOT
+#define CONFIG_SPL_SBOOT_SUPPORT
 #endif
 
 #endif	/* ! __CONFIG_AM335X_EVM_H */
