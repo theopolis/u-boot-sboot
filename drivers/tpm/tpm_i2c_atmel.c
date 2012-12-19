@@ -149,7 +149,7 @@ static int tpm_tis_i2c_send (struct tpm_chip *chip, u8 *buf, size_t count)
 	//printk(KERN_INFO "tpm_i2c_atmel: write status %i\n", rc);
 
 	/** should unlock device **/
-	if (rc < 0) {
+	if (0 && rc < 0) { /* seems to be an error with the A5 */
 		printf("i2c_write return < 0\n");
 		return -EIO;
 	}

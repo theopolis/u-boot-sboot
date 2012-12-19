@@ -396,7 +396,7 @@ CFLAGS_VBOOT = $(filter-out -I%, $(CFLAGS))
 # FWLIB=vboot_fw.a FWDIR=$(VBOOT_SOURCE)/firmware
 .PHONY : vboot
 vboot:
-	FIRMWARE_ARCH="$(ARCH)" CFLAGS="$(CFLAGS_VBOOT)" \
+	FIRMWARE_ARCH="$(ARCH)" CFLAGS="$(CFLAGS_VBOOT)" EXTRA_LOGGING="1" \
 		$(MAKE) -C $(VBOOT_SOURCE) $(MAKEFLAGS_VBOOT)
 
 __LIBS += $(VBOOT_SOURCE)/build/vboot_fw.a
