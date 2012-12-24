@@ -10,6 +10,8 @@
 #include <environment.h>
 #include <tlcl.h>
 
+#include <sha1.h>
+
 /* Prints error and returns on failure */
 #define TPM_CHECK(tpm_command) do { \
 	uint32_t result; \
@@ -431,6 +433,45 @@ static int test_write_limit(void)
 	return 0;
 }
 
+/* added for Seal/Unseal tests */
+static int test_seal(void)
+{
+	uint8_t i;
+	uint32_t result;
+	uint32_t keyHandle;
+	uint32_t pcrMap;
+	uint8_t keyAuth[20];
+	uint8_t dataAuth[20];
+
+	uint8_t pcrInfo[256];
+
+	uint8_t data[20];
+	uint8_t blob[256];
+	uint32_t blobSize;
+
+	printf("Testing seal ...\n");
+	keyHandle = 0x40000000; /*SRK*/
+	pcrMap = 0 + (1<<1) + (1<<4);
+	sha1_csum("password2", 9, keyAuth);
+	sha1_csum("password2", 9, dataAuth);
+
+	result = TlclSeal(keyHandle, pcrInfo, 0,
+		keyAuth, dataAuth, data, 20, blob, &blobSize);
+
+	printf("seal finished: %d\n", result);
+	for (i = 0; i < 255; ++i) {
+		printf("0x%x ", blob[i]);
+	}
+	printf("...done\n");
+
+}
+
+static int test_unseal(void)
+{
+
+}
+/* end seal/unseal tests */
+
 /* u-boot command table (include/command.h)
  */
 
@@ -459,6 +500,8 @@ VOIDTEST(space_perm)
 VOIDTEST(startup)
 VOIDTEST(timing)
 VOIDTEST(write_limit)
+VOIDTEST(seal)
+VOIDTEST(unseal)
 VOIDTEST(timer)
 
 static cmd_tbl_t cmd_tpm_tlcl_sub[] = {
@@ -475,6 +518,8 @@ static cmd_tbl_t cmd_tpm_tlcl_sub[] = {
 	VOIDENT(startup),
 	VOIDENT(timing),
 	VOIDENT(write_limit),
+	VOIDENT(seal),
+	VOIDENT(unseal),
 	VOIDENT(timer)
 };
 

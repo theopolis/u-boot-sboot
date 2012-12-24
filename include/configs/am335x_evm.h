@@ -257,10 +257,12 @@
 
 /* Atmel I2C TPM and Chromium vboot_reference for sboot */
 #ifdef CONFIG_ATMEL_TPM
+#define EXTRA_LOGGING /* for TLCL */
 #define CONFIG_TPM
 #define CONFIG_SPL_TPM_SUPPORT
 
 #define CONFIG_CMD_TPM
+#define CONFIG_CMD_TPM_TLCL
 #define CONFIG_TPM_I2C_ATMEL
 #define CONFIG_TPM_I2C_BUS 1
 #define CONFIG_TPM_I2C_ADDR 0x29

@@ -313,6 +313,7 @@ endif
 LIBS-y += drivers/rtc/librtc.o
 LIBS-y += drivers/serial/libserial.o
 LIBS-$(CONFIG_TPM) += drivers/tpm/libtpm.o
+LIBS-$(CONFIG_TPM) += lib/tlcl/libtlcl.o
 ifdef VBOOT_SOURCE
 LIBS-$(CONFIG_SBOOT) += lib/sboot/sboot.o
 endif

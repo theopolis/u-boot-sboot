@@ -82,11 +82,11 @@ static u8 tpm_i2c_read(u8 *buffer, size_t len)
 
 	do {
 		rc = i2c_read(tpm_dev.addr, 0, 0, buffer, len);
-		if (rc > 0x00) /* successful read */
+		if (rc == 0x00) /* successful read */
 			break;
 		trapdoor++;
-		msleep(5);
-	} while (trapdoor < trapdoor_limit);
+		msleep(50);
+	} while (trapdoor < 10	); /*trapdoor_limit*/
 
 	/** should unlock device **/
 	//i2c_unlock_adapter(tpm_dev.client->adapter);
@@ -136,6 +136,7 @@ to_user:
 static int tpm_tis_i2c_send (struct tpm_chip *chip, u8 *buf, size_t count)
 {
 	int rc;
+	int tries;
 
 	/** should lock the device **/
 	/** locking is hanging the I2C bus **/
@@ -144,13 +145,18 @@ static int tpm_tis_i2c_send (struct tpm_chip *chip, u8 *buf, size_t count)
 	/* should add sanitization */
 	memcpy(tpm_dev.buf, buf, count);
 
-	rc = i2c_write(tpm_dev.addr, 0, 0, tpm_dev.buf, count);
+	for (tries = 0; tries < 2; tries++) {
+		rc = i2c_write(tpm_dev.addr, 0, 0, tpm_dev.buf, count);
+		if (rc == 0)
+			break; /*win*/
+		udelay(60);
+	}
 
 	//printk(KERN_INFO "tpm_i2c_atmel: write status %i\n", rc);
 
 	/** should unlock device **/
-	if (0 && rc < 0) { /* seems to be an error with the A5 */
-		printf("i2c_write return < 0\n");
+	if (rc) { /* seems to be an error with the A5 */
+		printf("i2c_write return > 1\n");
 		return -EIO;
 	}
 
@@ -200,7 +206,7 @@ int tpm_vendor_init (uint32_t dev_addr)
 	/* Note: not sure why we set the irq to an int
 	 * This causes tpm_transmit to skip retries, waits, and interrupts
 	 */
-	chip->vendor.irq = 1;
+	chip->vendor.irq = 0;
 
 	printf("1.2 TPM (atmel)\n");
 

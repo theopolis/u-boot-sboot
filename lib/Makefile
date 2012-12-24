@@ -49,7 +49,9 @@ COBJS-y += ldiv.o
 COBJS-$(CONFIG_MD5) += md5.o
 COBJS-y += net_utils.o
 COBJS-y += qsort.o
-COBJS-$(CONFIG_SHA1) += sha1.o
+ifneq ($(CONFIG_TPM)$(CONFIG_SHA1),)
+COBJS-y += sha1.o
+endif
 COBJS-$(CONFIG_SHA256) += sha256.o
 COBJS-y	+= strmhz.o
 COBJS-$(CONFIG_RBTREE)	+= rbtree.o
