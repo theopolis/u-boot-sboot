@@ -354,6 +354,7 @@ void hmac_starts(sha1_context *ctx, const unsigned char *key, unsigned int len)
 
 	memset(k_ipad, 0x36, 64);
 	sha1_starts(ctx);
+
 	for (i = 0; i < len; ++i) {
 		if (i >= 64) break;
 		k_ipad[i] ^= key[i];
@@ -386,7 +387,7 @@ void hmac_finish(sha1_context *ctx, const unsigned char *key, unsigned int len, 
 	sha1_update(ctx, dest, 20);
 	sha1_finish(ctx, output);
 
-	memset(dest, 0, 64);
+	memset(dest, 0, 20);
 	memset(k_opad, 0, 64);
 	memset(ctx, 0, sizeof(sha1_context));
 }

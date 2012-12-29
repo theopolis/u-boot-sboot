@@ -176,7 +176,6 @@ if (alen > 0) {
 		status = wait_for_pin();
 
 		if (status == 0 || (status & I2C_STAT_NACK)) {
-			printf("i2c read(1): l=%d,c=%x (status=0x%x)\n", alen, devaddr, status);
 			i2c_error = 1;
 			goto read_exit;
 		}
@@ -188,19 +187,14 @@ if (alen > 0) {
 			w |= tmpbuf[i++] << 8;
 #endif
 			writew(w, &i2c_base->data);
-			printf("i2c read(2): b=%x,l=%d,c=%x (status=0x%x)\n", w, alen, devaddr, status);
 			writew(I2C_STAT_XRDY, &i2c_base->stat);
 		}
 
 		if (status & I2C_STAT_ARDY) {
-			printf("i2c read(3): l=%d,c=%x (status=0x%x)\n", alen, devaddr, status);
 			writew(I2C_STAT_ARDY, &i2c_base->stat);
 			break;
 		}
 	}
-
-	printf("i2c read: putting %x into sa (status=0x%x)\n", devaddr, status);
-
 }
 
 	/* set slave address */
@@ -216,13 +210,10 @@ if (alen > 0) {
 	while (1) {
 		status = wait_for_pin();
 		if (status & I2C_STAT_AL) {
-			printf("i2c read(AL): l=%d,%d,c=%x (status=0x%x)\n", alen, len, devaddr, status);
-
 			i2c_error = 1;
 			goto read_exit;
 		}
 		if (status == 0 || (status & I2C_STAT_NACK)) {
-			printf("i2c read(5): l=%d,%d,c=%x (status=0x%x)\n", alen, len, devaddr, status);
 			i2c_error = 1;
 			goto read_exit;
 		}
@@ -230,15 +221,13 @@ if (alen > 0) {
 #if defined(CONFIG_OMAP243X) || defined(CONFIG_OMAP34XX) || \
 	defined(CONFIG_OMAP44XX) || defined(CONFIG_AM33XX)
 			*value = readb(&i2c_base->data);
-			printf("i2c read(6): b=%x,l=%d,%d,c=%x (status=0x%x)\n", *value, alen, len, devaddr, status);
-			++value;
+			++value; /* instead of reading buff size reg, just inc by 1 */
 #else
 			*value = readw(&i2c_base->data);
 #endif
 			writew(I2C_STAT_RRDY, &i2c_base->stat);
 		}
 		if (status & I2C_STAT_ARDY) {
-			printf("i2c read(7): l=%d,%d,c=%x (status=0x%x)\n", alen, len, devaddr, status);
 			writew(I2C_STAT_ARDY, &i2c_base->stat);
 			break;
 		}
@@ -344,14 +333,11 @@ int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len)
 		return 1;
 	}
 
-	printf("i2c read (c=%x,a=%d,l=%d,%d)\n", chip, addr, alen, len);
 	/*for (i = 0; i < len; i++) {*/
 		if (i2c_read_byte(chip, addr + i, alen, len, buffer)) {
-			puts("I2C read: I/O error\n");
 			i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 			return 1;
 		}
-		printf("i2c read (c=%x,a=%d,l=%d,b=%x)\n", chip, addr, i, buffer);
 	/*}*/
 
 	return 0;
@@ -393,8 +379,6 @@ int i2c_write(uchar chip, uint addr, int alen, uchar *buffer, int len)
 		status = wait_for_pin();
 		if (status == 0 || (status & I2C_STAT_NACK)) {
 			i2c_error = 1;
-			printf("i2c write error waiting for data ACK (status=0x%x)\n",
-					status);
 			goto write_exit;
 		}
 
@@ -404,19 +388,15 @@ int i2c_write(uchar chip, uint addr, int alen, uchar *buffer, int len)
 	defined(CONFIG_OMAP44XX) || defined(CONFIG_AM33XX))
 			w |= ((++i < 0) ? tmpbuf[2+i] : buffer[i]) << 8;
 #endif
-			printf("i2c write(2): b=%x len=%d,%d chip=%x (status=0x%x)\n", w, alen, len, chip, status );
 			writew(w, &i2c_base->data);
 			writew(I2C_STAT_XRDY, &i2c_base->stat);
 		} else {
 			i2c_error = 1;
-			printf("i2c bus not ready for Tx (i=%d)\n", i);
 			goto write_exit;
 		}
 	}
 
 	status = wait_for_pin();
-    printf("i2c write(fin): len=%d,%d chip=%x (status=0x%x)\n", alen, len, chip, status );
-
     writew(I2C_CON_EN, &i2c_base->con);
 
 write_exit:

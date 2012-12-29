@@ -15,6 +15,7 @@
 #include <common.h>
 #include <tss_constants.h>
 
+
 /*****************************************************************************/
 /* Functions implemented in tlcl.c */
 
@@ -172,6 +173,6 @@ uint32_t TlclGetRandom(uint8_t* data, uint32_t length, uint32_t* size);
 uint32_t TlclSeal(uint32_t keyHandle, const uint8_t *pcrInfo, uint32_t pcrInfoSize, const uint8_t *keyAuth, const uint8_t *dataAuth, const uint8_t *data, uint32_t dataSize, uint8_t *blob, uint32_t *blobSize);
 uint32_t TSS_GenPCRInfo(uint32_t pcrMap, uint8_t *pcrInfo, uint32_t *size);
 uint32_t TlclSealPCR(uint32_t keyHandle, uint32_t pcrMap, const uint8_t *keyAuth, const uint8_t *dataAuth, const uint8_t *data, uint32_t dataSize, uint8_t *blob, uint32_t *blobSize);
-
+uint32_t TlclUnseal(uint32_t keyHandle, const uint8_t *keyAuth, const uint8_t *dataAuth, const uint8_t *blob, uint32_t blobSize, uint8_t *rawData, uint32_t *dataSize);
 
 #endif  /* TPM_LITE_TLCL_H_ */

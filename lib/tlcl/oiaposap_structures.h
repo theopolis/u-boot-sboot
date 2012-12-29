@@ -17,7 +17,7 @@ const struct s_tpm_oiap_open_cmd {
 }, };
 
 const struct s_tpm_osap_open_cmd {
-	uint8_t buffer[36];
+	uint8_t buffer[64];
 	uint8_t type;
 	uint8_t value;
 	uint8_t nonce;

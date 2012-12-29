@@ -16,6 +16,8 @@
 #include "oiaposap.h"
 #include "oiaposap_structures.h"
 
+#undef _DEBUG
+#define _DEBUG 1
 
 /****************************************************************************/
 /*                                                                          */
@@ -28,6 +30,7 @@ uint32_t TSS_OIAPopen(uint32_t *handle, uint8_t *enonce)
 	uint8_t response[TPM_LARGE_ENOUGH_COMMAND_SIZE];
 	uint32_t result;
 
+	debug("TPM: TSS_OIAPopen\n");
 	/* check input arguments */
 	if (handle == NULL || enonce == NULL) {
 		return TPM_E_NULL_ARG;
@@ -67,6 +70,7 @@ uint32_t TSS_OSAPopen(struct tss_osapsess *sess, const uint8_t *key, uint16_t et
 	uint32_t nonceSize;
 	uint32_t result;
 
+	debug("TPM: TSS_OSAPopen\n");
 	/* check input arguments */
 	if (key == NULL || sess == NULL) {
 		return TPM_E_NULL_ARG;
@@ -85,14 +89,19 @@ uint32_t TSS_OSAPopen(struct tss_osapsess *sess, const uint8_t *key, uint16_t et
 		FromTpmUint32(response + kTpmResponseHeaderLength, &(sess->handle));
 		memcpy(sess->enonce, response + kTpmResponseHeaderLength + sizeof(uint32_t), TPM_NONCE_SIZE);
 		memcpy(sess->enonceOSAP, response + kTpmResponseHeaderLength + sizeof(uint32_t) + TPM_NONCE_SIZE, TPM_NONCE_SIZE);
-	}
 
-	/* not implemented */
-	SHA1_CTX hmac;
-	hmac_starts(&hmac, key, TPM_HASH_SIZE);
-	hmac_update(&hmac, sess->enonceOSAP, TPM_NONCE_SIZE);
-	hmac_update(&hmac, sess->ononceOSAP, TPM_NONCE_SIZE);
-	hmac_finish(&hmac, key, TPM_HASH_SIZE, sess->ssecret);
+		debug("TPM: TSS_OSAPopen success, calculating HMAC\n");
+		/*DATA_DEBUG("key", key, TPM_HASH_SIZE);
+		DATA_DEBUG("enonceOSAP", sess->enonceOSAP, TPM_NONCE_SIZE);
+		DATA_DEBUG("ononceOSAP", sess->ononceOSAP, TPM_NONCE_SIZE);*/
+
+		/* not implemented */
+		SHA1_CTX hmac;
+		hmac_starts(&hmac, key, TPM_HASH_SIZE);
+		hmac_update(&hmac, sess->enonceOSAP, TPM_NONCE_SIZE);
+		hmac_update(&hmac, sess->ononceOSAP, TPM_NONCE_SIZE);
+		hmac_finish(&hmac, key, TPM_HASH_SIZE, sess->ssecret);
+	}
 
 	return result;
 }

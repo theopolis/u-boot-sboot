@@ -24,7 +24,7 @@
 #include <command.h>
 #include <tpm.h>
 
-#define MAX_TRANSACTION_SIZE 30
+#define MAX_TRANSACTION_SIZE 256
 
 /*
  * tpm_write() expects a variable number of parameters: the internal address

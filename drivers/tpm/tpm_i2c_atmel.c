@@ -67,7 +67,7 @@ static u8 tpm_i2c_read(u8 *buffer, size_t len)
 {
 	int rc;
 	u32 trapdoor = 0;
-	const u32 trapdoor_limit = 60000; /* 5min with base 5mil seconds */
+	const u32 trapdoor_limit = 1000; /* not 5min with base 5mil seconds */
 
 	/** Read into buffer, of size len **/
 	//struct i2c_msg msg1 = { tpm_dev.client->addr, I2C_M_RD, len, buffer };
@@ -81,12 +81,13 @@ static u8 tpm_i2c_read(u8 *buffer, size_t len)
 	//printk(KERN_INFO "tpm_i2c_atmel: read length requested %i\n", len);
 
 	do {
+		/* Atmel TPM requires RAW reads */
 		rc = i2c_read(tpm_dev.addr, 0, 0, buffer, len);
 		if (rc == 0x00) /* successful read */
 			break;
 		trapdoor++;
-		msleep(50);
-	} while (trapdoor < 10	); /*trapdoor_limit*/
+		msleep(5);
+	} while (trapdoor < trapdoor_limit); /*trapdoor_limit*/
 
 	/** should unlock device **/
 	//i2c_unlock_adapter(tpm_dev.client->adapter);
@@ -112,7 +113,10 @@ static int tpm_tis_i2c_recv (struct tpm_chip *chip, u8 *buf, size_t count)
 	expected = expected << 8;
 	expected += tpm_dev.buf[5]; /* should never be > TPM_BUFSIZE */
 
-	//printk(KERN_INFO "tpm_i2c_atmel: read expected %i\n", expected);
+	/* this should not happen, but just in case. */
+	if (expected > TPM_BUFSIZE)
+		return -EIO;
+
 	if (expected <= TPM_HEADER_SIZE) {
 		/* finished here */
 		goto to_user;
@@ -136,16 +140,20 @@ to_user:
 static int tpm_tis_i2c_send (struct tpm_chip *chip, u8 *buf, size_t count)
 {
 	int rc;
-	int tries;
+	u8 tries, tries_limit = 2;
 
 	/** should lock the device **/
 	/** locking is hanging the I2C bus **/
+
+	if (count > TPM_BUFSIZE)
+		return -EINVAL;
 
 	memset(tpm_dev.buf, 0x00, TPM_BUFSIZE);
 	/* should add sanitization */
 	memcpy(tpm_dev.buf, buf, count);
 
-	for (tries = 0; tries < 2; tries++) {
+	for (tries = 0; tries < tries_limit; tries++) {
+		/* Atmel TPM uses RAW writes */
 		rc = i2c_write(tpm_dev.addr, 0, 0, tpm_dev.buf, count);
 		if (rc == 0)
 			break; /*win*/
