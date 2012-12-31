@@ -189,6 +189,14 @@ static int test_lock(void)
 	return 0;
 }
 
+static int test_reset(void)
+{
+	printf("Testing reset ...\n");
+	TlclReset();
+	printf("\tdone\n");
+	return 0;
+}
+
 static void initialize_spaces(void) {
 	uint32_t zero = 0;
 	uint32_t perm = TPM_NV_PER_WRITE_STCLEAR | TPM_NV_PER_PPWRITE;
@@ -433,43 +441,103 @@ static int test_write_limit(void)
 	return 0;
 }
 
+#ifdef CONFIG_TLCL_SEAL
 /* added for Seal/Unseal tests */
 static int test_seal(void)
 {
-	uint8_t i;
 	uint32_t result;
 	uint32_t keyHandle;
 	uint32_t pcrMap;
 	uint8_t keyAuth[20];
 	uint8_t dataAuth[20];
+	void *keyAuth2;
 
 	uint8_t pcrInfo[256];
 
-	uint8_t data[20];
-	uint8_t blob[256];
-	uint32_t blobSize;
+	uint8_t data[256 * 2];
+	uint8_t blob[256 * 2];
+	uint32_t blobSize, dataSize;
 
-	printf("Testing seal ...\n");
+	/* TPM must have run TakeOwnership */
 	keyHandle = 0x40000000; /*SRK*/
 	pcrMap = 0 + (1<<1) + (1<<4);
-	sha1_csum("password2", 9, keyAuth);
-	sha1_csum("password2", 9, dataAuth);
+	/* hashss of passwords, 0's for well-known */
+	memset(keyAuth, 0, 20);
+	memset(dataAuth, 0, 20);
+
+	memset(data, 0x9, 256 * 2);
+	memset(blob, 0, 256 * 2);
+
+	printf("Testing seal ...\n");
 
 	result = TlclSeal(keyHandle, pcrInfo, 0,
 		keyAuth, dataAuth, data, 20, blob, &blobSize);
-
-	printf("seal finished: %d\n", result);
-	for (i = 0; i < 255; ++i) {
-		printf("0x%x ", blob[i]);
-	}
+	printf("seal finished: %d (size=%d)\n", result, blobSize);
 	printf("...done\n");
 
+	memset(data, 0, 256 * 2);
+
+	printf("Testing unseal (correct) ...\n");
+
+	result = TlclUnseal(keyHandle, keyAuth, dataAuth,
+		blob, blobSize, data, &dataSize);
+	if (result == 0x15) {
+		TlclReset();
+		test_startup();
+		result = TlclUnseal(keyHandle, keyAuth, dataAuth,
+			blob, blobSize, data, &dataSize);
+	}
+	printf("unseal finished: %d (size=%d)\n", result, dataSize);
+
+	return 0;
 }
 
-static int test_unseal(void)
+#endif
+
+#ifdef CONFIG_TLCL_KEYS
+static int test_createkey(void)
 {
+	uint8_t parentPass[20];
+	uint8_t keyPass[20];
+	uint8_t migrationPass[20];
+	Tlcl_KeyData input, output;
 
+	uint8_t blob[4096];
+	uint32_t blobSize;
+	uint32_t result;
+
+	/* set well-known password for SRK */
+	memset(parentPass, 0, 20);
+	memset(keyPass, 0, 20);
+	memset(migrationPass, 0, 20);
+
+	memset(&input, 0, sizeof(Tlcl_KeyData));
+	memset(&output, 0, sizeof(Tlcl_KeyData));
+
+	sha1_csum("password1", 9, keyPass);
+
+	input.keyflags = 0;
+	input.authdatausage = 1; /* 0 = well-known, 1=password */
+
+	input.privkeylen = 0; /* no privatekey */
+	input.pub.algorithm = 0x00000001; /* RSA */
+	input.keyusage = 0x0011; /* encryption */
+	input.pub.encscheme = 0x0003; /* encryption scheme: RSA */
+	input.pub.sigscheme = 0x0001; /* signature scheme: NONE */
+	input.pub.keybitlen = 2048; /* RSA modulus: 2048 bits */
+	input.pub.numprimes = 2; /* required */
+	input.pub.expsize = 0; /* RSA exponent */
+	input.pub.keylength = 0; /* no input key */
+	input.pub.pcrinfolen = 0; /* no PCR's used */
+
+	/* no migration password */
+	result = TlclCreateWrapKey(0x40000000, parentPass, keyPass, NULL, &input, &output, blob, &blobSize);
+
+	printf("...again\n");
+
+	return 0;
 }
+#endif
 /* end seal/unseal tests */
 
 /* u-boot command table (include/command.h)
@@ -500,8 +568,13 @@ VOIDTEST(space_perm)
 VOIDTEST(startup)
 VOIDTEST(timing)
 VOIDTEST(write_limit)
+#ifdef CONFIG_TLCL_SEAL
 VOIDTEST(seal)
-VOIDTEST(unseal)
+#endif
+VOIDTEST(reset)
+#ifdef CONFIG_TLCL_KEYS
+VOIDTEST(createkey)
+#endif
 VOIDTEST(timer)
 
 static cmd_tbl_t cmd_tpm_tlcl_sub[] = {
@@ -518,9 +591,14 @@ static cmd_tbl_t cmd_tpm_tlcl_sub[] = {
 	VOIDENT(startup),
 	VOIDENT(timing),
 	VOIDENT(write_limit),
+#ifdef CONFIG_TLCL_SEAL
 	VOIDENT(seal),
-	VOIDENT(unseal),
-	VOIDENT(timer)
+#endif
+	VOIDENT(reset),
+#ifdef CONFIG_TLCL_KEYS
+	VOIDENT(createkey),
+#endif
+	VOIDENT(timer),
 };
 
 /* u-boot shell commands
@@ -556,5 +634,13 @@ U_BOOT_CMD(tpm_tlcl, 2, 1, do_tpm_tlcl, "TPM_Lite tests",
 	"\tspace_perm\n"
 	"\tstartup\n"
 	"\ttiming\n"
-	"\twrite_limit\n");
+	"\twrite_limit\n"
+#ifdef CONFIG_TLCL_SEAL
+	"\tseal\n"
+#endif
+	"\treset\n"
+#ifdef CONFIG_TLCL_KEYS
+	"\tcreatekey\n"
+#endif
+);
 

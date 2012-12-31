@@ -17,6 +17,7 @@
  * Rewritten to fit into the current U-Boot framework
  *
  * Adapted for OMAP2420 I2C, r-woodruff2@ti.com
+ * Multi-byte and Raw read, teddy@prosauce.org
  *
  */
 
@@ -150,7 +151,7 @@ void i2c_init(int speed, int slaveadd)
 		bus_initialized[current_bus] = 1;
 }
 
-static int i2c_read_byte(u8 devaddr, u16 regoffset, u8 alen, u8 len, u8 *value)
+static int i2c_read_byte(u8 devaddr, u16 regoffset, u8 alen, u16 len, u8 *value)
 {
 	int i2c_error = 0;
 	u16 status;
@@ -161,41 +162,41 @@ static int i2c_read_byte(u8 devaddr, u16 regoffset, u8 alen, u8 len, u8 *value)
 	/* wait until bus not busy */
 	wait_for_bb();
 
-if (alen > 0) {
+	if (alen > 0) {
 
-	/* one byte only */
-	writew(alen, &i2c_base->cnt);
-	/* set slave address */
-	writew(devaddr, &i2c_base->sa);
-	/* no stop bit needed here */
-	writew(I2C_CON_EN | I2C_CON_MST | I2C_CON_STT | I2C_CON_TRX, &i2c_base->con);
+		/* one byte only */
+		writew(alen, &i2c_base->cnt);
+		/* set slave address */
+		writew(devaddr, &i2c_base->sa);
+		/* no stop bit needed here */
+		writew(I2C_CON_EN | I2C_CON_MST | I2C_CON_STT | I2C_CON_TRX, &i2c_base->con);
 
-	memset(tmpbuf + 2, 0, 62); /*oddness*/
-	/* send register offset */
-	while (1) {
-		status = wait_for_pin();
+		memset(tmpbuf + 2, 0, 62); /*oddness*/
+		/* send register offset */
+		while (1) {
+			status = wait_for_pin();
 
-		if (status == 0 || (status & I2C_STAT_NACK)) {
-			i2c_error = 1;
-			goto read_exit;
-		}
+			if (status == 0 || (status & I2C_STAT_NACK)) {
+				i2c_error = 1;
+				goto read_exit;
+			}
 
-		if (status & I2C_STAT_XRDY) {
-			w = tmpbuf[i++];
-#if !(defined(CONFIG_OMAP243X) || defined(CONFIG_OMAP34XX) || \
-	defined(CONFIG_OMAP44XX) || defined(CONFIG_AM33XX))
-			w |= tmpbuf[i++] << 8;
-#endif
-			writew(w, &i2c_base->data);
-			writew(I2C_STAT_XRDY, &i2c_base->stat);
-		}
+			if (status & I2C_STAT_XRDY) {
+				w = tmpbuf[i++];
+	#if !(defined(CONFIG_OMAP243X) || defined(CONFIG_OMAP34XX) || \
+		defined(CONFIG_OMAP44XX) || defined(CONFIG_AM33XX))
+				w |= tmpbuf[i++] << 8;
+	#endif
+				writew(w, &i2c_base->data);
+				writew(I2C_STAT_XRDY, &i2c_base->stat);
+			}
 
-		if (status & I2C_STAT_ARDY) {
-			writew(I2C_STAT_ARDY, &i2c_base->stat);
-			break;
+			if (status & I2C_STAT_ARDY) {
+				writew(I2C_STAT_ARDY, &i2c_base->stat);
+				break;
+			}
 		}
 	}
-}
 
 	/* set slave address */
 	writew(devaddr, &i2c_base->sa);

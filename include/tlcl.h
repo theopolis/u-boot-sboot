@@ -169,10 +169,47 @@ uint32_t TlclGetOwnership(uint8_t* owned);
  */
 uint32_t TlclGetRandom(uint8_t* data, uint32_t length, uint32_t* size);
 
+/* Resets the TPM, removing loaded keys and opened handles.
+ */
+uint32_t TlclReset(void);
+
 /* Seal commands */
 uint32_t TlclSeal(uint32_t keyHandle, const uint8_t *pcrInfo, uint32_t pcrInfoSize, const uint8_t *keyAuth, const uint8_t *dataAuth, const uint8_t *data, uint32_t dataSize, uint8_t *blob, uint32_t *blobSize);
 uint32_t TSS_GenPCRInfo(uint32_t pcrMap, uint8_t *pcrInfo, uint32_t *size);
 uint32_t TlclSealPCR(uint32_t keyHandle, uint32_t pcrMap, const uint8_t *keyAuth, const uint8_t *dataAuth, const uint8_t *data, uint32_t dataSize, uint8_t *blob, uint32_t *blobSize);
 uint32_t TlclUnseal(uint32_t keyHandle, const uint8_t *keyAuth, const uint8_t *dataAuth, const uint8_t *blob, uint32_t blobSize, uint8_t *rawData, uint32_t *dataSize);
+
+/* Key structures */
+typedef struct Tlcl_PublicKeyData {
+	uint32_t algorithm;
+	uint16_t encscheme;
+	uint16_t sigscheme;
+	uint32_t keybitlen;
+	uint32_t numprimes;
+	uint32_t expsize;
+	uint8_t exponent[3];
+	uint32_t keylength;
+	uint8_t modulus[256];
+	uint32_t pcrinfolen;
+	uint8_t pcrinfo[256];
+} Tlcl_PublicKeyData;
+
+typedef struct Tlcl_KeyData {
+	uint8_t version[4];
+	uint16_t keyusage;
+	uint32_t keyflags;
+	uint8_t authdatausage;
+	Tlcl_PublicKeyData pub;
+	uint32_t privkeylen;
+	uint8_t encprivkey[1024];
+} Tlcl_KeyData;
+
+uint32_t TlclGetCapability(uint32_t capability,
+	uint8_t *subCap, uint32_t subCapSize,
+	uint8_t *response, uint32_t *responseSize);
+uint32_t TlclCreateWrapKey(uint32_t parentKeyHandle, uint8_t *parentKeyAuth,
+	uint8_t *keyAuth, uint8_t *migrationAuth,
+	Tlcl_KeyData *keyParams, Tlcl_KeyData *key,
+	uint8_t *keyBlob, uint32_t *blobSize);
 
 #endif  /* TPM_LITE_TLCL_H_ */

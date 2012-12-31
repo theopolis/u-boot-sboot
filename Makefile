@@ -384,30 +384,6 @@ __OBJS := $(subst $(obj),,$(OBJS))
 __LIBS := $(subst $(obj),,$(LIBS)) $(subst $(obj),,$(LIBBOARD))
 
 #########################################################################
-# Chromium OS Vboot-Reference, used to implment sboot
-# Compile using VBOOT_SOURCE=/location/of/vboot_reference
-
-ifdef VBOOT_SOURCE
-# Go off and build vboot_reference directory with the same CFLAGS
-# This is a eng convenience, not used by ebuilds
-# set VBOOT_MAKEFLAGS to required make flags, e.g. MOCK_TPM=1 if no TPM
-CFLAGS_VBOOT = $(filter-out -I%, $(CFLAGS))
-
-# Always call the vboot Makefile, since we don't have its dependencies
-# FWLIB=vboot_fw.a FWDIR=$(VBOOT_SOURCE)/firmware
-.PHONY : vboot
-vboot:
-	FIRMWARE_ARCH="$(ARCH)" CFLAGS="$(CFLAGS_VBOOT)" EXTRA_LOGGING="1" \
-		$(MAKE) -C $(VBOOT_SOURCE) $(MAKEFLAGS_VBOOT)
-
-__LIBS += $(VBOOT_SOURCE)/build/vboot_fw.a
-
-# U-boot cannot implement a secure boot without included vboot
-
-VBOOT_TARGET := vboot
-endif
-
-#########################################################################
 #########################################################################
 
 ifneq ($(CONFIG_BOARD_SIZE_LIMIT),)

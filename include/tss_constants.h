@@ -11,10 +11,11 @@
 
 #include <common.h>
 
-#define TPM_MAX_COMMAND_SIZE 4096
+#define TPM_MAX_COMMAND_SIZE 1024
 #define TPM_LARGE_ENOUGH_COMMAND_SIZE 256  /* saves space in the firmware */
 #define TPM_PUBEK_SIZE 256
 #define TPM_PCR_DIGEST 20
+#define TPM_DATA_OFFSET 10
 
 #define TPM_E_NON_FATAL 0x800
 
@@ -45,7 +46,7 @@
 
 #define TPM_E_NULL_ARG         		 ((uint32_t)0x80001002)	/* An argument was NULL */
 #define TPM_E_BAD_ARG          		 ((uint32_t)0x80001003)	/* An argument had an invalid value */
-
+#define TPM_E_HMAC_FAIL				 ((uint32_t)0x80001004) /* HMAC validation failed */
 
 #define TPM_NV_INDEX0 ((uint32_t)0x00000000)
 #define TPM_NV_INDEX_LOCK ((uint32_t)0xffffffff)

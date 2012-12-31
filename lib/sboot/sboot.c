@@ -1,8 +1,11 @@
 /* Lite implementation of a secured boot using Chromium vboot architecture. */
 
 /* From u-boot */
-#include "sboot.h"
+#include <sboot.h>
 
+/* TPM must be started, enabled, actived, and owned.
+ *   If not owned, OSAP will return a key use error.
+ */
 static uint8_t sboot_seal(void)
 {
 	uint32_t result;
@@ -21,6 +24,8 @@ static uint8_t sboot_seal(void)
 	/* todo: keyAuth = SHA1("password1")
 	 * todo: dataAuth = SHA1("password2")
 	 */
+
+	/* default tpm passwords */
 	memset(keyAuth, 0, 20);
 	memset(dataAuth, 0, 20);
 

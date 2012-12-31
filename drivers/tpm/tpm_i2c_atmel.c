@@ -67,18 +67,13 @@ static u8 tpm_i2c_read(u8 *buffer, size_t len)
 {
 	int rc;
 	u32 trapdoor = 0;
-	const u32 trapdoor_limit = 1000; /* not 5min with base 5mil seconds */
-
-	/** Read into buffer, of size len **/
-	//struct i2c_msg msg1 = { tpm_dev.client->addr, I2C_M_RD, len, buffer };
+	const u32 trapdoor_limit = 60000; /* not 5min with base 5mil seconds */
 
 	/** should lock the device **/
 	/** locking is hanging the I2C bus **/
 	//if (!tpm_dev.client->adapter->algo->master_xfer)
 	//	return -EOPNOTSUPP;
 	//i2c_lock_adapter(tpm_dev.client->adapter);
-
-	//printk(KERN_INFO "tpm_i2c_atmel: read length requested %i\n", len);
 
 	do {
 		/* Atmel TPM requires RAW reads */
@@ -106,9 +101,9 @@ static int tpm_tis_i2c_recv (struct tpm_chip *chip, u8 *buf, size_t count)
 
 	memset(tpm_dev.buf, 0x00, TPM_BUFSIZE);
 	rc = tpm_i2c_read(tpm_dev.buf, TPM_HEADER_SIZE); /* returns status of read */
+	if (rc != 0x00)
+		return rc;
 
-	//expected = be32_to_cpu(*(__be32 *)(buf + 2));
-	//expected = get_unaligned_be32(tpm_dev.buf + TPM_RSP_SIZE_BYTE);
 	expected = tpm_dev.buf[4];
 	expected = expected << 8;
 	expected += tpm_dev.buf[5]; /* should never be > TPM_BUFSIZE */
@@ -122,17 +117,15 @@ static int tpm_tis_i2c_recv (struct tpm_chip *chip, u8 *buf, size_t count)
 		goto to_user;
 	}
 
-	//printk(KERN_INFO "tpm_i2c_atmel: need to read %i\n", expected);
-
 	/* Looks like it reads the entire expected, into the base of the buffer (from Max's code).
 	 * The AVR development board reads and additional expected - TPM_HEADER_SIZE.
 	 */
 	rc = tpm_i2c_read(tpm_dev.buf, expected);
+	if (rc != 0x00)
+		return rc;
 
 to_user:
 	memcpy(buf, tpm_dev.buf, expected);
-
-	//printk(KERN_INFO "tpm_i2c_atmel: read finished\n");
 
 	return expected;
 }
@@ -160,11 +153,9 @@ static int tpm_tis_i2c_send (struct tpm_chip *chip, u8 *buf, size_t count)
 		udelay(60);
 	}
 
-	//printk(KERN_INFO "tpm_i2c_atmel: write status %i\n", rc);
-
 	/** should unlock device **/
-	if (rc) { /* seems to be an error with the A5 */
-		printf("i2c_write return > 1\n");
+	if (rc) {
+		printf("tpm_i2c_atmel: write error\n");
 		return -EIO;
 	}
 
@@ -178,7 +169,7 @@ static u8 tpm_tis_i2c_status (struct tpm_chip *chip)
 
 static void tpm_tis_i2c_ready (struct tpm_chip *chip)
 {
-	//nothing
+	/* nothing */
 }
 
 
@@ -187,9 +178,9 @@ static struct tpm_vendor_specific tpm_tis_i2c = {
 	.recv = tpm_tis_i2c_recv,
 	.send = tpm_tis_i2c_send,
 	.cancel = tpm_tis_i2c_ready,
-	//.req_complete_mask = TPM_STS_DATA_AVAIL | TPM_STS_VALID,
-	//.req_complete_val = TPM_STS_DATA_AVAIL | TPM_STS_VALID,
-	//.req_canceled = TPM_STS_COMMAND_READY,
+	/*.req_complete_mask = TPM_STS_DATA_AVAIL | TPM_STS_VALID,
+	.req_complete_val = TPM_STS_DATA_AVAIL | TPM_STS_VALID,
+	.req_canceled = TPM_STS_COMMAND_READY,*/
 };
 
 int tpm_vendor_init (uint32_t dev_addr)
@@ -223,5 +214,5 @@ int tpm_vendor_init (uint32_t dev_addr)
 
 void tpm_vendor_cleanup(struct tpm_chip *chip)
 {
-	//nothing
+	/* nothing */
 }

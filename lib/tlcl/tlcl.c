@@ -15,10 +15,7 @@
  */
 
 #include <tlcl.h>
-#include <sha1.h>
-#include <malloc.h>
 
-#include "oiaposap.h"
 #include "tlcl_internal.h"
 #include "tlcl_structures.h"
 
@@ -311,6 +308,11 @@ uint32_t TlclSetNvLocked(void) {
   return TlclDefineSpace(TPM_NV_INDEX_LOCK, 0, 0);
 }
 
+uint32_t TlclReset(void) {
+	debug("TPM: Reset\n");
+	return Send(tpm_reset_cmd.buffer);
+}
+
 int TlclIsOwned(void) {
   uint8_t response[TPM_LARGE_ENOUGH_COMMAND_SIZE + TPM_PUBEK_SIZE];
   uint32_t result;
@@ -482,410 +484,37 @@ uint32_t TlclGetRandom(uint8_t* data, uint32_t length, uint32_t *size) {
   return result;
 }
 
-/* tpm seal/unseal commands */
 
-uint32_t TlclSeal(uint32_t keyHandle,
-		const uint8_t *pcrInfo, uint32_t pcrInfoSize,
-		const uint8_t *keyAuth, const uint8_t *dataAuth,
-		const uint8_t *data, uint32_t dataSize,
-		uint8_t *blob, uint32_t *blobSize)
-{
-	uint16_t i;
-	uint32_t result;
-	uint8_t command[TPM_LARGE_ENOUGH_COMMAND_SIZE] = {0x0, 0xC2};
-	uint8_t response[TPM_LARGE_ENOUGH_COMMAND_SIZE];
 
-	struct tss_osapsess sess;
-	uint8_t encAuth[TPM_HASH_SIZE];
-	uint8_t pubAuth[TPM_HASH_SIZE];
-	uint32_t size, sealInfoSize, encDataSize, storedSize;
-	uint8_t nonceOdd[TPM_NONCE_SIZE];
-
-	/* might not use */
-	uint8_t xorWork[TPM_HASH_SIZE * 2];
-	uint8_t xorHash[TPM_HASH_SIZE];
-	SHA1_CTX ctx;
-
-	uint16_t keyType; /* for keyHandle */
-
-	/* TPM (big-endian data) for authentication HMAC */
-	uint8_t tpm_hmac_data[TPM_U32_SIZE];
-	uint8_t authHmacDigest[TPM_HASH_SIZE];
-	uint8_t c;
-
-	debug("TPM: Seal\n");
-
-#ifdef EXTRA_LOGGING
-	DATA_DEBUG("keyAuth", keyAuth, TPM_HASH_SIZE);
-	DATA_DEBUG("dataAuth", dataAuth, TPM_HASH_SIZE);
-	debug("TPM: Seal: keyHandle 0x%x\n", keyHandle);
-#endif
-
-	/* Input data checking */
-	if (data == NULL || blob == NULL) {
-		/* Todo: return error */
-		return -22; /* EINVAL */
-	}
-	if (pcrInfoSize != 0 && pcrInfo == NULL) {
-		/* Todo: return error */
-		return -22; /* EINVAL */
-	}
-
-	if (keyHandle == 0x40000000) {
-		keyType = 0x0004;
-		debug("TPM: seal using SRK.\n");
-	} else {
-		keyType = 0x0001;
-	}
-	/* handle null auth for key and data, for now only use non-null passwords */
-	/* assert(keyAuth != NULL && dataAuth != NULL); */
-
-	result = TSS_OSAPopen(&sess, keyAuth, keyType, keyHandle);
-	if (result != 0) {
-		/* This will fail is key does not exist or TPM has not run TakeOwnership. */
-		debug("TPM: TSS_OSAPopen failed\n");
-		return result;
-	}
-
-	debug("TPM: Seal, OSAP finished, calculating xor\n");
-
-	/* calculate encrypted authorization value */
-	memcpy(xorWork, sess.ssecret, TPM_HASH_SIZE);
-	memcpy(xorWork + TPM_HASH_SIZE, sess.enonce, TPM_HASH_SIZE);
-	sha1_starts(&ctx);
-	sha1_update(&ctx, xorWork, TPM_HASH_SIZE * 2);
-	sha1_finish(&ctx, xorHash);
-
-#ifdef EXTRA_LOGGING
-	DATA_DEBUG("xorHash", xorHash, TPM_HASH_SIZE);
-#endif
-
-	/* generate odd nonce */
-	TlclGetRandom(nonceOdd, TPM_NONCE_SIZE, &size);
-
-#ifdef EXTRA_LOGGING
-	DATA_DEBUG("sess.ssecret", sess.ssecret, TPM_HASH_SIZE);
-	DATA_DEBUG("sess.enonce", sess.enonce, TPM_HASH_SIZE);
-	DATA_DEBUG("nonceOdd:", nonceOdd, TPM_NONCE_SIZE);
-#endif
-
-	/* encrypt data authorization key, expects dataAuth to be as hash */
-	for (i = 0; i < TPM_HASH_SIZE; ++i) {
-		encAuth[i] = xorHash[i] ^ dataAuth[i];
-	}
-
-#ifdef EXTRA_LOGGING
-	DATA_DEBUG("encAuth", encAuth, TPM_HASH_SIZE);
-#endif
-
-	/* calculate authorization HMAC */
-	c = 0;
-	sha1_starts(&ctx);
-	ToTpmUint32(tpm_hmac_data, 0x17);
-	sha1_update(&ctx, tpm_hmac_data, TPM_U32_SIZE);
-	sha1_update(&ctx, encAuth, TPM_HASH_SIZE);
-	ToTpmUint32(tpm_hmac_data, pcrInfoSize);
-	sha1_update(&ctx, tpm_hmac_data, TPM_U32_SIZE);
-	if (pcrInfoSize > 0) {
-		/* PCRs */
-		sha1_update(&ctx, pcrInfo, pcrInfoSize); /* this time include pcrInfo */
-	}
-	ToTpmUint32(tpm_hmac_data, dataSize);
-	sha1_update(&ctx, tpm_hmac_data, TPM_U32_SIZE);
-	sha1_update(&ctx, data, dataSize);
-	sha1_finish(&ctx, authHmacDigest);
-
-	hmac_starts(&ctx, sess.ssecret, TPM_HASH_SIZE);
-	hmac_update(&ctx, authHmacDigest, TPM_HASH_SIZE);
-	hmac_update(&ctx, sess.enonce, TPM_NONCE_SIZE);
-	hmac_update(&ctx, nonceOdd, TPM_NONCE_SIZE);
-	hmac_update(&ctx, &c, 1);
-	hmac_finish(&ctx, sess.ssecret, TPM_HASH_SIZE, pubAuth);
-
-#ifdef EXTRA_LOGGING
-	DATA_DEBUG("authHmacDigest", authHmacDigest, TPM_HASH_SIZE);
-	DATA_DEBUG("pubAuth", pubAuth, TPM_HASH_SIZE);
-#endif
-
-	/*unsigned char seal_fmt[] = "00 C2 T l(ordinal) l(keyHandle)
-	  %(TPM_HASH_SIZE,encAuth) @(pcrInfoSize, pcrInfo) @(dataLen, data)
-	  l(sess.handle) %(TPM_NONCE_SIZE, nonceodd) o(c) %(TPM_HASH_SIZE, pubAuth)"; */
-
-	/* Build command */
-	size = 2 /*tag*/ + 12 /*paramSize,ordinal,keyHandle*/ + TPM_HASH_SIZE /*encAuth*/ +
-		pcrInfoSize + 4 /*size included*/ + dataSize + 4 + 4 /*authHandle*/ + TPM_NONCE_SIZE +
-		1 /*authSess bool*/ + TPM_HASH_SIZE;
-	ToTpmUint32(command + 2, size);
-	ToTpmUint32(command + 6, 0x17);
-	ToTpmUint32(command + 10, keyHandle);
-	memcpy(command + 14, encAuth, TPM_HASH_SIZE);
-	ToTpmUint32(command + 14 + TPM_HASH_SIZE, pcrInfoSize);
-	if (pcrInfoSize > 0) {
-		memcpy(command + 18 + TPM_HASH_SIZE, pcrInfo, pcrInfoSize);
-	}
-	ToTpmUint32(command + 18 + TPM_HASH_SIZE + pcrInfoSize, dataSize);
-	memcpy(command + 22 + TPM_HASH_SIZE + pcrInfoSize, data, dataSize);
-	ToTpmUint32(command + 22 + TPM_HASH_SIZE + pcrInfoSize + dataSize, sess.handle);
-	memcpy(command + 26 + TPM_HASH_SIZE + pcrInfoSize + dataSize, nonceOdd, TPM_NONCE_SIZE);
-	memset(command + 26 + TPM_HASH_SIZE + pcrInfoSize + dataSize + TPM_NONCE_SIZE, 0, 1);
-	memcpy(command + 27 + TPM_HASH_SIZE + pcrInfoSize + dataSize + TPM_NONCE_SIZE, pubAuth, TPM_HASH_SIZE);
-
-	//DATA_DEBUG("command", command, size);
-
-	result = TlclSendReceive(command, response, sizeof(response));
-
-	//DATA_DEBUG("result", response, TpmCommandSize(response));
-
-	if (result == TPM_SUCCESS) {
-		/* first 32bit after the header is the size of return */
-		FromTpmUint32(response + kTpmResponseHeaderLength, &size);
-		printf("blob size: %d\n", size);
-		FromTpmUint32(response + kTpmResponseHeaderLength + TPM_U32_SIZE, &sealInfoSize);
-		printf("seal info size: %d\n", sealInfoSize);
-		FromTpmUint32(response + kTpmResponseHeaderLength + TPM_U32_SIZE + TPM_U32_SIZE, &encDataSize);
-		printf("enc data size: %d\n", encDataSize);
-		storedSize = TPM_U32_SIZE * 3 + sealInfoSize + encDataSize;
-		printf("stored size: %d\n", storedSize);
-
-		/* todo: should check HMAC here (ordinal, nonceOdd, sess.ssecret, storedSize) */
-		/* set output param values */
-
-		memcpy(blob, response + kTpmResponseHeaderLength, storedSize);
-		*blobSize = storedSize;
-	}
-
-	TSS_OSAPclose(&sess);
-
-	return result;
-}
-
-uint32_t TSS_GenPCRInfo(uint32_t pcrMap, uint8_t *pcrInfo, uint32_t *size)
+uint32_t TlclGetCapability(uint32_t capability,
+	uint8_t *subCap, uint32_t subCapSize,
+	uint8_t *response, uint32_t *responseSize)
 {
 	uint32_t result;
 
-	struct pcrInfo {
-		uint8_t selSize[TPM_U16_SIZE]; /* uint16_t */
-		uint8_t select[TPM_PCR_MASK_SIZE];
-		uint8_t relHash[TPM_HASH_SIZE];
-		uint8_t crtHash[TPM_HASH_SIZE];
-	} info;
+	uint8_t command[TPM_LARGE_ENOUGH_COMMAND_SIZE] = {0x0, 0xc1};
+	uint8_t tempResponse[TPM_LARGE_ENOUGH_COMMAND_SIZE];
+	uint32_t size;
 
-	uint16_t i, j, numRegs;
-	uint32_t pcrMapTemp;
-	uint8_t *pcrValues, valueSize[TPM_U32_SIZE];
-	SHA1_CTX ctx;
-
-	/* must be valid pointers */
-	if (pcrInfo == NULL || size == NULL) {
+	/* Check for improper inputs */
+	if ((subCapSize > 0 && subCap == NULL) || response == NULL || responseSize == NULL) {
 		return TPM_E_NULL_ARG;
 	}
 
-	/* build PCR selection matrix */
-	pcrMapTemp = pcrMap;
-	memset(info.select, 0, TPM_PCR_MASK_SIZE);
-	for (i = 0; i < TPM_PCR_MASK_SIZE; ++i) {
-		info.select[i] = pcrMapTemp & 0x000000FF;
-		pcrMapTemp = pcrMapTemp >> 8;
-	}
-
-	/* calculate number of PCR registers requested */
-	numRegs = 0;
-	pcrMapTemp = pcrMap;
-	for (i = 0; i < (TPM_PCR_MASK_SIZE * 8); ++i) {
-		if (pcrMapTemp & 1) ++numRegs;
-		pcrMapTemp = pcrMapTemp >> 1;
-	}
-
-	/* check for 0 registers */
-	if (numRegs == 0) {
-		*size = 0;
-		return 0;
-	}
-
-	/* create a matrix of PCR values */
-	pcrValues = (uint8_t *) malloc(TPM_HASH_SIZE * numRegs);
-	pcrMapTemp = pcrMap;
-	for (i = 0, j = 0; i < (TPM_PCR_MASK_SIZE * 8); ++i, pcrMapTemp = pcrMapTemp >> 1) {
-		if ((pcrMapTemp & 1) == 0) continue;
-		result = TlclPCRRead(i, &(pcrValues[(j * TPM_HASH_SIZE)]), kPcrDigestLength);
-		if (result != 0) {
-			/* todo: print trace */
-			return result;
-		}
-		++j;
-	}
-
-	ToTpmUint16(info.selSize, TPM_PCR_MASK_SIZE);
-	ToTpmUint32(valueSize, numRegs * TPM_HASH_SIZE);
-
-	/* composite hash of selected PCR values */
-	sha1_starts(&ctx);
-	sha1_update(&ctx, info.selSize, TPM_U16_SIZE);
-	sha1_update(&ctx, info.select, TPM_PCR_MASK_SIZE);
-	sha1_update(&ctx, valueSize, TPM_U32_SIZE);
-	for (i = 0; i < numRegs; ++i) {
-		sha1_update(&ctx, &(pcrValues[(i * TPM_HASH_SIZE)]), TPM_HASH_SIZE);
-	}
-	sha1_finish(&ctx, info.relHash);
-	memcpy(info.crtHash, info.relHash, TPM_HASH_SIZE);
-
-	/* copy to input params */
-	memcpy(pcrInfo, &info, sizeof(struct pcrInfo));
-	*size = sizeof(struct pcrInfo);
-
-	return 0;
-}
-
-
-uint32_t TlclSealPCR(uint32_t keyHandle, uint32_t pcrMap,
-		const uint8_t *keyAuth, const uint8_t *dataAuth,
-		const uint8_t *data, uint32_t dataSize,
-		uint8_t *blob, uint32_t *blobSize)
-{
-	uint32_t result;
-
-	uint8_t pcrInfo[TPM_MAX_PCR_INFO_SIZE];
-	uint32_t pcrSize;
-
-	result = TSS_GenPCRInfo(pcrMap, pcrInfo, &pcrSize);
-	if (result != 0) {
-		return result;
-	}
-
-	return TlclSeal(keyHandle, pcrInfo, pcrSize, keyAuth, dataAuth, data,
-		dataSize, blob, blobSize);
-}
-
-uint32_t TlclUnseal(uint32_t keyHandle,
-		const uint8_t *keyAuth, const uint8_t *dataAuth,
-		const uint8_t *blob, uint32_t blobSize,
-		uint8_t *rawData, uint32_t *dataSize)
-{
-	uint32_t result;
-	uint8_t command[TPM_LARGE_ENOUGH_COMMAND_SIZE] = {0x0, 0xC3};
-	uint8_t response[TPM_LARGE_ENOUGH_COMMAND_SIZE];
-
-	uint32_t keyAuthHandle, dataAuthHandle, size;
-	uint8_t keyAuthData[TPM_HASH_SIZE], dataAuthData[TPM_HASH_SIZE];
-	uint8_t enonceKey[TPM_NONCE_SIZE], enonceData[TPM_NONCE_SIZE];
-	uint8_t nonceOdd[TPM_NONCE_SIZE];
-	uint8_t authHmacDigest[TPM_HASH_SIZE];
-	uint8_t c;
-	SHA1_CTX ctx;
-
-	/* used to convert host-endianess to TPM-endianess (big) */
-	uint8_t tpm_hmac_data[TPM_U32_SIZE];
-
-	/* check input params */
-	if (rawData == NULL || blob == NULL) {
-		return TPM_E_NULL_ARG;
-	}
-
-	/* todo: this assumes there is a provided keyAuth (and data) */
-	if (keyAuth != NULL) {
-		result = TSS_OIAPopen(&keyAuthHandle, enonceKey);
-		DATA_DEBUG("keyAuthHandle", &keyAuthHandle, 4);
-	}
-	result = TSS_OIAPopen(&dataAuthHandle, enonceData);
-
-	DATA_DEBUG("dataAuthHandle", &dataAuthHandle, 4);
-	DATA_DEBUG("enonceKey", enonceKey, 20);
-	DATA_DEBUG("enonceData", enonceData, 20);
-
-
-	/* generate odd nonce */
-	TlclGetRandom(nonceOdd, TPM_NONCE_SIZE, &size);
-	/* todo: is it OK to use the same odd nonce? */
-
-	c = 0;
-	ToTpmUint32(tpm_hmac_data, 0x18);
-	/* calculate key authorization HMAC */
-	sha1_starts(&ctx);
-	sha1_update(&ctx, tpm_hmac_data, TPM_U32_SIZE);
-	sha1_update(&ctx, blob, blobSize);
-	sha1_finish(&ctx, authHmacDigest);
-
-	DATA_DEBUG("authHmacDigest", authHmacDigest, 20);
-
-	debug("TPM: unseal, calculating HMACs\n");
-
-	if (keyAuth != NULL) {
-		hmac_starts(&ctx, keyAuth, TPM_HASH_SIZE);
-		hmac_update(&ctx, authHmacDigest, TPM_HASH_SIZE);
-		hmac_update(&ctx, enonceKey, TPM_NONCE_SIZE);
-		hmac_update(&ctx, nonceOdd, TPM_NONCE_SIZE);
-		hmac_update(&ctx, &c, 1);
-		hmac_finish(&ctx, keyAuth, TPM_HASH_SIZE, keyAuthData);
-
-		DATA_DEBUG("keyAuth", keyAuth, 20);
-	}
-
-	/* calculate data authorization HMAC */
-	hmac_starts(&ctx, dataAuth, TPM_HASH_SIZE);
-	hmac_update(&ctx, authHmacDigest, TPM_HASH_SIZE);
-	hmac_update(&ctx, enonceData, TPM_NONCE_SIZE);
-	hmac_update(&ctx, nonceOdd, TPM_NONCE_SIZE);
-	hmac_update(&ctx, &c, 1);
-	hmac_finish(&ctx, dataAuth, TPM_HASH_SIZE, dataAuthData);
-
-	DATA_DEBUG("dataAuth", dataAuth, 20);
-	/*DATA_DEBUG("blob(16)", blob, 16);
-	DATA_DEBUG("blob+16(40)", blob+16, 40);*/
-
-	/* unsigned char unseal_fmt[] = "00 C3 T(size) l(ordinal) l(keyHandle)
-	 * %(blob, blobSize) l(keyAuthHandle) %(nonceOdd, TPM_NONCE_SIZE
-	 * o(c, 1) %(keyAuthData, TPM_HASH_SIZE l(dataAuthHandle)
-	 * %(nonceOdd, TPM_NONCE_SIZE) o(c, 1) %(dataAuthData, TPM_HASH_SIZE)"; */
-	/* build command buffer */
-	size = 2 /*tag*/ + TPM_U32_SIZE * 3 /*paramSize, ordinal, keyHandle*/ +
-		blobSize + TPM_U32_SIZE + TPM_NONCE_SIZE + 1 + TPM_HASH_SIZE;
-
-	if (keyAuth == NULL) {
-		size += TPM_U32_SIZE + TPM_NONCE_SIZE + 1 + TPM_HASH_SIZE;
-		memset(command, 0x00, 1);
-		memset(command + 1, 0xc2, 1);
-	}
-
+	size = 2 + 4 + 4 + TPM_U32_SIZE + TPM_U32_SIZE + subCapSize;
 	ToTpmUint32(command + 2, size);
-	ToTpmUint32(command + 6, 0x18);
-	ToTpmUint32(command + 10, keyHandle);
-	//ToTpmUint32(command + 10, blobSize);
-	/* todo: might be some fields missing here, check TPM commands spec */
-	memcpy(command + 14, blob, blobSize); /* assumed a static 256? */
-
-	/* key auth params: handle, nonceOdd, continue_bool, keyAuthHMAC */
-	if (keyAuth != NULL) {
-		ToTpmUint32(command + 14 + blobSize, keyAuthHandle);
-		memcpy(command + 18 + blobSize, nonceOdd, TPM_NONCE_SIZE);
-		memcpy(command + 18 + blobSize + TPM_NONCE_SIZE, &c, 1);
-		memcpy(command + 19 + blobSize + TPM_NONCE_SIZE, keyAuthData, TPM_HASH_SIZE);
+	ToTpmUint32(command + 6, 0x65); /* ordinal */
+	ToTpmUint32(command + 10, capability);
+	ToTpmUint32(command + 14, subCapSize);
+	if (subCapSize > 0) {
+		memcpy(command + 18, subCap, subCapSize);
 	}
 
-	/* data auth params: handle, nonceOdd, continue_bool, dataAuthHMAC */
-	ToTpmUint32(command + 19 + blobSize + TPM_NONCE_SIZE + TPM_HASH_SIZE, dataAuthHandle);
-	memcpy(command + 23 + blobSize + TPM_NONCE_SIZE + TPM_HASH_SIZE, nonceOdd, TPM_NONCE_SIZE);
-	memcpy(command + 23 + blobSize + TPM_NONCE_SIZE * 2 + TPM_HASH_SIZE, &c, 1);
-	memcpy(command + 24 + blobSize + TPM_NONCE_SIZE * 2 + TPM_HASH_SIZE, dataAuthData, TPM_HASH_SIZE);
-
-	//DATA_DEBUG("command", command, size);
-
-	result = TlclSendReceive(command, response, sizeof(response));
-
-	//DATA_DEBUG("result", response, TpmCommandSize(response));
+	result = TlclSendReceive(command, tempResponse, sizeof(tempResponse));
 
 	if (result == TPM_SUCCESS) {
-		/* first 32bit after the header is the size of return */
-		/* size of returned data blob */
-		FromTpmUint32(response + kTpmResponseHeaderLength, dataSize);
-
-#ifdef EXTRA_LOGGING
-	debug("TPM: Unseal return size %d", *dataSize);
-	DATA_DEBUG("unseal return", response + kTpmResponseHeaderLength + TPM_U32_SIZE, *dataSize);
-#endif
-
-		/* todo: should check HMAC here (AUTH2) */
-		/* set output param values */
-		memcpy(rawData, response + kTpmResponseHeaderLength + TPM_U32_SIZE, *dataSize);
+		FromTpmUint32(tempResponse + TPM_DATA_OFFSET, responseSize);
+		memcpy(response, tempResponse + TPM_DATA_OFFSET + TPM_U32_SIZE, *responseSize);
 	}
 
 	return result;

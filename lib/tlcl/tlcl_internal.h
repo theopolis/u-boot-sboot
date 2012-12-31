@@ -69,4 +69,24 @@ static inline void FromTpmUint16(const uint8_t *buffer, uint16_t *x) {
   *x = (buffer[0] << 8) | buffer[1];
 }
 
+/* The following HMAC functions are defined in tlcl_hmac */
+
+/* Validate the HMAC for an AUTH1 or AUTH2 TPM response
+ * response - pointer to response buffer
+ * command - the 4byte command code generating the TPM reponse
+ * nonceOdd - pointer to TPM_NONCE_SIZE byte array used in the request HMAC
+ * key, keySize - the key used in the request HMAC
+ * ... - a variable length set of argument pairs (length, offset)
+ *   they are an offset and length referring to the TPM response buffer
+ *   the last pair must be 0, 0.
+ */
+uint32_t TSS_CheckHMAC(const uint8_t *response, uint32_t command,
+	const uint8_t *nonceOdd,
+	const uint8_t *key, uint32_t keySize, const uint8_t *key2, uint32_t keySize2, ...);
+
+uint32_t TSS_AuthHMAC(uint8_t *digest,
+	const uint8_t *key, uint32_t keySize, const uint8_t *nonce1, const uint8_t *nonce2,
+	uint8_t authBool, ...);
+
+
 #endif  /* TPM_LITE_TLCL_INTERNAL_H_ */

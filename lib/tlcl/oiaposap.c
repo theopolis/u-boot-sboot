@@ -1,13 +1,16 @@
 /*
  * libtpm: OAIP/OSAP routines
- *
  * Copyright (C) 2004 IBM Corporation
  * Author: J. Kravitz
  *
- *      This program is free software; you can redistribute it and/or modify
- *      it under the terms of the GNU General Public License as published by
- *      the Free Software Foundation; either version 2 of the License, or
- *      (at your option) any later version.
+ * tlcl implementation
+ * Copyright (C) 2012 V Lab Technologies
+ * Author: Teddy Reed
+ *
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2 of the License, or
+ *   (at your option) any later version.
  */
 
 #include <sha1.h>

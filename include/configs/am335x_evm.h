@@ -255,10 +255,10 @@
 #define CONFIG_PHYLIB
 #define CONFIG_PHY_SMSC
 
-/* Atmel I2C TPM and Chromium vboot_reference for sboot */
+/* Atmel I2C TPM, libtlcl, and sboot */
 #ifdef CONFIG_ATMEL_TPM
 #define EXTRA_LOGGING /* for TLCL */
-#define CONFIG_TPM
+#define CONFIG_TPM /* builds libtlcl */
 #define CONFIG_SPL_TPM_SUPPORT
 
 #define CONFIG_CMD_TPM
@@ -267,6 +267,7 @@
 #define CONFIG_TPM_I2C_BUS 1
 #define CONFIG_TPM_I2C_ADDR 0x29
 
+#define CONFIG_TLCL_SEAL /* required by SBOOT */
 #define CONFIG_SBOOT
 #define CONFIG_SPL_SBOOT_SUPPORT
 #endif
