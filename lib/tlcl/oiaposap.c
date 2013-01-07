@@ -19,14 +19,13 @@
 #include "oiaposap.h"
 #include "oiaposap_structures.h"
 
-#undef _DEBUG
-#define _DEBUG 1
-
-/****************************************************************************/
-/*                                                                          */
-/* Open an OIAP session                                                     */
-/*                                                                          */
-/****************************************************************************/
+/****************************************************************************
+ *
+ * Open an OIAP session
+ * Object Independent Authorization Protocol, will not work on commands
+ * that introduce new AuthData to the TPM
+ *
+ ****************************************************************************/
 uint32_t TSS_OIAPopen(uint32_t *handle, uint8_t *enonce)
 {
 	struct s_tpm_oiap_open_cmd cmd;
@@ -60,11 +59,13 @@ uint32_t TSS_OIAPclose(uint32_t handle)
 	return TSS_HANDclose(handle);
 }
 
-/****************************************************************************/
-/*                                                                          */
-/* Open an OSAP session                                                     */
-/*                                                                          */
-/****************************************************************************/
+/****************************************************************************
+ *
+ * Open an OSAP session
+ * Object Specific Authorization Protocol, returned handle must manipulate
+ * a single object given as a parameter (can introduce AuthData).
+ *                                                                          *
+ ****************************************************************************/
 uint32_t TSS_OSAPopen(struct tss_osapsess *sess, const uint8_t *key, uint16_t etype,
 		      uint32_t evalue)
 {

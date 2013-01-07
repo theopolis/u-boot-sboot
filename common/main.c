@@ -64,6 +64,15 @@ int update_tftp (ulong addr);
 
 char        console_buffer[CONFIG_SYS_CBSIZE + 1];	/* console I/O buffer	*/
 
+/* If SBOOT is extending console commands then it has two options for
+ * measurement, as it must consider measuring the act of sealing measurement:
+ *   1. Check for the SBOOT seal command, and skip measurement.
+ *   2. Always measure the SBOOT seal command before booting.
+ */
+#if defined(CONFIG_SBOOT) && !defined(CONFIG_SBOOT_DISABLE_CONSOLE_EXTEND)
+const char 		*seal_buffer = "sboot seal";
+#endif
+
 static char * delete_char (char *buffer, char *p, int *colp, int *np, int plen);
 static const char erase_seq[] = "\b \b";		/* erase sequence	*/
 static const char   tab_seq[] = "        ";		/* used to expand TABs	*/
@@ -1365,6 +1374,17 @@ static int builtin_run_command(const char *cmd, int flag)
  */
 int run_command(const char *cmd, int flag)
 {
+	/* Must extend console PCR whether or not command was interpreted
+	 * or successful. If not, executable code may be introduced using
+	 * the console history buffer.
+	 */
+#if defined(CONFIG_SBOOT) && !defined(CONFIG_SBOOT_DISABLE_CONSOLE_EXTEND)
+	/* Do not seal if command buffer is "sboot seal" */
+	if (memcmp(seal_buffer, console_buffer, 11) != 0) {
+		sboot_extend_console(cmd, strlen(cmd));
+	}
+#endif
+
 #ifndef CONFIG_SYS_HUSH_PARSER
 	/*
 	 * builtin_run_command can return 0 or 1 for success, so clean up
@@ -1439,6 +1459,15 @@ int run_command_list(const char *cmd, int len, int flag)
 		need_buff = strchr(cmd, '\n') != NULL;
 #endif
 	}
+
+	/* Must extend console PCR whether or not command was interpreted
+	 * or successful. If not, executable code may be introduced using
+	 * the console history buffer.
+	 */
+#if defined(CONFIG_SBOOT) && !defined(CONFIG_SBOOT_DISABLE_CONSOLE_EXTEND)
+	sboot_extend_console(cmd, len);
+#endif
+
 	if (need_buff) {
 		buff = malloc(len + 1);
 		if (!buff)

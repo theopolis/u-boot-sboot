@@ -11,10 +11,11 @@
  *
  * TPM Operations (Baseline Trusted Boot Components):
  *   SPL: sboot_init() -> initialize TPM, run SelfTest, enable physical presence
- *   SPL: sboot_read_uboot() -> PCR Extend for load loader
- *   UBT: sboot_read_bootoptions() -> PCR Extend for boot configuration data
+ *   SPL: sboot_read_uboot() -> PCR Extend for "firmware"
+ *   SPL: sboot_read_eeprom() -> PCR Extend for EEPROM data
+ *   UBT: sboot_read_bootoptions() -> PCR Extend for boot configuration data, may include additional EEPROM data
  *   UBT: sboot_read_kernel() -> PCR Extend for Linux kernel
- *   UBT: sboot_seal() -> Save PCR context using Skey^i to trusted store
+ *   UBT: sboot_seal() -> Save PCR context using Skey^i to untrusted store
  *   	- verify key can be used for secure storage
  *   	- create context using key and PCR values (uboot, config, kernel)
  *   	- generate symmetric encryption key (FSkey) for filesystem
@@ -25,6 +26,9 @@
  *   SPL: sboot_init() -> initialize TPM, run SelfTest, enable physical presence
  *   SPL: sboot_read_uboot() -> PCR Extend for boot loader
  *   	- read u-boot binary from mmc1
+ *   	- calculate SHA1, extend SBOOT_PCR_UBOOT
+ *   SPL: sboot_read_eeprom() -> PCR Extend for EEPROM data
+ *   	- read EEPROM (various methods)
  *   	- calculate SHA1, extend SBOOT_PCR_UBOOT
  *   UBT: sboot_read_bootoptions() -> PCR Extend for boot configuration data
  *   	- read uEnv.txt from mmc1
@@ -44,37 +48,59 @@
 #include <common.h>
 #include <tpm.h>
 
-/* From vboot */
 #include <tlcl.h>
 
 /* TSS-defined (section here) PCR locations for UBOOT and OS Kernel */
-#define SBOOT_PCR_UBOOT 0x3
-#define SBOOT_PCR_KERNEL 0x4
+#define SBOOT_PCR_UBOOT 0x1
+#define SBOOT_PCR_CHIPSET_CONFIG 0x2
+#define SBOOT_PCR_UBOOT_ENVIRONMENT 0x3
+#define SBOOT_PCR_UBOOT_CONSOLE 0x4
+#define SBOOT_PCR_UBOOT_MEMORY 0x4
+#define SBOOT_PCR_KERNEL 0x5
+
+#define SBOOT_SPL_READ_SIZE (0x1 << 15) /* 32K */
+
+/* Temporary (simple) SBOOT errors */
+#define SBOOT_SUCCESS 0x0
+#define SBOOT_TPM_ERROR 0x1
+#define SBOOT_DATA_ERROR 0x2
+
+/* SPL functions */
+/* Extend PCRs for U-boot and EEPROM */
+void spl_sboot_extend(void);
+/* Load sealed data and verify */
+void spl_sboot_check_image(void);
+
+/* U-Boot functions */
+__attribute__((unused))
+uint8_t sboot_extend_console(const char *buffer, uint32_t size);
+__attribute__((unused))
+uint8_t sboot_extend_environment(const char *buffer, uint32_t size);
 
 /* may not be exposed */
-static uint8_t sboot_seal(void);
-static uint8_t sboot_unseal(void);
+uint8_t sboot_seal(const uint8_t *key, uint32_t keySize, uint16_t nv_index);
+uint8_t sboot_unseal(const uint8_t *sealData, uint32_t sealDataSize,
+	uint8_t *unsealData, uint32_t *unsealDataSize);
 
 /* Initialization steps needed for TPM:
  * 	TlclStartup()
  * 	TlclSelfTestFull() //optional
- * 	TlclAssertPhysicalPresence() //this is implicit for SPL
  */
-static uint8_t sboot_init(void);
+uint8_t sboot_init(void);
 
-static uint8_t sboot_check(void);
+uint8_t sboot_check(uint16_t nv_index);
 
 /* Performs a TlclExtend (TPM PCR Extend) with the given 20 byte hash */
-static uint8_t sboot_extend(uint8_t pcr, const uint8_t* in_digest, uint8_t* out_digest);
+uint8_t sboot_extend(uint16_t pcr, const uint8_t* in_digest, uint8_t* out_digest);
 
-static uint8_t sboot_read_uboot(const uint8_t* in_digest);
-static uint8_t sboot_read_kernel(const uint8_t* in_digest);
-static uint8_t sboot_read_bootoptions(const uint8_t* in_digest);
+uint8_t sboot_read_uboot(const uint8_t* in_digest);
+uint8_t sboot_read_kernel(const uint8_t* in_digest);
+uint8_t sboot_read_bootoptions(const uint8_t* in_digest);
 
 /* After system is booted, lock PCRS by extending with random data. */
-static uint8_t sboot_lock_pcrs(void);
+uint8_t sboot_lock_pcrs(void);
 
 /* May turn off physical presence, may allow for a trusted boot instead of secure. */
-static uint8_t sboot_finish(void);
+uint8_t sboot_finish(void);
 
 #endif /* SBOOT_H_ */

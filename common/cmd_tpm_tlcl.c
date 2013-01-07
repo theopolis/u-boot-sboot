@@ -450,7 +450,6 @@ static int test_seal(void)
 	uint32_t pcrMap;
 	uint8_t keyAuth[20];
 	uint8_t dataAuth[20];
-	void *keyAuth2;
 
 	uint8_t pcrInfo[256];
 
@@ -643,4 +642,3 @@ U_BOOT_CMD(tpm_tlcl, 2, 1, do_tpm_tlcl, "TPM_Lite tests",
 	"\tcreatekey\n"
 #endif
 );
-

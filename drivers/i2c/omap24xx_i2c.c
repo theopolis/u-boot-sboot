@@ -322,8 +322,6 @@ probe_exit:
 
 int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len)
 {
-	int i;
-
 	if (alen > 2) {
 		printf("I2C read: addr len %d not supported\n", alen);
 		return 1;
@@ -334,12 +332,10 @@ int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len)
 		return 1;
 	}
 
-	/*for (i = 0; i < len; i++) {*/
-		if (i2c_read_byte(chip, addr + i, alen, len, buffer)) {
-			i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
-			return 1;
-		}
-	/*}*/
+	if (i2c_read_byte(chip, addr, alen, len, buffer)) {
+		i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
+		return 1;
+	}
 
 	return 0;
 }

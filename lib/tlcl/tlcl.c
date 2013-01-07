@@ -19,10 +19,7 @@
 #include "tlcl_internal.h"
 #include "tlcl_structures.h"
 
-#undef _DEBUG
-#define _DEBUG 1
-
-#ifdef EXTRA_LOGGING
+#ifdef DEBUG
 static void inline DATA_DEBUG(const char *label, const uint8_t *data, uint32_t size) {
 	uint16_t i;
 
@@ -74,7 +71,7 @@ static uint32_t TlclSendReceiveNoRetry(const uint8_t* request,
   uint32_t response_length = max_length;
   uint32_t result;
 
-#ifdef EXTRA_LOGGING
+#ifdef DEBUG
   debug("TPM: command: %x %x, %x %x %x %x, %x %x %x %x (%d)\n",
            request[0], request[1],
            request[2], request[3], request[4], request[5],
@@ -98,7 +95,7 @@ static uint32_t TlclSendReceiveNoRetry(const uint8_t* request,
    * (and possibly expected length from the response header).  See
    * crosbug.com/17017 */
 
-#ifdef EXTRA_LOGGING
+#ifdef DEBUG
   debug("TPM: response: %x %x, %x %x %x %x, %x %x %x %x (%d)\n",
            response[0], response[1],
            response[2], response[3], response[4], response[5],
@@ -119,9 +116,7 @@ static uint32_t TlclSendReceiveNoRetry(const uint8_t* request,
 uint32_t TlclSendReceive(const uint8_t* request, uint8_t* response,
                                 int max_length) {
   uint32_t result = TlclSendReceiveNoRetry(request, response, max_length);
-  /* When compiling for the firmware, hide command failures due to the self
-   * test not having run or completed. */
-#ifndef CHROMEOS_ENVIRONMENT
+
   /* If the command fails because the self test has not completed, try it
    * again after attempting to ensure that the self test has completed. */
   if (result == TPM_E_NEEDS_SELFTEST || result == TPM_E_DOING_SELFTEST) {
@@ -129,10 +124,7 @@ uint32_t TlclSendReceive(const uint8_t* request, uint8_t* response,
     if (result != TPM_SUCCESS) {
       return result;
     }
-#if defined(TPM_BLOCKING_CONTINUESELFTEST) || defined(VB_RECOVERY_MODE)
-    /* Retry only once */
-    result = TlclSendReceiveNoRetry(request, response, max_length);
-#else
+
     /* This needs serious testing.  The TPM specification says: "iii. The
      * caller MUST wait for the actions of TPM_ContinueSelfTest to complete
      * before reissuing the command C1."  But, if ContinueSelfTest is
@@ -141,9 +133,8 @@ uint32_t TlclSendReceive(const uint8_t* request, uint8_t* response,
     do {
       result = TlclSendReceiveNoRetry(request, response, max_length);
     } while (result == TPM_E_DOING_SELFTEST);
-#endif
+
   }
-#endif  /* ! defined(CHROMEOS_ENVIRONMENT) */
   return result;
 }
 

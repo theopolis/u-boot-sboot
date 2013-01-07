@@ -8,6 +8,10 @@ SOBJS	=
 
 CFLAGS += -I$(VBOOT_SOURCE)/firmware/include -I$(VBOOT_SOURCE)/firmware/arch/$(ARCH)/include
 
+ifdef CONFIG_SPL_BUILD
+COBJS-$(CONFIG_SPL_SBOOT_SUPPORT) += spl_sboot.o
+endif
+
 COBJS-$(CONFIG_SBOOT) += sboot.o
 
 COBJS	= $(COBJS-y)

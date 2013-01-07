@@ -108,8 +108,13 @@ void spl_mmc_load_image(void)
 	u32 boot_mode;
 
 	mmc_initialize(gd->bd);
-	/* We register only one device. So, the dev id is always 0 */
+	/* Boards may register multiple devices (e.g., OMAP3) */
+#ifdef CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE
+	mmc = find_mmc_device(CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE);
+#else
+	/* We 'may' register only one device. So, the dev id is always 0 */
 	mmc = find_mmc_device(0);
+#endif
 	if (!mmc) {
 		puts("spl: mmc device not found!!\n");
 		hang();

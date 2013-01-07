@@ -47,7 +47,7 @@
 /* removed */
 
 /* set to negative value for no autoboot */
-#define CONFIG_BOOTDELAY		-1
+#define CONFIG_BOOTDELAY		0
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"loadaddr=0x80200000\0" \
 	"fdtaddr=0x80F80000\0" \
@@ -175,6 +175,7 @@
 #define CONFIG_ENV_EEPROM_IS_ON_I2C
 #define CONFIG_SYS_I2C_EEPROM_ADDR	0x50	/* Main EEPROM */
 #define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	2
+#define CONFIG_SYS_I2C_EEPROM_SIZE (0x1 << 15) /* 32K */
 #define CONFIG_SYS_I2C_MULTI_EEPROMS
 
 #define CONFIG_OMAP_GPIO
@@ -204,6 +205,7 @@
 
 #define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	0x300 /* address 0x60000 */
 #define CONFIG_SYS_U_BOOT_MAX_SIZE_SECTORS	0x200 /* 256 KB */
+#define CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE 		1 /* Added for Sboot */
 #define CONFIG_SYS_MMC_SD_FAT_BOOT_PARTITION	1
 #define CONFIG_SPL_FAT_LOAD_PAYLOAD_NAME	"u-boot.img"
 #define CONFIG_SPL_MMC_SUPPORT
@@ -258,7 +260,9 @@
 /* Atmel I2C TPM, libtlcl, and sboot */
 #ifdef CONFIG_ATMEL_TPM
 #define EXTRA_LOGGING /* for TLCL */
+#define DEBUG
 #define CONFIG_TPM /* builds libtlcl */
+#define CONFIG_TLCL_SEAL /* required by SBOOT */
 #define CONFIG_SPL_TPM_SUPPORT
 
 #define CONFIG_CMD_TPM
@@ -267,9 +271,17 @@
 #define CONFIG_TPM_I2C_BUS 1
 #define CONFIG_TPM_I2C_ADDR 0x29
 
-#define CONFIG_TLCL_SEAL /* required by SBOOT */
 #define CONFIG_SBOOT
+/* #define CONFIG_SBOOT_DISABLE_CONSOLE_EXTEND */
+/* #define CONFIG_SBOOT_DISABLE_ENV_EXTEND */
+#define CONFIG_CMD_SBOOT
 #define CONFIG_SPL_SBOOT_SUPPORT
+#define CONFIG_SBOOT_UBOOT_SEAL_INDEX 0xd000
+#define CONFIG_SBOOT_IMAGE_SEAL_INDEX (0xd000 + 268)
+/* unused */
+#define CONFIG_SPL_SBOOT_UBOOT_SEAL_PAYLOAD "u-boot.img.seal"
+#define CONFIG_SPL_SBOOT_UBOOT_BACKUP_PAYLOAD "u-boot.img"
+/* end unused */
 #endif
 
 #endif	/* ! __CONFIG_AM335X_EVM_H */
