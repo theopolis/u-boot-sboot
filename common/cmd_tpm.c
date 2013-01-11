@@ -131,8 +131,8 @@ static int do_tpm_many(cmd_tbl_t *cmdtp, int flag,
 	}
 
 	if (tis_open()) {
-		puts("tis_open() failed!\n");
-		return -1;
+		/* puts("tis_open() failed!\n");
+		return -1; */
 	}
 
 	rv = tpm_process(argc - 1, argv + 1, cmdtp);

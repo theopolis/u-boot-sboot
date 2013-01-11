@@ -47,7 +47,7 @@
 /* removed */
 
 /* set to negative value for no autoboot */
-#define CONFIG_BOOTDELAY		0
+#define CONFIG_BOOTDELAY		-1
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"loadaddr=0x80200000\0" \
 	"fdtaddr=0x80F80000\0" \
@@ -205,7 +205,7 @@
 
 #define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	0x300 /* address 0x60000 */
 #define CONFIG_SYS_U_BOOT_MAX_SIZE_SECTORS	0x200 /* 256 KB */
-#define CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE 		1 /* Added for Sboot */
+#define CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE 		0 /* Added for Sboot */
 #define CONFIG_SYS_MMC_SD_FAT_BOOT_PARTITION	1
 #define CONFIG_SPL_FAT_LOAD_PAYLOAD_NAME	"u-boot.img"
 #define CONFIG_SPL_MMC_SUPPORT
@@ -272,10 +272,12 @@
 #define CONFIG_TPM_I2C_ADDR 0x29
 
 #define CONFIG_SBOOT
+/* #define CONFIG_SBOOT_ENFORCE */
 /* #define CONFIG_SBOOT_DISABLE_CONSOLE_EXTEND */
 /* #define CONFIG_SBOOT_DISABLE_ENV_EXTEND */
 #define CONFIG_CMD_SBOOT
 #define CONFIG_SPL_SBOOT_SUPPORT
+/* #define CONFIG_SPL_SBOOT_ENFORCE */
 #define CONFIG_SBOOT_UBOOT_SEAL_INDEX 0xd000
 #define CONFIG_SBOOT_IMAGE_SEAL_INDEX (0xd000 + 268)
 /* unused */

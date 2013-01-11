@@ -144,7 +144,7 @@ uint32_t TlclSeal(uint32_t keyHandle,
 		printf("blob size: %d\n", size);
 		FromTpmUint32(response + kTpmResponseHeaderLength + TPM_U32_SIZE, &sealInfoSize);
 		printf("seal info size: %d\n", sealInfoSize);
-		FromTpmUint32(response + kTpmResponseHeaderLength + TPM_U32_SIZE + TPM_U32_SIZE, &encDataSize);
+		FromTpmUint32(response + kTpmResponseHeaderLength + TPM_U32_SIZE + TPM_U32_SIZE + sealInfoSize, &encDataSize);
 		printf("enc data size: %d\n", encDataSize);
 		storedSize = TPM_U32_SIZE * 3 + sealInfoSize + encDataSize;
 		printf("stored size: %d\n", storedSize);

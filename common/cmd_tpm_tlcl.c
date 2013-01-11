@@ -51,7 +51,7 @@ static int test_early_extend(void)
 	uint8_t value_out[20];
 	printf("Testing earlyextend ...");
 	TlclLibInit();
-	TPM_CHECK(TlclStartup());
+	TlclStartup();
 	TPM_CHECK(TlclContinueSelfTest());
 	TPM_CHECK(TlclExtend(1, value_in, value_out));
 	printf("done\n");
@@ -63,7 +63,7 @@ static int test_early_nvram(void)
 	uint32_t x;
 	printf("Testing earlynvram ...");
 	TlclLibInit();
-	TPM_CHECK(TlclStartup());
+	TlclStartup();
 	TPM_CHECK(TlclContinueSelfTest());
 	TPM_CHECK(TlclAssertPhysicalPresence());
 	TPM_CHECK(TlclRead(INDEX0, (uint8_t*) &x, sizeof(x)));
@@ -443,7 +443,7 @@ static int test_write_limit(void)
 
 #ifdef CONFIG_TLCL_SEAL
 /* added for Seal/Unseal tests */
-static int test_seal(void)
+static int test_test_seal(void)
 {
 	uint32_t result;
 	uint32_t keyHandle;
@@ -568,7 +568,7 @@ VOIDTEST(startup)
 VOIDTEST(timing)
 VOIDTEST(write_limit)
 #ifdef CONFIG_TLCL_SEAL
-VOIDTEST(seal)
+VOIDTEST(test_seal)
 #endif
 VOIDTEST(reset)
 #ifdef CONFIG_TLCL_KEYS
@@ -591,7 +591,7 @@ static cmd_tbl_t cmd_tpm_tlcl_sub[] = {
 	VOIDENT(timing),
 	VOIDENT(write_limit),
 #ifdef CONFIG_TLCL_SEAL
-	VOIDENT(seal),
+	VOIDENT(test_seal),
 #endif
 	VOIDENT(reset),
 #ifdef CONFIG_TLCL_KEYS
@@ -635,7 +635,7 @@ U_BOOT_CMD(tpm_tlcl, 2, 1, do_tpm_tlcl, "TPM_Lite tests",
 	"\ttiming\n"
 	"\twrite_limit\n"
 #ifdef CONFIG_TLCL_SEAL
-	"\tseal\n"
+	"\ttest_seal\n"
 #endif
 	"\treset\n"
 #ifdef CONFIG_TLCL_KEYS

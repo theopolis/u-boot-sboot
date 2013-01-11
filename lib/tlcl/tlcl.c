@@ -199,13 +199,13 @@ uint32_t TlclDefineSpace(uint32_t index, uint32_t perm, uint32_t size) {
 
 uint32_t TlclWrite(uint32_t index, const void* data, uint32_t length) {
   struct s_tpm_nv_write_cmd cmd;
-  uint8_t response[TPM_LARGE_ENOUGH_COMMAND_SIZE];
+  uint8_t response[TPM_MAX_COMMAND_SIZE];
   const int total_length =
     kTpmRequestHeaderLength + kWriteInfoLength + length;
 
   debug("TPM: TlclWrite(0x%x, %d)\n", index, length);
   memcpy(&cmd, &tpm_nv_write_cmd, sizeof(cmd));
-  assert(total_length <= TPM_LARGE_ENOUGH_COMMAND_SIZE);
+  assert(total_length <= TPM_MAX_COMMAND_SIZE);
   SetTpmCommandSize(cmd.buffer, total_length);
 
   ToTpmUint32(cmd.buffer + tpm_nv_write_cmd.index, index);
@@ -217,7 +217,7 @@ uint32_t TlclWrite(uint32_t index, const void* data, uint32_t length) {
 
 uint32_t TlclRead(uint32_t index, void* data, uint32_t length) {
   struct s_tpm_nv_read_cmd cmd;
-  uint8_t response[TPM_LARGE_ENOUGH_COMMAND_SIZE];
+  uint8_t response[TPM_MAX_COMMAND_SIZE];
   uint32_t result_length;
   uint32_t result;
 
@@ -474,8 +474,6 @@ uint32_t TlclGetRandom(uint8_t* data, uint32_t length, uint32_t *size) {
 
   return result;
 }
-
-
 
 uint32_t TlclGetCapability(uint32_t capability,
 	uint8_t *subCap, uint32_t subCapSize,

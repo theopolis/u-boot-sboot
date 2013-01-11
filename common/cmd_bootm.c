@@ -62,6 +62,10 @@
 #include <linux/lzo.h>
 #endif /* CONFIG_LZO */
 
+#ifdef CONFIG_SBOOT
+#include <sboot.h>
+#endif
+
 DECLARE_GLOBAL_DATA_PTR;
 
 #ifndef CONFIG_SYS_BOOTM_LEN
@@ -674,6 +678,25 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			return 1;
 		}
 	}
+
+#ifdef CONFIG_SBOOT
+	/* The SBOOT seal command was issued, bootm should now seal state. */
+	if (getenv("sbootseal") != NULL) {
+		sboot_seal_default();
+	}
+
+	/* Verify (default=enable) sealed blob. */
+	if (sboot_check_default() != SBOOT_SUCCESS) {
+		puts("sboot: Failed to verify state.\n");
+		sboot_finish();
+
+		/* If SBOOT is enforced, then a failure to unseal will hang the device. */
+#ifdef CONFIG_SBOOT_ENFORCE
+		sboot_finish();
+		hang();
+#endif
+	}
+#endif /* CONFIG_SBOOT */
 
 	lmb_reserve(&images.lmb, images.os.load, (load_end - images.os.load));
 

@@ -52,6 +52,7 @@
 #define TPM_NV_INDEX_LOCK ((uint32_t)0xffffffff)
 #define TPM_NV_PER_GLOBALLOCK (((uint32_t)1)<<15)
 #define TPM_NV_PER_PPWRITE (((uint32_t)1)<<0)
+#define TPM_NV_PER_PPREAD (((uint32_t)1)<<16)
 #define TPM_NV_PER_READ_STCLEAR (((uint32_t)1)<<31)
 #define TPM_NV_PER_WRITE_STCLEAR (((uint32_t)1)<<14)
 

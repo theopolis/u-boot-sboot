@@ -65,6 +65,10 @@
 #define SBOOT_TPM_ERROR 0x1
 #define SBOOT_DATA_ERROR 0x2
 
+#define SBOOT_SEAL_WELL_KNOWN_KEY 		0x10
+#define SBOOT_NV_INDEX_SEAL_OS			0xd000
+#define SBOOT_NV_INDEX_SEAL_UBOOT		0xe000
+
 /* SPL functions */
 /* Extend PCRs for U-boot and EEPROM */
 void spl_sboot_extend(void);
@@ -77,8 +81,19 @@ uint8_t sboot_extend_console(const char *buffer, uint32_t size);
 __attribute__((unused))
 uint8_t sboot_extend_environment(const char *buffer, uint32_t size);
 
-/* may not be exposed */
-uint8_t sboot_seal(const uint8_t *key, uint32_t keySize, uint16_t nv_index);
+/* Seal toggle will set an environment variable that bootm checks.
+ * If this variable is still set when bootm is executed, it will
+ * run sboot_seal_default(void); which is a simple wrapper for sboot_seal
+ * with a well-known key value and configured nv_index as SBOOT_NV_INDEX_SEAL_OS.
+ */
+__attribute__((unused))
+uint8_t sboot_seal_toggle(void);
+__attribute__((unused))
+uint8_t sboot_seal_default(void);
+__attribute__((unused))
+uint8_t sboot_seal_uboot(void);
+uint8_t sboot_seal(const uint8_t *key, uint32_t keySize,
+	uint32_t pcrMap, uint16_t nv_index);
 uint8_t sboot_unseal(const uint8_t *sealData, uint32_t sealDataSize,
 	uint8_t *unsealData, uint32_t *unsealDataSize);
 
@@ -86,8 +101,11 @@ uint8_t sboot_unseal(const uint8_t *sealData, uint32_t sealDataSize,
  * 	TlclStartup()
  * 	TlclSelfTestFull() //optional
  */
+__attribute__((unused))
 uint8_t sboot_init(void);
 
+__attribute__((unused))
+uint8_t sboot_check_default(void);
 uint8_t sboot_check(uint16_t nv_index);
 
 /* Performs a TlclExtend (TPM PCR Extend) with the given 20 byte hash */
@@ -98,9 +116,11 @@ uint8_t sboot_read_kernel(const uint8_t* in_digest);
 uint8_t sboot_read_bootoptions(const uint8_t* in_digest);
 
 /* After system is booted, lock PCRS by extending with random data. */
+__attribute__((unused))
 uint8_t sboot_lock_pcrs(void);
 
 /* May turn off physical presence, may allow for a trusted boot instead of secure. */
+__attribute__((unused))
 uint8_t sboot_finish(void);
 
 #endif /* SBOOT_H_ */

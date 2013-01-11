@@ -70,7 +70,9 @@ char        console_buffer[CONFIG_SYS_CBSIZE + 1];	/* console I/O buffer	*/
  *   2. Always measure the SBOOT seal command before booting.
  */
 #if defined(CONFIG_SBOOT) && !defined(CONFIG_SBOOT_DISABLE_CONSOLE_EXTEND)
-const char 		*seal_buffer = "sboot seal";
+const char 		seal_buffer[CONFIG_SYS_CBSIZE] = {
+	's', 'b', 'o', 'o', 't', ' ', 's', 'e', 'a', 'l', '\0'
+};
 #endif
 
 static char * delete_char (char *buffer, char *p, int *colp, int *np, int plen);
@@ -926,13 +928,26 @@ static int cread_line(const char *const prompt, char *buf, unsigned int *len,
  */
 int readline (const char *const prompt)
 {
+	int result;
 	/*
 	 * If console_buffer isn't 0-length the user will be prompted to modify
 	 * it instead of entering it from scratch as desired.
 	 */
 	console_buffer[0] = '\0';
 
-	return readline_into_buffer(prompt, console_buffer, 0);
+	result = readline_into_buffer(prompt, console_buffer, 0);
+
+	/* Must extend console PCR whether or not command was interpreted
+	 * or successful. If not, executable code may be introduced using
+	 * the console history buffer.
+	 */
+#if defined(CONFIG_SBOOT) && !defined(CONFIG_SBOOT_DISABLE_CONSOLE_EXTEND)
+	/* Do not seal if command buffer is "sboot seal" */
+	if (memcmp(seal_buffer, console_buffer, CONFIG_SYS_CBSIZE) != 0) {
+		sboot_extend_console(console_buffer, CONFIG_SYS_CBSIZE);
+	}
+#endif
+	return result;
 }
 
 

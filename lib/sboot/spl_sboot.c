@@ -27,15 +27,16 @@ void spl_sboot_extend(void)
 #if defined(CONFIG_SPL_MMC_SUPPORT) && defined(CONFIG_SPL_FAT_SUPPORT)
 	for (i = 0; i * SBOOT_SPL_READ_SIZE < spl_image.size; ++i) {
 		/* Consistent memory before read, take care of a short read */
-		memset(image_buffer, 0, SBOOT_SPL_READ_SIZE);
+		/* memset(image_buffer, 0, SBOOT_SPL_READ_SIZE); */
 		/* filename, start_at, buffer, max_size */
-		result = file_fat_read_at(CONFIG_SPL_FAT_LOAD_PAYLOAD_NAME,
+		/* result = file_fat_read_at(CONFIG_SPL_FAT_LOAD_PAYLOAD_NAME,
 				i * SBOOT_SPL_READ_SIZE, image_buffer, SBOOT_SPL_READ_SIZE);
 		if (result != 0) {
 			puts("SPL: (sboot) error while reading image\n");
 			return;
-		}
-		sha1_update(&ctx, image_buffer, SBOOT_SPL_READ_SIZE);
+		} */
+		debug ("SPL: (sboot) hashing U-BOOT (len=%d)\n", SBOOT_SPL_READ_SIZE);
+		sha1_update(&ctx, (unsigned char *) spl_image.load_addr + (i * SBOOT_SPL_READ_SIZE), SBOOT_SPL_READ_SIZE);
 	}
 #endif
 	sha1_finish(&ctx, csum);
@@ -77,8 +78,14 @@ void spl_sboot_check_image(void)
 	return;
 #endif
 
-	result = sboot_check(CONFIG_SBOOT_UBOOT_SEAL_INDEX);
+	result = sboot_check(SBOOT_NV_INDEX_SEAL_UBOOT);
 	if (result != SBOOT_SUCCESS) {
-		puts("SPL: failed to unseal UBOOT\n");
+		puts("SPL: failed to unseal UBOOT.\n");
+
+		/* If SBOOT is enforced, then a failure to unseal will hang the device. */
+#ifdef CONFIG_SPL_SBOOT_ENFORCE
+		sboot_finish();
+		hang();
+#endif
 	}
 }

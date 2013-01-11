@@ -9,14 +9,26 @@
 
 #include <sha1.h>
 
-static int test_sboot_seal(void)
+static int test_seal(void)
 {
 	uint8_t result;
 
-	uint8_t key[20];
+	/* First we seal the currently running U-Boot */
+	printf("SBOOT: Sealing U-Boot.\n");
+	result = sboot_seal_uboot();
+	if (result != SBOOT_SUCCESS) {
+		printf("SBOOT: Failed to seal U-boot.\n");
+		return -1;
+	}
 
-	memset(key, 0x10, 20);
-	result = sboot_seal(key, 20, 0xd000);
+	/* Then we tell bootm to seal the os, initrd, external environment, and dtb.
+	 * The user (and U-Boot) may continue to execute console commands and edit the
+	 * environment. All changes will be measured and sealed when bootm runs.
+	 *
+	 * To abort the seal, reset the device or unset the environment variable 'sbootseal'.
+	 */
+	printf("SBOOT: When bootm next runs, it will attempt to seal the current state.\n");
+	sboot_seal_toggle();
 
 	return 0;
 }
@@ -36,11 +48,11 @@ static int test_sboot_seal(void)
 #define VOIDENT(XNAME) \
   U_BOOT_CMD_MKENT(XNAME, 0, 1, do_test_##XNAME, "", "")
 
-VOIDTEST(sboot_seal)
+VOIDTEST(seal)
 
 
 static cmd_tbl_t cmd_sboot_sub[] = {
-	VOIDENT(sboot_seal),
+	VOIDENT(seal),
 };
 
 /* u-boot shell commands
