@@ -25,6 +25,7 @@ uint32_t Send(const uint8_t* command);
 
 /* Call this first.  Returns 0 if success, nonzero if error.
  */
+__attribute__((unused))
 uint32_t TlclLibInit(void);
 
 /* Call this on shutdown.  Returns 0 if success, nonzero if error.

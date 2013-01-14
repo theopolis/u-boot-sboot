@@ -3,9 +3,9 @@
  */
 
 #include <common.h>
+#include <image.h>
 #include <spl.h>
 #include <sha1.h>
-#include <fat.h>
 #include <i2c.h>
 
 #include <sboot.h>
@@ -13,8 +13,6 @@
 /* spl_image defined in spl.c */
 void spl_sboot_extend(void)
 {
-	uint32_t result;
-
 	uint8_t csum[20];
 	uint8_t out_digest[20];
 
@@ -25,31 +23,25 @@ void spl_sboot_extend(void)
 	sha1_starts(&ctx);
 	/* Only support MMC/FAT */
 #if defined(CONFIG_SPL_MMC_SUPPORT) && defined(CONFIG_SPL_FAT_SUPPORT)
-	for (i = 0; i * SBOOT_SPL_READ_SIZE < spl_image.size; ++i) {
-		/* Consistent memory before read, take care of a short read */
-		/* memset(image_buffer, 0, SBOOT_SPL_READ_SIZE); */
-		/* filename, start_at, buffer, max_size */
-		/* result = file_fat_read_at(CONFIG_SPL_FAT_LOAD_PAYLOAD_NAME,
-				i * SBOOT_SPL_READ_SIZE, image_buffer, SBOOT_SPL_READ_SIZE);
-		if (result != 0) {
-			puts("SPL: (sboot) error while reading image\n");
-			return;
-		} */
-		debug ("SPL: (sboot) hashing U-BOOT (len=%d)\n", SBOOT_SPL_READ_SIZE);
-		sha1_update(&ctx, (unsigned char *) spl_image.load_addr + (i * SBOOT_SPL_READ_SIZE), SBOOT_SPL_READ_SIZE);
-	}
+	/* Todo: add a configuration option to limit the memory read length.
+	 * This will allow us to SHA1 in blocks.
+	 * Todo: add a configuration option to use the TPM's SHA1 for extreme
+	 * memory contention scenarios. */
+	sha1_update(&ctx, (unsigned char *) spl_image.load_addr, spl_image.size);
+#else
+#warning "Warning: sboot does not support the U-Boot storage configuration."
 #endif
 	sha1_finish(&ctx, csum);
 
-	result = sboot_extend(SBOOT_PCR_UBOOT, csum, out_digest);
-	if (result != TPM_SUCCESS) {
-		puts("SPL: (sboot) error while extending UBOOT PCR\n");
+	if (sboot_extend(SBOOT_PCR_UBOOT, csum, out_digest) != SBOOT_SUCCESS) {
+		puts("SPL: (sboot) error while measuring U-Boot\n");
 		return;
 	}
 
 	sha1_starts(&ctx);
 	/* Extend EEPROM, support I2C only */
 #ifdef CONFIG_ENV_EEPROM_IS_ON_I2C
+	/*
 	for (i = 0; i * SBOOT_SPL_READ_SIZE < CONFIG_SYS_I2C_EEPROM_SIZE; ++i) {
 		memset(image_buffer, 0, SBOOT_SPL_READ_SIZE);
 		if (i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0, CONFIG_SYS_I2C_EEPROM_ADDR_LEN,
@@ -58,34 +50,35 @@ void spl_sboot_extend(void)
 			return;
 		}
 		sha1_update(&ctx, image_buffer, SBOOT_SPL_READ_SIZE);
-	}
+	}*/
+	debug("SPL: (sboot) measuring EEPROM\n");
+	i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0, CONFIG_SYS_I2C_EEPROM_ADDR_LEN, image_buffer, CONFIG_SYS_I2C_EEPROM_SIZE);
+	sha1_update(&ctx, image_buffer, CONFIG_SYS_I2C_EEPROM_SIZE);
+	debug("SPL: (sboot) finished\n");
+#else
+#warning "Warning: sboot does not support the ENV storage configuration."
 #endif
 	sha1_finish(&ctx, csum);
 
-	result = sboot_extend(SBOOT_PCR_CHIPSET_CONFIG, csum, out_digest);
-	if (result != TPM_SUCCESS) {
-		puts("SPL: (sboot) error while extending CHIPSET CONFIG PCR\n");
+	if (sboot_extend(SBOOT_PCR_CHIPSET_CONFIG, csum, out_digest) != SBOOT_SUCCESS) {
+		puts("SPL: (sboot) error while measuring chipset config\n");
 		return;
 	}
 }
 
-void spl_sboot_check_image(void)
+void spl_sboot_check(void)
 {
-	uint8_t result;
-
 #ifndef CONFIG_SBOOT_UBOOT_SEAL_INDEX
-	puts("SPL: no uboot seal index defined\n");
-	return;
+	puts("SPL: (sboot) no U-boot seal index defined\n");
+	hang();
 #endif
 
-	result = sboot_check(SBOOT_NV_INDEX_SEAL_UBOOT);
-	if (result != SBOOT_SUCCESS) {
-		puts("SPL: failed to unseal UBOOT.\n");
-
-		/* If SBOOT is enforced, then a failure to unseal will hang the device. */
-#ifdef CONFIG_SPL_SBOOT_ENFORCE
-		sboot_finish();
-		hang();
-#endif
+	puts("SPL: (Sboot) measuring U-Boot ... ");
+	if (sboot_check(SBOOT_NV_INDEX_SEAL_UBOOT) != SBOOT_SUCCESS) {
+		/* If CONFIG_SBOOT_ENFORCE is enabled the system is already hung. */
+		puts("Failed\n");
+		return;
 	}
+
+	puts("OK\n");
 }

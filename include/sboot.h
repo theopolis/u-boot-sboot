@@ -51,6 +51,10 @@
 #include <tlcl.h>
 
 /* TSS-defined (section here) PCR locations for UBOOT and OS Kernel */
+/* Todo: this should be represented as a linked list, this will ease iteration
+ * and allow developers to easily add data for measurement (other than static
+ * defines of PCR values).
+ */
 #define SBOOT_PCR_UBOOT 0x1
 #define SBOOT_PCR_CHIPSET_CONFIG 0x2
 #define SBOOT_PCR_UBOOT_ENVIRONMENT 0x3
@@ -73,7 +77,7 @@
 /* Extend PCRs for U-boot and EEPROM */
 void spl_sboot_extend(void);
 /* Load sealed data and verify */
-void spl_sboot_check_image(void);
+void spl_sboot_check(void);
 
 /* U-Boot functions */
 __attribute__((unused))
@@ -83,13 +87,13 @@ uint8_t sboot_extend_environment(const char *buffer, uint32_t size);
 
 /* Seal toggle will set an environment variable that bootm checks.
  * If this variable is still set when bootm is executed, it will
- * run sboot_seal_default(void); which is a simple wrapper for sboot_seal
+ * run sboot_seal_os(void); which is a simple wrapper for sboot_seal
  * with a well-known key value and configured nv_index as SBOOT_NV_INDEX_SEAL_OS.
  */
 __attribute__((unused))
 uint8_t sboot_seal_toggle(void);
 __attribute__((unused))
-uint8_t sboot_seal_default(void);
+uint8_t sboot_seal_os(void);
 __attribute__((unused))
 uint8_t sboot_seal_uboot(void);
 uint8_t sboot_seal(const uint8_t *key, uint32_t keySize,
@@ -105,7 +109,7 @@ __attribute__((unused))
 uint8_t sboot_init(void);
 
 __attribute__((unused))
-uint8_t sboot_check_default(void);
+uint8_t sboot_check_os(void);
 uint8_t sboot_check(uint16_t nv_index);
 
 /* Performs a TlclExtend (TPM PCR Extend) with the given 20 byte hash */
@@ -118,8 +122,6 @@ uint8_t sboot_read_bootoptions(const uint8_t* in_digest);
 /* After system is booted, lock PCRS by extending with random data. */
 __attribute__((unused))
 uint8_t sboot_lock_pcrs(void);
-
-/* May turn off physical presence, may allow for a trusted boot instead of secure. */
 __attribute__((unused))
 uint8_t sboot_finish(void);
 

@@ -173,9 +173,9 @@
 #define CONFIG_DRIVER_OMAP24XX_I2C
 #define CONFIG_CMD_EEPROM
 #define CONFIG_ENV_EEPROM_IS_ON_I2C
-#define CONFIG_SYS_I2C_EEPROM_ADDR	0x50	/* Main EEPROM */
+#define CONFIG_SYS_I2C_EEPROM_ADDR		0x50 /* Main EEPROM */
 #define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	2
-#define CONFIG_SYS_I2C_EEPROM_SIZE (0x1 << 15) /* 32K */
+#define CONFIG_SYS_I2C_EEPROM_SIZE 		66 /* 32K total */
 #define CONFIG_SYS_I2C_MULTI_EEPROMS
 
 #define CONFIG_OMAP_GPIO
@@ -259,9 +259,9 @@
 
 /* Atmel I2C TPM, libtlcl, and sboot */
 #ifdef CONFIG_ATMEL_TPM
-#define EXTRA_LOGGING /* for TLCL */
-#define DEBUG
+/* #define DEBUG */
 #define CONFIG_TPM /* builds libtlcl */
+/* #define CONFIG_TLCL_DEBUG */
 #define CONFIG_TLCL_SEAL /* required by SBOOT */
 #define CONFIG_SPL_TPM_SUPPORT
 
@@ -277,13 +277,8 @@
 /* #define CONFIG_SBOOT_DISABLE_ENV_EXTEND */
 #define CONFIG_CMD_SBOOT
 #define CONFIG_SPL_SBOOT_SUPPORT
-/* #define CONFIG_SPL_SBOOT_ENFORCE */
 #define CONFIG_SBOOT_UBOOT_SEAL_INDEX 0xd000
 #define CONFIG_SBOOT_IMAGE_SEAL_INDEX (0xd000 + 268)
-/* unused */
-#define CONFIG_SPL_SBOOT_UBOOT_SEAL_PAYLOAD "u-boot.img.seal"
-#define CONFIG_SPL_SBOOT_UBOOT_BACKUP_PAYLOAD "u-boot.img"
-/* end unused */
 #endif
 
 #endif	/* ! __CONFIG_AM335X_EVM_H */

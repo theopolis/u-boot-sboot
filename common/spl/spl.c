@@ -213,16 +213,16 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
 
 #ifdef CONFIG_SPL_SBOOT_SUPPORT
 #if !defined(CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE) || CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE == 0
-#warning "Warning: CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE may not be configured or may \
-	configured as the same device as the SPL image. If implementing a trusted \
-	or secured boot (with SBOOT) your SRTM (SPL) should be read from write \
-	protected storage."
+#warning "CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE may not be configured or may \
+ configured as the same device as the SPL image. If implementing a trusted \
+ or secured boot (with SBOOT) your SRTM (SPL) should be read from write \
+ protected storage."
 #endif
 	sboot_init();
 	spl_sboot_extend();
 
 	/* Assumes IH_OS_U_BOOT */
-	spl_sboot_check_image();
+	spl_sboot_check();
 #endif
 
 	switch (spl_image.os) {

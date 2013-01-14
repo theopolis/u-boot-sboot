@@ -14,11 +14,11 @@ static int test_seal(void)
 	uint8_t result;
 
 	/* First we seal the currently running U-Boot */
-	printf("SBOOT: Sealing U-Boot.\n");
+	printf("sboot: Sealing U-Boot\n");
 	result = sboot_seal_uboot();
 	if (result != SBOOT_SUCCESS) {
-		printf("SBOOT: Failed to seal U-boot.\n");
-		return -1;
+		printf("sboot: Failed to seal U-Boot\n");
+		return 0;
 	}
 
 	/* Then we tell bootm to seal the os, initrd, external environment, and dtb.
@@ -27,7 +27,7 @@ static int test_seal(void)
 	 *
 	 * To abort the seal, reset the device or unset the environment variable 'sbootseal'.
 	 */
-	printf("SBOOT: When bootm next runs, it will attempt to seal the current state.\n");
+	puts("sboot: When bootm next runs, it will seal the boot state\n");
 	sboot_seal_toggle();
 
 	return 0;
@@ -75,7 +75,6 @@ static int do_sboot(cmd_tbl_t * cmdtp, int flag, int argc,
 	return c ? c->cmd(cmdtp, flag, argc, argv) : cmd_usage(cmdtp);
 }
 
-U_BOOT_CMD(sboot, 2, 1, do_sboot, "SBOOT tests",
+U_BOOT_CMD(sboot, 2, 1, do_sboot, "sboot commands",
 	"\n\tseal\n"
 );
-
