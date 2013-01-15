@@ -1,0 +1,6 @@
+_u_boot_list__start = .;
+_u_boot_list_cmd__start = .;
+*(SORT(.u_boot_list.cmd.*));
+_u_boot_list_cmd__end = .;
+*(SORT(.u_boot_list.*));
+_u_boot_list__end = .;

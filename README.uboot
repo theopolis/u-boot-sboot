@@ -1,8 +1,29 @@
-ATMEL's AT97SC3204T I2C TPM -- U-boot support
+#
+# (C) Copyright 2000 - 2012
+# Wolfgang Denk, DENX Software Engineering, wd@denx.de.
+#
+# See file CREDITS for list of people who contributed to this
+# project.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of
+# the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+# MA 02111-1307 USA
+#
 
-Note: This only includes a board config for the BeagleBone: am335x_evm_tpm
+Summary:
+========
 
-<<<<<<< HEAD
 This directory contains the source code for U-Boot, a boot loader for
 Embedded boards based on PowerPC, ARM, MIPS and several other
 processors, which can be installed in a boot ROM and used to
@@ -32,11 +53,6 @@ Makefile have been tested to some extent and can be considered
 In case of problems see the CHANGELOG and CREDITS files to find out
 who contributed the specific port. The MAINTAINERS file lists board
 maintainers.
-
-Note: There is no CHANGELOG file in the actual U-Boot source tree;
-it can be created dynamically from the Git log using:
-
-	make CHANGELOG
 
 
 Where to get help:
@@ -595,14 +611,6 @@ The following options need to be configured:
 		boot loader that has already initialized the UART.  Define this
 		variable to flush the UART at init time.
 
-		CONFIG_SYS_NS16550_BROKEN_TEMT
-
-		16550 UART set the Transmitter Empty (TEMT) Bit when all output
-		has finished and the transmitter is totally empty. U-Boot waits
-		for this bit to be set to initialize the serial console. On some
-		broken platforms this bit is not set in SPL making U-Boot to
-		hang while waiting for TEMT. Define this option to avoid it.
-
 
 - Console Interface:
 		Depending on board, define exactly one serial port
@@ -802,8 +810,6 @@ The following options need to be configured:
 		CONFIG_CMD_EDITENV	  edit env variable
 		CONFIG_CMD_EEPROM	* EEPROM read/write support
 		CONFIG_CMD_ELF		* bootelf, bootvx
-		CONFIG_CMD_ENV_CALLBACK	* display details about env callbacks
-		CONFIG_CMD_ENV_FLAGS	* display details about env flags
 		CONFIG_CMD_EXPORTENV	* export the environment
 		CONFIG_CMD_EXT2		* ext2 command support
 		CONFIG_CMD_EXT4		* ext4 command support
@@ -813,10 +819,8 @@ The following options need to be configured:
 		CONFIG_CMD_FDOS		* Dos diskette Support
 		CONFIG_CMD_FLASH	  flinfo, erase, protect
 		CONFIG_CMD_FPGA		  FPGA device initialization support
-		CONFIG_CMD_GETTIME	* Get time since boot
 		CONFIG_CMD_GO		* the 'go' command (exec code)
 		CONFIG_CMD_GREPENV	* search environment
-		CONFIG_CMD_HASH		* calculate hash / digest
 		CONFIG_CMD_HWFLOW	* RTS/CTS hw flow control
 		CONFIG_CMD_I2C		* I2C serial bus support
 		CONFIG_CMD_IDE		* IDE harddisk support
@@ -836,7 +840,6 @@ The following options need to be configured:
 		CONFIG_CMD_LOADS	  loads
 		CONFIG_CMD_MD5SUM	  print md5 message digest
 					  (requires CONFIG_CMD_MEMORY and CONFIG_MD5)
-		CONFIG_CMD_MEMINFO	* Display detailed memory information
 		CONFIG_CMD_MEMORY	  md, mm, nm, mw, cp, cmp, crc, base,
 					  loop, loopw, mtest
 		CONFIG_CMD_MISC		  Misc functions like sleep etc
@@ -852,7 +855,6 @@ The following options need to be configured:
 		CONFIG_CMD_PING		* send ICMP ECHO_REQUEST to network
 					  host
 		CONFIG_CMD_PORTIO	* Port I/O
-		CONFIG_CMD_READ		* Read raw data from partition
 		CONFIG_CMD_REGINFO	* Register dump
 		CONFIG_CMD_RUN		  run command in env variable
 		CONFIG_CMD_SAVES	* save S record dump
@@ -1407,13 +1409,6 @@ CBFS (Coreboot Filesystem) support
 		boot.  See the documentation file README.video for a
 		description of this variable.
 
-		CONFIG_VIDEO_VGA
-
-		Enable the VGA video / BIOS for x86. The alternative if you
-		are using coreboot is to use the coreboot frame buffer
-		driver.
-
-
 - Keyboard Support:
 		CONFIG_KEYBOARD
 
@@ -1474,29 +1469,10 @@ CBFS (Coreboot Filesystem) support
 		Normally display is black on white background; define
 		CONFIG_SYS_WHITE_ON_BLACK to get it inverted.
 
-		CONFIG_LCD_ALIGNMENT
-
-		Normally the LCD is page-aligned (tyically 4KB). If this is
-		defined then the LCD will be aligned to this value instead.
-		For ARM it is sometimes useful to use MMU_SECTION_SIZE
-		here, since it is cheaper to change data cache settings on
-		a per-section basis.
-
-		CONFIG_CONSOLE_SCROLL_LINES
-
-		When the console need to be scrolled, this is the number of
-		lines to scroll by. It defaults to 1. Increasing this makes
-		the console jump but can help speed up operation when scrolling
-		is slow.
-
 		CONFIG_LCD_BMP_RLE8
 
 		Support drawing of RLE8-compressed bitmaps on the LCD.
 
-		CONFIG_I2C_EDID
-
-		Enables an 'i2c edid' command which can read EDID
-		information over I2C from an attached LCD display.
 
 - Splash Screen Support: CONFIG_SPLASH_SCREEN
 
@@ -2191,11 +2167,6 @@ CBFS (Coreboot Filesystem) support
 		serial# is unaffected by this, i. e. it remains
 		read-only.]
 
-		The same can be accomplished in a more flexible way
-		for any variable by configuring the type of access
-		to allow for those variables in the ".flags" variable
-		or define CONFIG_ENV_FLAGS_LIST_STATIC.
-
 - Protected RAM:
 		CONFIG_PRAM
 
@@ -2228,14 +2199,6 @@ CBFS (Coreboot Filesystem) support
 			IVMS8, IVML24, SPD8xx, TQM8xxL,
 			HERMES, IP860, RPXlite, LWMON,
 			FLAGADM, TQM8260
-
-- Access to physical memory region (> 4GB)
-		Some basic support is provided for operations on memory not
-		normally accessible to U-Boot - e.g. some architectures
-		support access to more than 4GB of memory on 32-bit
-		machines using physical address extension or similar.
-		Define CONFIG_PHYSMEM to access this basic support, which
-		currently only supports clearing the memory.
 
 - Error Recovery:
 		CONFIG_PANIC_HANG
@@ -2366,15 +2329,6 @@ CBFS (Coreboot Filesystem) support
 		run-time determined information about the hardware to the
 		environment.  These will be named board_name, board_rev.
 
-		CONFIG_DELAY_ENVIRONMENT
-
-		Normally the environment is loaded when the board is
-		intialised so that it is available to U-Boot. This inhibits
-		that so that the environment is not available until
-		explicitly loaded later by U-Boot code. With CONFIG_OF_CONTROL
-		this is instead controlled by the value of
-		/config/load-environment.
-
 - DataFlash Support:
 		CONFIG_HAS_DATAFLASH
 
@@ -2400,11 +2354,6 @@ CBFS (Coreboot Filesystem) support
 		CONFIG_SF_DEFAULT_CS		Chip-select
 		CONFIG_SF_DEFAULT_MODE 		(see include/spi.h)
 		CONFIG_SF_DEFAULT_SPEED		in Hz
-
-		CONFIG_CMD_SF_TEST
-
-		Define this option to include a destructive SPI flash
-		test ('sf test').
 
 - SystemACE Support:
 		CONFIG_SYSTEMACE
@@ -2439,23 +2388,6 @@ CBFS (Coreboot Filesystem) support
 		the remainder of the TFTP transfer to proceed normally.
 		A better solution is to properly configure the firewall,
 		but sometimes that is not allowed.
-
-- Hashing support:
-		CONFIG_CMD_HASH
-
-		This enables a generic 'hash' command which can produce
-		hashes / digests from a few algorithms (e.g. SHA1, SHA256).
-
-		CONFIG_HASH_VERIFY
-
-		Enable the hash verify command (hash -v). This adds to code
-		size a little.
-
-		CONFIG_SHA1 - support SHA1 hashing
-		CONFIG_SHA256 - support SHA256 hashing
-
-		Note: There is also a sha1sum command, which should perhaps
-		be deprecated in favour of 'hash sha1'.
 
 - Show boot progress:
 		CONFIG_SHOW_BOOT_PROGRESS
@@ -2693,13 +2625,10 @@ FIT uImage format:
 		CONFIG_FB_ADDR
 
 		Define CONFIG_FB_ADDR if you want to use specific
-		address for frame buffer.  This is typically the case
-		when using a graphics controller has separate video
-		memory.  U-Boot will then place the frame buffer at
-		the given address instead of dynamically reserving it
-		in system RAM by calling lcd_setmem(), which grabs
-		the memory for the frame buffer depending on the
-		configured panel size.
+		address for frame buffer.
+		Then system will reserve the frame buffer address to
+		defined address instead of lcd_setmem (this function
+		grabs the memory for frame buffer by panel's size).
 
 		Please see board_init_f function.
 
@@ -2994,6 +2923,9 @@ Configuration Settings:
 		non page size aligned address and this could cause major
 		problems.
 
+- CONFIG_SYS_TFTP_LOADADDR:
+		Default load address for network file downloads
+
 - CONFIG_SYS_LOADS_BAUD_CHANGE:
 		Enable temporary baudrate change while serial download
 
@@ -3134,49 +3066,6 @@ Configuration Settings:
 	setting is supposed to be generous and should work in most
 	cases. This setting can be used to tune behaviour; see
 	lib/hashtable.c for details.
-
-- CONFIG_ENV_FLAGS_LIST_DEFAULT
-- CONFIG_ENV_FLAGS_LIST_STATIC
-	Enable validation of the values given to enviroment variables when
-	calling env set.  Variables can be restricted to only decimal,
-	hexadecimal, or boolean.  If CONFIG_CMD_NET is also defined,
-	the variables can also be restricted to IP address or MAC address.
-
-	The format of the list is:
-		type_attribute = [s|d|x|b|i|m]
-		access_atribute = [a|r|o|c]
-		attributes = type_attribute[access_atribute]
-		entry = variable_name[:attributes]
-		list = entry[,list]
-
-	The type attributes are:
-		s - String (default)
-		d - Decimal
-		x - Hexadecimal
-		b - Boolean ([1yYtT|0nNfF])
-		i - IP address
-		m - MAC address
-
-	The access attributes are:
-		a - Any (default)
-		r - Read-only
-		o - Write-once
-		c - Change-default
-
-	- CONFIG_ENV_FLAGS_LIST_DEFAULT
-		Define this to a list (string) to define the ".flags"
-		envirnoment variable in the default or embedded environment.
-
-	- CONFIG_ENV_FLAGS_LIST_STATIC
-		Define this to a list (string) to define validation that
-		should be done if an entry is not found in the ".flags"
-		environment variable.  To override a setting in the static
-		list, simply add an entry for the same variable name to the
-		".flags" variable.
-
-- CONFIG_ENV_ACCESS_IGNORE_FORCE
-	If defined, don't allow the -f switch to env set override variable
-	access flags.
 
 The following definitions that deal with the placement and management
 of environment data (variable area); in general, we support the
@@ -3452,16 +3341,6 @@ use the "saveenv" command to store a valid environment.
 		drivers/serial/ns16550.c.  This option is useful for saving
 		space for already greatly restricted images, including but not
 		limited to NAND_SPL configurations.
-
-- CONFIG_DISPLAY_BOARDINFO
-		Display information about the board that U-Boot is running on
-		when U-Boot starts up. The board function checkboard() is called
-		to do this.
-
-- CONFIG_DISPLAY_BOARDINFO_LATE
-		Similar to the previous option, but display this information
-		later, once stdio is running and output goes to the LCD, if
-		present.
 
 Low Level (hardware related) configuration options:
 ---------------------------------------------------
@@ -4289,36 +4168,6 @@ Please note that changes to some configuration parameters may take
 only effect after the next boot (yes, that's just like Windoze :-).
 
 
-Callback functions for environment variables:
----------------------------------------------
-
-For some environment variables, the behavior of u-boot needs to change
-when their values are changed.  This functionailty allows functions to
-be associated with arbitrary variables.  On creation, overwrite, or
-deletion, the callback will provide the opportunity for some side
-effect to happen or for the change to be rejected.
-
-The callbacks are named and associated with a function using the
-U_BOOT_ENV_CALLBACK macro in your board or driver code.
-
-These callbacks are associated with variables in one of two ways.  The
-static list can be added to by defining CONFIG_ENV_CALLBACK_LIST_STATIC
-in the board configuration to a string that defines a list of
-associations.  The list must be in the following format:
-
-	entry = variable_name[:callback_name]
-	list = entry[,list]
-
-If the callback name is not specified, then the callback is deleted.
-Spaces are also allowed anywhere in the list.
-
-Callbacks can also be associated by defining the ".callbacks" variable
-with the same list format above.  Any association in ".callbacks" will
-override any association in the static list. You can define
-CONFIG_ENV_CALLBACK_LIST_DEFAULT to a list (string) to define the
-".callbacks" envirnoment variable in the default or embedded environment.
-
-
 Command Line Parsing:
 =====================
 
@@ -4972,27 +4821,447 @@ configuration to your "File transfer protocols" section:
 
 
 NetBSD Notes:
-=======
-Instructions:
->>>>>>> sboot
 =============
 
-1. Install an ARMv7 cross compiler.
-2. make ARCH=arm CROSS_COMPILE=/cross/compiler am335x_evm_tpm_config
-3. make ARCH=arm CROSS_COMPILE=/cross/compiler
-4. Move the compiled MLO and u-boot.img to your BeagleBone.
+Starting at version 0.9.2, U-Boot supports NetBSD both as host
+(build U-Boot) and target system (boots NetBSD/mpc8xx).
 
-You may need to change settings in /include/configs/am335x_evm.h to 
-match your boot, kernel, or partition configuration.
+Building requires a cross environment; it is known to work on
+NetBSD/i386 with the cross-powerpc-netbsd-1.3 package (you will also
+need gmake since the Makefiles are not compatible with BSD make).
+Note that the cross-powerpc package does not install include files;
+attempting to build U-Boot will fail because <machine/ansi.h> is
+missing.  This file has to be installed and patched manually:
 
-Add TPM Support:
-================
+	# cd /usr/pkg/cross/powerpc-netbsd/include
+	# mkdir powerpc
+	# ln -s powerpc machine
+	# cp /usr/src/sys/arch/powerpc/include/ansi.h powerpc/ansi.h
+	# ${EDIT} powerpc/ansi.h	## must remove __va_list, _BSD_VA_LIST
 
-Use the following defines to add AT97SC3204T support to additional boards.
+Native builds *don't* work due to incompatibilities between native
+and U-Boot include files.
 
-In your board configuration, add:
- #define CONFIG_TPM
- #define CONFIG_TPM_I2C_ATMEL
- #define CONFIG_TPM_I2C_BUS <number>
- #define CONFIG_TPM_I2C_ADDR 0x29
- #define CONFIG_CMD_TPM
+Booting assumes that (the first part of) the image booted is a
+stage-2 loader which in turn loads and then invokes the kernel
+proper. Loader sources will eventually appear in the NetBSD source
+tree (probably in sys/arc/mpc8xx/stand/u-boot_stage2/); in the
+meantime, see ftp://ftp.denx.de/pub/u-boot/ppcboot_stage2.tar.gz
+
+
+Implementation Internals:
+=========================
+
+The following is not intended to be a complete description of every
+implementation detail. However, it should help to understand the
+inner workings of U-Boot and make it easier to port it to custom
+hardware.
+
+
+Initial Stack, Global Data:
+---------------------------
+
+The implementation of U-Boot is complicated by the fact that U-Boot
+starts running out of ROM (flash memory), usually without access to
+system RAM (because the memory controller is not initialized yet).
+This means that we don't have writable Data or BSS segments, and BSS
+is not initialized as zero. To be able to get a C environment working
+at all, we have to allocate at least a minimal stack. Implementation
+options for this are defined and restricted by the CPU used: Some CPU
+models provide on-chip memory (like the IMMR area on MPC8xx and
+MPC826x processors), on others (parts of) the data cache can be
+locked as (mis-) used as memory, etc.
+
+	Chris Hallinan posted a good summary of these issues to the
+	U-Boot mailing list:
+
+	Subject: RE: [U-Boot-Users] RE: More On Memory Bank x (nothingness)?
+	From: "Chris Hallinan" <clh@net1plus.com>
+	Date: Mon, 10 Feb 2003 16:43:46 -0500 (22:43 MET)
+	...
+
+	Correct me if I'm wrong, folks, but the way I understand it
+	is this: Using DCACHE as initial RAM for Stack, etc, does not
+	require any physical RAM backing up the cache. The cleverness
+	is that the cache is being used as a temporary supply of
+	necessary storage before the SDRAM controller is setup. It's
+	beyond the scope of this list to explain the details, but you
+	can see how this works by studying the cache architecture and
+	operation in the architecture and processor-specific manuals.
+
+	OCM is On Chip Memory, which I believe the 405GP has 4K. It
+	is another option for the system designer to use as an
+	initial stack/RAM area prior to SDRAM being available. Either
+	option should work for you. Using CS 4 should be fine if your
+	board designers haven't used it for something that would
+	cause you grief during the initial boot! It is frequently not
+	used.
+
+	CONFIG_SYS_INIT_RAM_ADDR should be somewhere that won't interfere
+	with your processor/board/system design. The default value
+	you will find in any recent u-boot distribution in
+	walnut.h should work for you. I'd set it to a value larger
+	than your SDRAM module. If you have a 64MB SDRAM module, set
+	it above 400_0000. Just make sure your board has no resources
+	that are supposed to respond to that address! That code in
+	start.S has been around a while and should work as is when
+	you get the config right.
+
+	-Chris Hallinan
+	DS4.COM, Inc.
+
+It is essential to remember this, since it has some impact on the C
+code for the initialization procedures:
+
+* Initialized global data (data segment) is read-only. Do not attempt
+  to write it.
+
+* Do not use any uninitialized global data (or implicitely initialized
+  as zero data - BSS segment) at all - this is undefined, initiali-
+  zation is performed later (when relocating to RAM).
+
+* Stack space is very limited. Avoid big data buffers or things like
+  that.
+
+Having only the stack as writable memory limits means we cannot use
+normal global data to share information beween the code. But it
+turned out that the implementation of U-Boot can be greatly
+simplified by making a global data structure (gd_t) available to all
+functions. We could pass a pointer to this data as argument to _all_
+functions, but this would bloat the code. Instead we use a feature of
+the GCC compiler (Global Register Variables) to share the data: we
+place a pointer (gd) to the global data into a register which we
+reserve for this purpose.
+
+When choosing a register for such a purpose we are restricted by the
+relevant  (E)ABI  specifications for the current architecture, and by
+GCC's implementation.
+
+For PowerPC, the following registers have specific use:
+	R1:	stack pointer
+	R2:	reserved for system use
+	R3-R4:	parameter passing and return values
+	R5-R10: parameter passing
+	R13:	small data area pointer
+	R30:	GOT pointer
+	R31:	frame pointer
+
+	(U-Boot also uses R12 as internal GOT pointer. r12
+	is a volatile register so r12 needs to be reset when
+	going back and forth between asm and C)
+
+    ==> U-Boot will use R2 to hold a pointer to the global data
+
+    Note: on PPC, we could use a static initializer (since the
+    address of the global data structure is known at compile time),
+    but it turned out that reserving a register results in somewhat
+    smaller code - although the code savings are not that big (on
+    average for all boards 752 bytes for the whole U-Boot image,
+    624 text + 127 data).
+
+On Blackfin, the normal C ABI (except for P3) is followed as documented here:
+	http://docs.blackfin.uclinux.org/doku.php?id=application_binary_interface
+
+    ==> U-Boot will use P3 to hold a pointer to the global data
+
+On ARM, the following registers are used:
+
+	R0:	function argument word/integer result
+	R1-R3:	function argument word
+	R9:	GOT pointer
+	R10:	stack limit (used only if stack checking if enabled)
+	R11:	argument (frame) pointer
+	R12:	temporary workspace
+	R13:	stack pointer
+	R14:	link register
+	R15:	program counter
+
+    ==> U-Boot will use R8 to hold a pointer to the global data
+
+On Nios II, the ABI is documented here:
+	http://www.altera.com/literature/hb/nios2/n2cpu_nii51016.pdf
+
+    ==> U-Boot will use gp to hold a pointer to the global data
+
+    Note: on Nios II, we give "-G0" option to gcc and don't use gp
+    to access small data sections, so gp is free.
+
+On NDS32, the following registers are used:
+
+	R0-R1:	argument/return
+	R2-R5:	argument
+	R15:	temporary register for assembler
+	R16:	trampoline register
+	R28:	frame pointer (FP)
+	R29:	global pointer (GP)
+	R30:	link register (LP)
+	R31:	stack pointer (SP)
+	PC:	program counter (PC)
+
+    ==> U-Boot will use R10 to hold a pointer to the global data
+
+NOTE: DECLARE_GLOBAL_DATA_PTR must be used with file-global scope,
+or current versions of GCC may "optimize" the code too much.
+
+Memory Management:
+------------------
+
+U-Boot runs in system state and uses physical addresses, i.e. the
+MMU is not used either for address mapping nor for memory protection.
+
+The available memory is mapped to fixed addresses using the memory
+controller. In this process, a contiguous block is formed for each
+memory type (Flash, SDRAM, SRAM), even when it consists of several
+physical memory banks.
+
+U-Boot is installed in the first 128 kB of the first Flash bank (on
+TQM8xxL modules this is the range 0x40000000 ... 0x4001FFFF). After
+booting and sizing and initializing DRAM, the code relocates itself
+to the upper end of DRAM. Immediately below the U-Boot code some
+memory is reserved for use by malloc() [see CONFIG_SYS_MALLOC_LEN
+configuration setting]. Below that, a structure with global Board
+Info data is placed, followed by the stack (growing downward).
+
+Additionally, some exception handler code is copied to the low 8 kB
+of DRAM (0x00000000 ... 0x00001FFF).
+
+So a typical memory configuration with 16 MB of DRAM could look like
+this:
+
+	0x0000 0000	Exception Vector code
+	      :
+	0x0000 1FFF
+	0x0000 2000	Free for Application Use
+	      :
+	      :
+
+	      :
+	      :
+	0x00FB FF20	Monitor Stack (Growing downward)
+	0x00FB FFAC	Board Info Data and permanent copy of global data
+	0x00FC 0000	Malloc Arena
+	      :
+	0x00FD FFFF
+	0x00FE 0000	RAM Copy of Monitor Code
+	...		eventually: LCD or video framebuffer
+	...		eventually: pRAM (Protected RAM - unchanged by reset)
+	0x00FF FFFF	[End of RAM]
+
+
+System Initialization:
+----------------------
+
+In the reset configuration, U-Boot starts at the reset entry point
+(on most PowerPC systems at address 0x00000100). Because of the reset
+configuration for CS0# this is a mirror of the onboard Flash memory.
+To be able to re-map memory U-Boot then jumps to its link address.
+To be able to implement the initialization code in C, a (small!)
+initial stack is set up in the internal Dual Ported RAM (in case CPUs
+which provide such a feature like MPC8xx or MPC8260), or in a locked
+part of the data cache. After that, U-Boot initializes the CPU core,
+the caches and the SIU.
+
+Next, all (potentially) available memory banks are mapped using a
+preliminary mapping. For example, we put them on 512 MB boundaries
+(multiples of 0x20000000: SDRAM on 0x00000000 and 0x20000000, Flash
+on 0x40000000 and 0x60000000, SRAM on 0x80000000). Then UPM A is
+programmed for SDRAM access. Using the temporary configuration, a
+simple memory test is run that determines the size of the SDRAM
+banks.
+
+When there is more than one SDRAM bank, and the banks are of
+different size, the largest is mapped first. For equal size, the first
+bank (CS2#) is mapped first. The first mapping is always for address
+0x00000000, with any additional banks following immediately to create
+contiguous memory starting from 0.
+
+Then, the monitor installs itself at the upper end of the SDRAM area
+and allocates memory for use by malloc() and for the global Board
+Info data; also, the exception vector code is copied to the low RAM
+pages, and the final stack is set up.
+
+Only after this relocation will you have a "normal" C environment;
+until that you are restricted in several ways, mostly because you are
+running from ROM, and because the code will have to be relocated to a
+new address in RAM.
+
+
+U-Boot Porting Guide:
+----------------------
+
+[Based on messages by Jerry Van Baren in the U-Boot-Users mailing
+list, October 2002]
+
+
+int main(int argc, char *argv[])
+{
+	sighandler_t no_more_time;
+
+	signal(SIGALRM, no_more_time);
+	alarm(PROJECT_DEADLINE - toSec (3 * WEEK));
+
+	if (available_money > available_manpower) {
+		Pay consultant to port U-Boot;
+		return 0;
+	}
+
+	Download latest U-Boot source;
+
+	Subscribe to u-boot mailing list;
+
+	if (clueless)
+		email("Hi, I am new to U-Boot, how do I get started?");
+
+	while (learning) {
+		Read the README file in the top level directory;
+		Read http://www.denx.de/twiki/bin/view/DULG/Manual;
+		Read applicable doc/*.README;
+		Read the source, Luke;
+		/* find . -name "*.[chS]" | xargs grep -i <keyword> */
+	}
+
+	if (available_money > toLocalCurrency ($2500))
+		Buy a BDI3000;
+	else
+		Add a lot of aggravation and time;
+
+	if (a similar board exists) {	/* hopefully... */
+		cp -a board/<similar> board/<myboard>
+		cp include/configs/<similar>.h include/configs/<myboard>.h
+	} else {
+		Create your own board support subdirectory;
+		Create your own board include/configs/<myboard>.h file;
+	}
+	Edit new board/<myboard> files
+	Edit new include/configs/<myboard>.h
+
+	while (!accepted) {
+		while (!running) {
+			do {
+				Add / modify source code;
+			} until (compiles);
+			Debug;
+			if (clueless)
+				email("Hi, I am having problems...");
+		}
+		Send patch file to the U-Boot email list;
+		if (reasonable critiques)
+			Incorporate improvements from email list code review;
+		else
+			Defend code as written;
+	}
+
+	return 0;
+}
+
+void no_more_time (int sig)
+{
+      hire_a_guru();
+}
+
+
+Coding Standards:
+-----------------
+
+All contributions to U-Boot should conform to the Linux kernel
+coding style; see the file "Documentation/CodingStyle" and the script
+"scripts/Lindent" in your Linux kernel source directory.
+
+Source files originating from a different project (for example the
+MTD subsystem) are generally exempt from these guidelines and are not
+reformated to ease subsequent migration to newer versions of those
+sources.
+
+Please note that U-Boot is implemented in C (and to some small parts in
+Assembler); no C++ is used, so please do not use C++ style comments (//)
+in your code.
+
+Please also stick to the following formatting rules:
+- remove any trailing white space
+- use TAB characters for indentation and vertical alignment, not spaces
+- make sure NOT to use DOS '\r\n' line feeds
+- do not add more than 2 consecutive empty lines to source files
+- do not add trailing empty lines to source files
+
+Submissions which do not conform to the standards may be returned
+with a request to reformat the changes.
+
+
+Submitting Patches:
+-------------------
+
+Since the number of patches for U-Boot is growing, we need to
+establish some rules. Submissions which do not conform to these rules
+may be rejected, even when they contain important and valuable stuff.
+
+Please see http://www.denx.de/wiki/U-Boot/Patches for details.
+
+Patches shall be sent to the u-boot mailing list <u-boot@lists.denx.de>;
+see http://lists.denx.de/mailman/listinfo/u-boot
+
+When you send a patch, please include the following information with
+it:
+
+* For bug fixes: a description of the bug and how your patch fixes
+  this bug. Please try to include a way of demonstrating that the
+  patch actually fixes something.
+
+* For new features: a description of the feature and your
+  implementation.
+
+* A CHANGELOG entry as plaintext (separate from the patch)
+
+* For major contributions, your entry to the CREDITS file
+
+* When you add support for a new board, don't forget to add this
+  board to the MAINTAINERS file, too.
+
+* If your patch adds new configuration options, don't forget to
+  document these in the README file.
+
+* The patch itself. If you are using git (which is *strongly*
+  recommended) you can easily generate the patch using the
+  "git format-patch". If you then use "git send-email" to send it to
+  the U-Boot mailing list, you will avoid most of the common problems
+  with some other mail clients.
+
+  If you cannot use git, use "diff -purN OLD NEW". If your version of
+  diff does not support these options, then get the latest version of
+  GNU diff.
+
+  The current directory when running this command shall be the parent
+  directory of the U-Boot source tree (i. e. please make sure that
+  your patch includes sufficient directory information for the
+  affected files).
+
+  We prefer patches as plain text. MIME attachments are discouraged,
+  and compressed attachments must not be used.
+
+* If one logical set of modifications affects or creates several
+  files, all these changes shall be submitted in a SINGLE patch file.
+
+* Changesets that contain different, unrelated modifications shall be
+  submitted as SEPARATE patches, one patch per changeset.
+
+
+Notes:
+
+* Before sending the patch, run the MAKEALL script on your patched
+  source tree and make sure that no errors or warnings are reported
+  for any of the boards.
+
+* Keep your modifications to the necessary minimum: A patch
+  containing several unrelated changes or arbitrary reformats will be
+  returned with a request to re-formatting / split it.
+
+* If you modify existing code, make sure that your new code does not
+  add to the memory footprint of the code ;-) Small is beautiful!
+  When adding new features, these should compile conditionally only
+  (using #ifdef), and the resulting code with the new feature
+  disabled must not need more memory than the old code without your
+  modification.
+
+* Remember that there is a size limit of 100 kB per message on the
+  u-boot mailing list. Bigger patches will be moderated. If they are
+  reasonable and not too big, they will be acknowledged. But patches
+  bigger than the size limit should be avoided.

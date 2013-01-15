@@ -317,7 +317,9 @@ endif
 LIBS-y += drivers/rtc/librtc.o
 LIBS-y += drivers/serial/libserial.o
 LIBS-y += drivers/sound/libsound.o
-LIBS-$(CONFIG_GENERIC_LPC_TPM) += drivers/tpm/libtpm.o
+LIBS-$(CONFIG_TPM) += drivers/tpm/libtpm.o
+LIBS-$(CONFIG_TPM) += lib/tlcl/libtlcl.o
+LIBS-$(CONFIG_SBOOT) += lib/sboot/libsboot.o
 LIBS-y += drivers/twserial/libtws.o
 LIBS-y += drivers/usb/eth/libusb_eth.o
 LIBS-y += drivers/usb/gadget/libusb_gadget.o

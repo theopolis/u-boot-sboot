@@ -50,13 +50,16 @@ COBJS-$(CONFIG_MD5) += md5.o
 COBJS-y += net_utils.o
 COBJS-$(CONFIG_PHYSMEM) += physmem.o
 COBJS-y += qsort.o
-COBJS-$(CONFIG_SHA1) += sha1.o
+ifneq ($(CONFIG_TPM)$(CONFIG_SHA1),)
+COBJS-y += sha1.o
+endif
 COBJS-$(CONFIG_SHA256) += sha256.o
 COBJS-y	+= strmhz.o
 COBJS-$(CONFIG_RBTREE)	+= rbtree.o
 endif
 
 ifdef CONFIG_SPL_BUILD
+COBJS-$(CONFIG_SPL_TPM_SUPPORT) += sha1.o
 COBJS-$(CONFIG_SPL_YMODEM_SUPPORT) += crc16.o
 COBJS-$(CONFIG_SPL_NET_SUPPORT) += crc32.o
 ifneq ($(CONFIG_SPL_SPI_FLASH_SUPPORT)$(CONFIG_SPL_NET_SUPPORT),)

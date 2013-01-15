@@ -82,6 +82,11 @@ LIBS-$(CONFIG_SPL_NET_SUPPORT) += net/libnet.o
 LIBS-$(CONFIG_SPL_ETH_SUPPORT) += drivers/net/libnet.o
 LIBS-$(CONFIG_SPL_ETH_SUPPORT) += drivers/net/phy/libphy.o
 
+# TPM, tlcl, and sboot
+LIBS-$(CONFIG_SPL_TPM_SUPPORT) += drivers/tpm/libtpm.o
+LIBS-$(CONFIG_SPL_TPM_SUPPORT) += lib/tlcl/libtlcl.o
+LIBS-$(CONFIG_SPL_SBOOT_SUPPORT) += lib/sboot/libsboot.o
+
 ifneq ($(CONFIG_AM33XX)$(CONFIG_OMAP34XX)$(CONFIG_OMAP44XX)$(CONFIG_OMAP54XX),)
 LIBS-y += $(CPUDIR)/omap-common/libomap-common.o
 endif

@@ -165,6 +165,10 @@ int env_import(const char *buf, int check)
 {
 	env_t *ep = (env_t *)buf;
 
+#if defined(CONFIG_SBOOT) && !defined(CONFIG_SBOOT_DISABLE_ENV_EXTEND)
+	sboot_extend_environment(buf, CONFIG_ENV_SIZE);
+#endif
+
 	if (check) {
 		uint32_t crc;
 

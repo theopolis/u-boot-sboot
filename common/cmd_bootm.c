@@ -62,6 +62,10 @@
 #include <linux/lzo.h>
 #endif /* CONFIG_LZO */
 
+#ifdef CONFIG_SBOOT
+#include <sboot.h>
+#endif
+
 DECLARE_GLOBAL_DATA_PTR;
 
 #ifndef CONFIG_SYS_BOOTM_LEN
@@ -188,6 +192,37 @@ static void boot_start_lmb(bootm_headers_t *images)
 #else
 #define lmb_reserve(lmb, base, size)
 static inline void boot_start_lmb(bootm_headers_t *images) { }
+#endif
+
+#ifdef CONFIG_SBOOT
+void bootm_sboot(void)
+{
+	printf("Sboot measuring ... ");
+
+	/* Measure loaded images (kernel, ramdisk, fdt) */
+	sboot_extend_os(images.os.image_start, images.os.image_len);
+	sboot_extend_os(images.rd_start, images.rd_end - images.rd_start);
+	sboot_extend_os(images.initrd_start, images.initrd_end - images.initrd_start);
+	sboot_extend_os(images.cmdline_start, images.cmdline_end - images.initrd_start);
+#ifdef CONFIG_OF_LIBFDT
+	sboot_extend_os(images.ft_addr, images.ft_len);
+#endif
+
+	/* If the SBOOT seal command was issued, bootm should now seal state. */
+	if (getenv("sbootseal") != NULL) {
+		sboot_seal_os();
+	}
+
+	/* Verify (default=enable) sealed blob. */
+	if (sboot_check_os() != SBOOT_SUCCESS) {
+		/* If CONFIG_SBOOT_ENFORCE is enabled the system is already hung. */
+		puts("Failed\n");
+	} else {
+		puts("OK\n");
+	}
+
+	sboot_finish();
+}
 #endif
 
 static int bootm_start(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -571,6 +606,9 @@ static int do_bootm_subcommand(cmd_tbl_t *cmdtp, int flag, int argc,
 			 */
 			eth_halt();
 #endif
+#ifdef CONFIG_SBOOT
+			bootm_sboot();
+#endif
 			arch_preboot_os();
 			boot_fn(BOOTM_STATE_OS_GO, argc, argv, &images);
 			break;
@@ -651,6 +689,10 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	 * details see the OpenHCI specification.
 	 */
 	usb_stop();
+#endif
+
+#ifdef CONFIG_SBOOT
+	bootm_sboot();
 #endif
 
 	ret = bootm_load_os(images.os, &load_end, 1);
@@ -1648,6 +1690,10 @@ static int do_bootz(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	 * details see the OpenHCI specification.
 	 */
 	usb_stop();
+#endif
+
+#ifdef CONFIG_SBOOT
+	bootm_sboot();
 #endif
 
 #ifdef CONFIG_SILENT_CONSOLE

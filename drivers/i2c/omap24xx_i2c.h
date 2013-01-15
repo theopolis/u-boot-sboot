@@ -59,8 +59,10 @@
 
 /* I2C Buffer Configuration Register (I2C_BUF): */
 
-#define I2C_BUF_RDMA_EN		(1 << 15) /* Receive DMA channel enable */
-#define I2C_BUF_XDMA_EN		(1 << 7)  /* Transmit DMA channel enable */
+#define I2C_BUF_RDMA_EN         (1 << 15) /* Receive DMA channel enable */
+#define I2C_BUF_RXFIF_CLR       (1 << 14) /* RX FIFO Clear */
+#define I2C_BUF_XDMA_EN         (1 << 7)  /* Transmit DMA channel enable */
+#define I2C_BUF_TXFIF_CLR       (1 << 6)  /* TX FIFO Clear */
 
 /* I2C Configuration Register (I2C_CON): */
 
@@ -84,6 +86,14 @@
 #define I2C_SYSTEST_SCL_O	(1 << 2)  /* SCL line drive output value */
 #define I2C_SYSTEST_SDA_I	(1 << 1)  /* SDA line sense input value */
 #define I2C_SYSTEST_SDA_O	(1 << 0)  /* SDA line drive output value */
+
+/* I2C Buffer Status Register (I2C_BUFSTAT): */
+
+#define I2C_BUFSTAT_FIFODEPTH_MASK  (3 << 14)   /* FIFO buffers depth */
+#define I2C_BUFSTAT_FIFODEPTH_SHIFT (14)        /* FIFO buffers depth */
+#define I2C_BUFSTAT_RXSTAT_MASK     (0x3f << 8) /* RX Buffer Status */
+#define I2C_BUFSTAT_RXSTAT_SHIFT    (8)         /* RX Buffer Status */
+#define I2C_BUFSTAT_TXSTAT_MASK     (0x3f << 0) /* TX Buffer Status */
 
 /* I2C System Status Register (I2C_SYSS): */
 

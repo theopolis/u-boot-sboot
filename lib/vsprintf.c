@@ -820,7 +820,7 @@ void panic(const char *fmt, ...)
 	hang();
 #else
 	udelay(100000);	/* allow messages to go out */
-	do_reset(NULL, 0, 0, NULL);
+	//do_reset(NULL, 0, 0, NULL);
 #endif
 	while (1)
 		;

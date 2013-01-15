@@ -36,7 +36,7 @@
 #include <string.h>
 #endif /* USE_HOSTCC */
 #include <watchdog.h>
-#include "sha1.h"
+#include <sha1.h>
 
 /*
  * 32-bit integer manipulation macros (big endian)
@@ -73,7 +73,11 @@ void sha1_starts (sha1_context * ctx)
 	ctx->state[4] = 0xC3D2E1F0;
 }
 
+<<<<<<< HEAD
 static void sha1_process(sha1_context *ctx, const unsigned char data[64])
+=======
+static void sha1_process (sha1_context * ctx, const unsigned char data[64])
+>>>>>>> sboot
 {
 	unsigned long temp, W[16], A, B, C, D, E;
 
@@ -230,8 +234,12 @@ static void sha1_process(sha1_context *ctx, const unsigned char data[64])
 /*
  * SHA-1 process buffer
  */
+<<<<<<< HEAD
 void sha1_update(sha1_context *ctx, const unsigned char *input,
 		 unsigned int ilen)
+=======
+void sha1_update (sha1_context * ctx, const unsigned char *input, int ilen)
+>>>>>>> sboot
 {
 	int fill;
 	unsigned long left;
@@ -306,8 +314,12 @@ void sha1_finish (sha1_context * ctx, unsigned char output[20])
 /*
  * Output = SHA-1( input buffer )
  */
+<<<<<<< HEAD
 void sha1_csum(const unsigned char *input, unsigned int ilen,
 	       unsigned char *output)
+=======
+void sha1_csum (const unsigned char *input, int ilen, unsigned char output[20])
+>>>>>>> sboot
 {
 	sha1_context ctx;
 
@@ -320,8 +332,13 @@ void sha1_csum(const unsigned char *input, unsigned int ilen,
  * Output = SHA-1( input buffer ). Trigger the watchdog every 'chunk_sz'
  * bytes of input processed.
  */
+<<<<<<< HEAD
 void sha1_csum_wd(const unsigned char *input, unsigned int ilen,
 		  unsigned char *output, unsigned int chunk_sz)
+=======
+void sha1_csum_wd (const unsigned char *input, int ilen, unsigned char output[20],
+			unsigned int chunk_sz)
+>>>>>>> sboot
 {
 	sha1_context ctx;
 #if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
@@ -349,12 +366,62 @@ void sha1_csum_wd(const unsigned char *input, unsigned int ilen,
 	sha1_finish (&ctx, output);
 }
 
+void hmac_starts(sha1_context *ctx, const unsigned char *key, unsigned int len)
+{
+	unsigned short i;
+	unsigned char k_ipad[64];
+
+	memset(k_ipad, 0x36, 64);
+	sha1_starts(ctx);
+
+	for (i = 0; i < len; ++i) {
+		if (i >= 64) break;
+		k_ipad[i] ^= key[i];
+	}
+
+	sha1_update(ctx, k_ipad, 64);
+	memset(k_ipad, 0, 64);
+}
+
+void hmac_update(sha1_context *ctx, const unsigned char *data, unsigned int len)
+{
+	sha1_update(ctx, data, len);
+}
+
+void hmac_finish(sha1_context *ctx, const unsigned char *key, unsigned int len, unsigned char *output)
+{
+	unsigned short i;
+	unsigned char k_opad[64], dest[20];
+
+	memset(k_opad, 0x5C, 64);
+	sha1_finish(ctx, dest);
+
+	for (i = 0; i < len; ++i) {
+		if (i >= 64) break;
+		k_opad[i] ^= key[i];
+	}
+
+	sha1_starts(ctx);
+	sha1_update(ctx, k_opad, 64);
+	sha1_update(ctx, dest, 20);
+	sha1_finish(ctx, output);
+
+	memset(dest, 0, 20);
+	memset(k_opad, 0, 64);
+	memset(ctx, 0, sizeof(sha1_context));
+}
+
 /*
  * Output = HMAC-SHA-1( input buffer, hmac key )
  */
+<<<<<<< HEAD
 void sha1_hmac(const unsigned char *key, int keylen,
 	       const unsigned char *input, unsigned int ilen,
 	       unsigned char *output)
+=======
+void sha1_hmac (const unsigned char *key, int keylen,
+		const unsigned char *input, int ilen, unsigned char output[20])
+>>>>>>> sboot
 {
 	int i;
 	sha1_context ctx;
