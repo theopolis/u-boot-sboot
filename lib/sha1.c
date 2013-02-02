@@ -73,11 +73,7 @@ void sha1_starts (sha1_context * ctx)
 	ctx->state[4] = 0xC3D2E1F0;
 }
 
-<<<<<<< HEAD
-static void sha1_process(sha1_context *ctx, const unsigned char data[64])
-=======
 static void sha1_process (sha1_context * ctx, const unsigned char data[64])
->>>>>>> sboot
 {
 	unsigned long temp, W[16], A, B, C, D, E;
 
@@ -234,12 +230,7 @@ static void sha1_process (sha1_context * ctx, const unsigned char data[64])
 /*
  * SHA-1 process buffer
  */
-<<<<<<< HEAD
-void sha1_update(sha1_context *ctx, const unsigned char *input,
-		 unsigned int ilen)
-=======
 void sha1_update (sha1_context * ctx, const unsigned char *input, int ilen)
->>>>>>> sboot
 {
 	int fill;
 	unsigned long left;
@@ -314,12 +305,7 @@ void sha1_finish (sha1_context * ctx, unsigned char output[20])
 /*
  * Output = SHA-1( input buffer )
  */
-<<<<<<< HEAD
-void sha1_csum(const unsigned char *input, unsigned int ilen,
-	       unsigned char *output)
-=======
 void sha1_csum (const unsigned char *input, int ilen, unsigned char output[20])
->>>>>>> sboot
 {
 	sha1_context ctx;
 
@@ -332,13 +318,8 @@ void sha1_csum (const unsigned char *input, int ilen, unsigned char output[20])
  * Output = SHA-1( input buffer ). Trigger the watchdog every 'chunk_sz'
  * bytes of input processed.
  */
-<<<<<<< HEAD
-void sha1_csum_wd(const unsigned char *input, unsigned int ilen,
-		  unsigned char *output, unsigned int chunk_sz)
-=======
 void sha1_csum_wd (const unsigned char *input, int ilen, unsigned char output[20],
 			unsigned int chunk_sz)
->>>>>>> sboot
 {
 	sha1_context ctx;
 #if defined(CONFIG_HW_WATCHDOG) || defined(CONFIG_WATCHDOG)
@@ -414,14 +395,8 @@ void hmac_finish(sha1_context *ctx, const unsigned char *key, unsigned int len, 
 /*
  * Output = HMAC-SHA-1( input buffer, hmac key )
  */
-<<<<<<< HEAD
-void sha1_hmac(const unsigned char *key, int keylen,
-	       const unsigned char *input, unsigned int ilen,
-	       unsigned char *output)
-=======
 void sha1_hmac (const unsigned char *key, int keylen,
 		const unsigned char *input, int ilen, unsigned char output[20])
->>>>>>> sboot
 {
 	int i;
 	sha1_context ctx;

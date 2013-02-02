@@ -12,6 +12,7 @@ ifdef CONFIG_SPL_BUILD
 COBJS-$(CONFIG_SPL_SBOOT_SUPPORT) += spl_sboot.o
 endif
 
+COBJS-$(CONFIG_SBOOT_KEYS) += sboot_keys.o
 COBJS-$(CONFIG_SBOOT) += sboot.o
 
 COBJS	= $(COBJS-y)

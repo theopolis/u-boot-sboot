@@ -169,6 +169,7 @@
 /* NS16550 Configuration */
 #define CONFIG_SYS_NS16550
 #define CONFIG_SYS_NS16550_SERIAL
+#define CONFIG_CONS_INDEX			1 /* Needed by NS16550 */
 #define CONFIG_SERIAL_MULTI
 #define CONFIG_SYS_NS16550_REG_SIZE	(-4)
 #define CONFIG_SYS_NS16550_CLK		(48000000)
@@ -217,7 +218,7 @@
 
 #define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	0x300 /* address 0x60000 */
 #define CONFIG_SYS_U_BOOT_MAX_SIZE_SECTORS	0x200 /* 256 KB */
-#define CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE 		0 /* Added for Sboot */
+#define CONFIG_SPL_MMC_SD_FAT_BOOT_DEVICE 	0 /* Added for Sboot */
 #define CONFIG_SYS_MMC_SD_FAT_BOOT_PARTITION	1
 #define CONFIG_SPL_FAT_LOAD_PAYLOAD_NAME	"u-boot.img"
 #define CONFIG_SPL_MMC_SUPPORT
@@ -351,6 +352,29 @@
 #define CONFIG_ENV_IS_IN_NAND
 #define CONFIG_ENV_OFFSET		0x260000 /* environment starts here */
 #define CONFIG_SYS_ENV_SECT_SIZE	(128 << 10)	/* 128 KiB */
+#endif
+
+/* Atmel I2C TPM, libtlcl, and sboot */
+#ifdef CONFIG_ATMEL_TPM
+#define CONFIG_TPM 				/* builds libtlcl */
+/* #define CONFIG_TLCL_DEBUG */
+#define CONFIG_TLCL_SEAL 			/* required by SBOOT */
+#define CONFIG_SPL_TPM_SUPPORT
+
+#define CONFIG_CMD_TPM
+#define CONFIG_CMD_TPM_TLCL
+#define CONFIG_TPM_I2C_ATMEL
+#define CONFIG_TPM_I2C_BUS 1
+#define CONFIG_TPM_I2C_ADDR 0x29
+
+#define CONFIG_SBOOT
+/* #define CONFIG_SBOOT_ENFORCE */
+/* #define CONFIG_SBOOT_DISABLE_CONSOLE_EXTEND */
+/* #define CONFIG_SBOOT_DISABLE_ENV_EXTEND */
+#define CONFIG_CMD_SBOOT
+#define CONFIG_SPL_SBOOT_SUPPORT
+#define CONFIG_SBOOT_UBOOT_SEAL_INDEX 0xd000
+#define CONFIG_SBOOT_IMAGE_SEAL_INDEX 0xe000
 #endif
 
 #endif	/* ! __CONFIG_AM335X_EVM_H */

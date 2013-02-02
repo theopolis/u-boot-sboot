@@ -61,12 +61,7 @@ void sha1_starts( sha1_context *ctx );
  * \param input    buffer holding the  data
  * \param ilen	   length of the input data
  */
-<<<<<<< HEAD
-void sha1_update(sha1_context *ctx, const unsigned char *input,
-		 unsigned int ilen);
-=======
 void sha1_update( sha1_context *ctx, const unsigned char *input, int ilen );
->>>>>>> sboot
 
 /**
  * \brief	   SHA-1 final digest
@@ -83,13 +78,8 @@ void sha1_finish( sha1_context *ctx, unsigned char output[20] );
  * \param ilen	   length of the input data
  * \param output   SHA-1 checksum result
  */
-<<<<<<< HEAD
-void sha1_csum(const unsigned char *input, unsigned int ilen,
-		unsigned char *output);
-=======
 void sha1_csum( const unsigned char *input, int ilen,
 		unsigned char output[20] );
->>>>>>> sboot
 
 /**
  * \brief	   Output = SHA-1( input buffer ), with watchdog triggering
@@ -99,10 +89,6 @@ void sha1_csum( const unsigned char *input, int ilen,
  * \param output   SHA-1 checksum result
  * \param chunk_sz watchdog triggering period (in bytes of input processed)
  */
-<<<<<<< HEAD
-void sha1_csum_wd(const unsigned char *input, unsigned int ilen,
-		unsigned char *output, unsigned int chunk_sz);
-=======
 void sha1_csum_wd (const unsigned char *input, int ilen,
 		unsigned char output[20], unsigned int chunk_sz);
 
@@ -114,7 +100,6 @@ void sha1_csum_wd (const unsigned char *input, int ilen,
  * \return	   0 if successful, or 1 if fopen failed
  */
 int sha1_file( char *path, unsigned char output[20] );
->>>>>>> sboot
 
 /**
  * \brief	   Output = HMAC-SHA-1( input buffer, hmac key )
@@ -125,15 +110,9 @@ int sha1_file( char *path, unsigned char output[20] );
  * \param ilen	   length of the input data
  * \param output   HMAC-SHA-1 result
  */
-<<<<<<< HEAD
-void sha1_hmac(const unsigned char *key, int keylen,
-		const unsigned char *input, unsigned int ilen,
-		unsigned char *output);
-=======
 void sha1_hmac( const unsigned char *key, int keylen,
 		const unsigned char *input, int ilen,
 		unsigned char output[20] );
->>>>>>> sboot
 
 void hmac_starts( sha1_context *ctx, const unsigned char *key, unsigned int len);
 void hmac_update( sha1_context *ctx, const unsigned char *data, unsigned int len);

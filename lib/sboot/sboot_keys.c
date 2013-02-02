@@ -24,4 +24,65 @@
  *     etc...
  */
 
+#include <sboot.h>
+#include <common.h>
 
+#define SBOOT_MAX_PASS 256
+
+/* not used, just an FYI */
+void sboot_getpass(uint8 *pass, uint32 *pass_size)
+{
+	uint8 *pass_p = pass;
+	uint32 size;
+	uint8 c;
+
+	if (pass == NULL) {
+		return;
+	}
+
+	for (;;) {
+		c = getc();
+
+		switch (c) {
+		/* Enter, finished typing password */
+		case '\r':
+		case '\n':
+		case '\0':
+			*pass_p = '\0';
+			puts("\r\n");
+			*pass_size = size;
+			return;
+		/* Break, discard input */
+		case 0x03:
+			while (size > 0) {
+				*(--pass_p) = '\0';
+				--size;
+			}
+			*pass_size = 0;
+			return;
+		/* ^U, erase line or ^W, erase word */
+		case 0x15:
+			while (size > 0) {
+				*(--pass_p) = '\0';
+				--size;
+			}
+			continue;
+		case 0x08:
+		case 0x7F:
+			if (size > 0) {
+				*(--pass_p) = '\0';
+				--size;
+			}
+			continue;
+		default:
+			*pass_p++ = c;
+			++size;
+			break;
+		}
+
+		if (size >= SBOOT_MAX_PASS)
+			*pass_size = size;
+			puts("\r\n");
+			return;
+	}
+}
