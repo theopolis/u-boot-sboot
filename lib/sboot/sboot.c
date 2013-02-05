@@ -7,6 +7,7 @@
  */
 
 #include <common.h>
+#include <errno.h>
 #include <sha1.h>
 
 #include <sboot.h>
@@ -30,6 +31,12 @@ const char 		*console_measure_exceptions[] = {
 	"sboot seal", "boot", "bootd"
 };
 #endif
+
+typedef struct {
+	uint8_t is_open;
+} sboot_env;
+
+sboot_env sboot_state = {0x0};
 
 /* TPM must be started, enabled, activated, and owned.
  *   If not owned, OSAP will return a key use error.
@@ -59,7 +66,8 @@ uint8_t sboot_seal(const uint8_t *key, uint32_t keySize,
 	memset(keyAuth, 0, 20);
 	memset(dataAuth, 0, 20);
 
-	TlclLibInit();
+	if (sboot_init() != SBOOT_SUCCESS)
+		return SBOOT_TPM_ERROR;
 
 	result = TlclSealPCR(keyHandle, pcrMap, keyAuth, dataAuth,
 		key, keySize, blob, &blobSize);
@@ -144,6 +152,9 @@ uint8_t sboot_unseal(const uint8_t *sealData, uint32_t sealDataSize,
 	uint8_t keyAuth[20];
 	uint8_t dataAuth[20];
 
+	if (sboot_init() != SBOOT_SUCCESS)
+		return SBOOT_TPM_ERROR;
+
 	/* Use WK-password for SRK and data */
 	memset(keyAuth, 0, 20);
 	memset(dataAuth, 0, 20);
@@ -161,21 +172,42 @@ uint8_t sboot_init(void)
 {
 	uint32_t tpm_result;
 
-	TSS_BOOL disabled, deactivated, nvlocked;
-	uint8_t pcrCheck[20], pcrDefault[20];
-	uint32_t permissions;
+	if (sboot_state.is_open == 1) {
+		return SBOOT_SUCCESS;
+	}
 
-	puts("Sboot initializing SRTM\n");
-
-	TlclLibInit();
+	tpm_result = TlclLibInit();
+	if (tpm_result != SBOOT_SUCCESS && tpm_result != -EBUSY) {
+		puts("sboot: Could not find TPM\n");
+		return SBOOT_TPM_ERROR;
+	}
 
 	tpm_result = TlclStartup();
 	if (tpm_result != TPM_SUCCESS && tpm_result != TPM_INVALID_POSTINIT) {
 		/* Invalid Postinit is returned if TPM is already started */
-		goto error;
+		return SBOOT_TPM_ERROR;
 	}
 
-	TlclSelfTestFull(); /* Required by some TPMs */
+	/* Continue or state self-test, depending on TPM. */
+	TlclSelfTestFull();
+
+	sboot_state.is_open = 1;
+	return SBOOT_SUCCESS;
+}
+
+uint8_t sboot_srtm_init(void)
+{
+	uint32_t tpm_result = 0;
+
+	TSS_BOOL disabled, deactivated, nvlocked;
+	uint8_t pcrCheck[20], pcrDefault[20];
+	uint32_t permissions;
+
+	puts("sboot: initializing SRTM\n");
+
+	if (sboot_init() != SBOOT_SUCCESS)
+		goto error;
+
 	TlclSetNvLocked(); /* Enforce security controls on NVRAM. */
 	TlclGetFlags(&disabled, &deactivated, &nvlocked);
 
@@ -284,6 +316,9 @@ uint8_t sboot_check(uint16_t nv_index)
 	uint8_t sealData[312];
 	uint8_t unsealData[20];
 
+	if (sboot_init() != SBOOT_SUCCESS)
+		return SBOOT_TPM_ERROR;
+
 	result = TlclRead(nv_index, sealData, 312);
 	if (result != TPM_SUCCESS) {
 		debug("sboot: failed to read seal data from %d.\n", nv_index);
@@ -315,7 +350,8 @@ uint8_t sboot_check_os(void)
 __attribute__((unused))
 uint8_t sboot_extend(uint16_t pcr, const uint8_t* in_digest, uint8_t* out_digest)
 {
-	TlclLibInit();
+	if (sboot_init() != SBOOT_SUCCESS)
+		return SBOOT_TPM_ERROR;
 
 	if (TlclExtend(pcr, in_digest, out_digest) != TPM_SUCCESS)
 		return SBOOT_TPM_ERROR;
@@ -418,8 +454,8 @@ __attribute__((unused))
 uint8_t sboot_finish(void)
 {
 	/* Remove PP, thus locking READ/WRITE to NVRAM. */
-	debug("sboot: finished; locking PCRs and Physical Presence.\n");
-	sboot_lock_pcrs();
+	debug("sboot: finished; locking Physical Presence.\n");
+	/* sboot_lock_pcrs(); */
 	TlclLockPhysicalPresence();
 
 	return SBOOT_SUCCESS;

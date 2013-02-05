@@ -234,7 +234,7 @@ void board_init_r(gd_t *dummy1, ulong dummy2)
  or secured boot (with SBOOT) your SRTM (SPL) should be read from write \
  protected storage."
 #endif
-	sboot_init();
+	sboot_srtm_init();
 	spl_sboot_extend();
 
 	/* Assumes IH_OS_U_BOOT */

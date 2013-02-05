@@ -23,13 +23,15 @@
  *   	- optionally encrypt FS on MMC1
  *
  * TPM Operations (Booting Securely):
- *   SPL: sboot_init() -> initialize TPM, run SelfTest, enable physical presence
+ *   SPL: sboot_init() -> initialize TPM, run SelfTest
+ *   SPL: sboot_srtm_init() -> Verify TPM locks (config), assert PP
  *   SPL: sboot_read_uboot() -> PCR Extend for boot loader
  *   	- read u-boot binary from mmc1
  *   	- calculate SHA1, extend SBOOT_PCR_UBOOT
  *   SPL: sboot_read_eeprom() -> PCR Extend for EEPROM data
  *   	- read EEPROM (various methods)
  *   	- calculate SHA1, extend SBOOT_PCR_UBOOT
+ *   UBT: sboot_init() -> initialize TPM (again, different MMIO)
  *   UBT: sboot_read_bootoptions() -> PCR Extend for boot configuration data
  *   	- read uEnv.txt from mmc1
  *   	- calculate SHA1, extend SBOOT_PCR_UBOOT
@@ -38,7 +40,6 @@
  *   	- calculate SHA1, extend SBOOT_PCR_KERNEL
  *   KRN: sboot_unseal() -> [or UBT] Decrypt filesystem symmetric encryption key.
  *   	- use SKey^i and PCRs to unseal protected storage
- *   KRN: sboot_lock_pcrs() -> extend all used PCRs with random data
  *   KRN: sboot_finish() -> optionally remove physical presence
  *
  */
@@ -49,6 +50,7 @@
 #include <tpm.h>
 
 #include <tlcl.h>
+#include <crypto.h>
 
 /* TSS-defined (section here) PCR locations for UBOOT and OS Kernel */
 /* Todo: this should be represented as a linked list, this will ease iteration
@@ -107,6 +109,8 @@ uint8_t sboot_unseal(const uint8_t *sealData, uint32_t sealDataSize,
  */
 __attribute__((unused))
 uint8_t sboot_init(void);
+__attribute__((unused))
+uint8_t sboot_srtm_init(void);
 
 __attribute__((unused))
 uint8_t sboot_check_os(void);
@@ -124,5 +128,14 @@ __attribute__((unused))
 uint8_t sboot_lock_pcrs(void);
 __attribute__((unused))
 uint8_t sboot_finish(void);
+
+/* Signature-based sboot */
+__attribute__((unused))
+uint8_t sboot_verify_digest(const uint8_t* signature, const uint8_t *digest);
+__attribute__((unused))
+uint8_t sboot_verify_data(const uint8_t *signature, const uint8_t *start, uint32_t size);
+__attribute__((unused))
+uint8_t sboot_signature_key(uint16_t nv_index, RSAPublicKey* key);
+void sboot_getpass(uint8_t *pass, uint32_t *pass_size);
 
 #endif /* SBOOT_H_ */

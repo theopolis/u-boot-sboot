@@ -17,7 +17,6 @@ void spl_sboot_extend(void)
 	uint8_t out_digest[20];
 
 	uint8_t image_buffer[SBOOT_SPL_READ_SIZE];
-	uint32_t i;
 	SHA1_CTX ctx;
 
 	sha1_starts(&ctx);

@@ -8,6 +8,8 @@
 #ifndef _CRYPTO_H_
 #define _CRYPTO_H_
 
+#include <common.h>
+
 #define RSA1024NUMBYTES 128  /* 1024 bit key length */
 #define RSA2048NUMBYTES 256  /* 2048 bit key length */
 #define RSA4096NUMBYTES 512  /* 4096 bit key length */
@@ -17,6 +19,33 @@
 #define RSA2048NUMWORDS (RSA2048NUMBYTES / sizeof(uint32_t))
 #define RSA4096NUMWORDS (RSA4096NUMBYTES / sizeof(uint32_t))
 #define RSA8192NUMWORDS (RSA8192NUMBYTES / sizeof(uint32_t))
+
+/* From Chromium padding.h */
+extern const uint8_t paddingRSA1024_SHA1[];
+extern const uint8_t paddingRSA1024_SHA256[];
+extern const uint8_t paddingRSA1024_SHA512[];
+extern const uint8_t paddingRSA2048_SHA1[];
+extern const uint8_t paddingRSA2048_SHA256[];
+extern const uint8_t paddingRSA2048_SHA512[];
+extern const uint8_t paddingRSA4096_SHA1[];
+extern const uint8_t paddingRSA4096_SHA256[];
+extern const uint8_t paddingRSA4096_SHA512[];
+extern const uint8_t paddingRSA8192_SHA1[];
+extern const uint8_t paddingRSA8192_SHA256[];
+extern const uint8_t paddingRSA8192_SHA512[];
+
+extern const int kNumAlgorithms;
+
+extern const int digestinfo_size_map[];
+extern const int siglen_map[];
+extern const uint8_t* const padding_map[];
+extern const int padding_size_map[];
+extern const int hash_type_map[];
+extern const int hash_size_map[];
+extern const int hash_blocksize_map[];
+extern const uint8_t* const hash_digestinfo_map[];
+extern const char* const algo_strings[];
+/* End from Chromium padding.h */
 
 typedef struct RSAPublicKey {
 	uint32_t len;  /* Length of n[] in number of uint32_t */

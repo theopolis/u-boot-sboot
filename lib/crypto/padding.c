@@ -7,7 +7,6 @@
 
 #include <crypto.h>
 #include <sha1.h>
-#include "padding.h"
 
 #define SHA1_DIGEST_SIZE 20
 #define SHA1_BLOCK_SIZE 64
