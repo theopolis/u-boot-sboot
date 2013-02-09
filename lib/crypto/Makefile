@@ -2,16 +2,11 @@
 
 include $(TOPDIR)/config.mk
 
-LIB	= $(obj)libsboot.o
+LIB	= $(obj)libcrypto.o
 
 SOBJS	=
 
-ifdef CONFIG_SPL_BUILD
-COBJS-$(CONFIG_SPL_SBOOT_SUPPORT) += spl_sboot.o
-endif
-
-COBJS-$(CONFIG_SBOOT_KEYS) += sboot_keys.o
-COBJS-$(CONFIG_SBOOT) += sboot.o
+COBJS-$(CONFIG_CRYPTO) += padding.o rsa.o
 
 COBJS	= $(COBJS-y)
 SRCS 	:= $(SOBJS:.o=.S) $(COBJS:.o=.c)

@@ -23,13 +23,15 @@
  *   	- optionally encrypt FS on MMC1
  *
  * TPM Operations (Booting Securely):
- *   SPL: sboot_init() -> initialize TPM, run SelfTest, enable physical presence
+ *   SPL: sboot_init() -> initialize TPM, run SelfTest
+ *   SPL: sboot_srtm_init() -> Verify TPM locks (config), assert PP
  *   SPL: sboot_read_uboot() -> PCR Extend for boot loader
  *   	- read u-boot binary from mmc1
  *   	- calculate SHA1, extend SBOOT_PCR_UBOOT
  *   SPL: sboot_read_eeprom() -> PCR Extend for EEPROM data
  *   	- read EEPROM (various methods)
  *   	- calculate SHA1, extend SBOOT_PCR_UBOOT
+ *   UBT: sboot_init() -> initialize TPM (again, different MMIO)
  *   UBT: sboot_read_bootoptions() -> PCR Extend for boot configuration data
  *   	- read uEnv.txt from mmc1
  *   	- calculate SHA1, extend SBOOT_PCR_UBOOT
@@ -38,7 +40,6 @@
  *   	- calculate SHA1, extend SBOOT_PCR_KERNEL
  *   KRN: sboot_unseal() -> [or UBT] Decrypt filesystem symmetric encryption key.
  *   	- use SKey^i and PCRs to unseal protected storage
- *   KRN: sboot_lock_pcrs() -> extend all used PCRs with random data
  *   KRN: sboot_finish() -> optionally remove physical presence
  *
  */
@@ -49,6 +50,7 @@
 #include <tpm.h>
 
 #include <tlcl.h>
+#include <crypto.h>
 
 /* TSS-defined (section here) PCR locations for UBOOT and OS Kernel */
 /* Todo: this should be represented as a linked list, this will ease iteration
@@ -72,6 +74,30 @@
 #define SBOOT_SEAL_WELL_KNOWN_KEY 		0x10
 #define SBOOT_NV_INDEX_SEAL_OS			0xd000
 #define SBOOT_NV_INDEX_SEAL_UBOOT		0xe000
+
+typedef struct {
+	uint8_t is_open; /* If we have already opened, and stated the TPM. */
+	uint8_t failed; /* Cache the result of a possible TPM init failure. */
+#ifdef CONFIG_SBOOT_TIMING
+	uint32_t timer;
+#endif
+} sboot_env;
+
+extern sboot_env sboot_state;
+
+#ifdef CONFIG_SBOOT_TIMING
+/* Taken from cmd_time */
+static inline void report_time(char *prefix, uint32_t cycles)
+{
+	sboot_state.timer += cycles;
+	printf("sboot %s time taken: ", prefix);
+	printf(" %u minutes,", ((cycles / CONFIG_SYS_HZ) / 60));
+	printf(" %u.%03u seconds, %u ticks\n", ((cycles / CONFIG_SYS_HZ) % 60),
+		((cycles % CONFIG_SYS_HZ) * 1000 + CONFIG_SYS_HZ / 2) / CONFIG_SYS_HZ,
+		cycles);
+}
+#endif
+
 
 /* SPL functions */
 /* Extend PCRs for U-boot and EEPROM */
@@ -107,6 +133,8 @@ uint8_t sboot_unseal(const uint8_t *sealData, uint32_t sealDataSize,
  */
 __attribute__((unused))
 uint8_t sboot_init(void);
+__attribute__((unused))
+uint8_t sboot_srtm_init(void);
 
 __attribute__((unused))
 uint8_t sboot_check_os(void);
@@ -124,5 +152,14 @@ __attribute__((unused))
 uint8_t sboot_lock_pcrs(void);
 __attribute__((unused))
 uint8_t sboot_finish(void);
+
+/* Signature-based sboot */
+__attribute__((unused))
+uint8_t sboot_verify_digest(const uint8_t* signature, const uint8_t *digest);
+__attribute__((unused))
+uint8_t sboot_verify_data(const uint8_t *signature, const uint8_t *start, uint32_t size);
+__attribute__((unused))
+uint8_t sboot_signature_key(uint16_t nv_index, RSAPublicKey* key);
+void sboot_getpass(uint8_t *pass, uint32_t *pass_size);
 
 #endif /* SBOOT_H_ */

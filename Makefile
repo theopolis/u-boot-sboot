@@ -314,6 +314,7 @@ LIBS-y += drivers/rtc/librtc.o
 LIBS-y += drivers/serial/libserial.o
 LIBS-$(CONFIG_TPM) += drivers/tpm/libtpm.o
 LIBS-$(CONFIG_TPM) += lib/tlcl/libtlcl.o
+LIBS-$(CONFIG_CRYPTO) += lib/crypto/libcrypto.o
 LIBS-$(CONFIG_SBOOT) += lib/sboot/libsboot.o
 LIBS-y += drivers/twserial/libtws.o
 LIBS-y += drivers/usb/eth/libusb_eth.o

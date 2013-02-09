@@ -17,8 +17,11 @@ void spl_sboot_extend(void)
 	uint8_t out_digest[20];
 
 	uint8_t image_buffer[SBOOT_SPL_READ_SIZE];
-	uint32_t i;
 	SHA1_CTX ctx;
+
+#ifdef CONFIG_SBOOT_TIMING
+	uint32_t timer_begin = get_timer_masked();
+#endif
 
 	sha1_starts(&ctx);
 	/* Only support MMC/FAT */
@@ -35,7 +38,7 @@ void spl_sboot_extend(void)
 
 	if (sboot_extend(SBOOT_PCR_UBOOT, csum, out_digest) != SBOOT_SUCCESS) {
 		puts("SPL: (sboot) error while measuring U-Boot\n");
-		return;
+		goto finished;
 	}
 
 	sha1_starts(&ctx);
@@ -62,8 +65,15 @@ void spl_sboot_extend(void)
 
 	if (sboot_extend(SBOOT_PCR_CHIPSET_CONFIG, csum, out_digest) != SBOOT_SUCCESS) {
 		puts("SPL: (sboot) error while measuring chipset config\n");
-		return;
+		goto finished;
 	}
+
+finished:
+#ifdef CONFIG_SBOOT_TIMING
+	report_time("extend", get_timer_masked() - timer_begin);
+#endif
+
+	return;
 }
 
 void spl_sboot_check(void)
