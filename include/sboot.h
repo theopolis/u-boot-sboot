@@ -75,6 +75,30 @@
 #define SBOOT_NV_INDEX_SEAL_OS			0xd000
 #define SBOOT_NV_INDEX_SEAL_UBOOT		0xe000
 
+typedef struct {
+	uint8_t is_open; /* If we have already opened, and stated the TPM. */
+	uint8_t failed; /* Cache the result of a possible TPM init failure. */
+#ifdef CONFIG_SBOOT_TIMING
+	uint32_t timer;
+#endif
+} sboot_env;
+
+extern sboot_env sboot_state;
+
+#ifdef CONFIG_SBOOT_TIMING
+/* Taken from cmd_time */
+static inline void report_time(char *prefix, uint32_t cycles)
+{
+	sboot_state.timer += cycles;
+	printf("sboot %s time taken: ", prefix);
+	printf(" %u minutes,", ((cycles / CONFIG_SYS_HZ) / 60));
+	printf(" %u.%03u seconds, %u ticks\n", ((cycles / CONFIG_SYS_HZ) % 60),
+		((cycles % CONFIG_SYS_HZ) * 1000 + CONFIG_SYS_HZ / 2) / CONFIG_SYS_HZ,
+		cycles);
+}
+#endif
+
+
 /* SPL functions */
 /* Extend PCRs for U-boot and EEPROM */
 void spl_sboot_extend(void);

@@ -32,11 +32,7 @@ const char 		*console_measure_exceptions[] = {
 };
 #endif
 
-typedef struct {
-	uint8_t is_open;
-} sboot_env;
-
-sboot_env sboot_state = {0x0};
+sboot_env sboot_state;
 
 /* TPM must be started, enabled, activated, and owned.
  *   If not owned, OSAP will return a key use error.
@@ -170,43 +166,61 @@ uint8_t sboot_unseal(const uint8_t *sealData, uint32_t sealDataSize,
 
 uint8_t sboot_init(void)
 {
-	uint32_t tpm_result;
+	uint32_t tpm_result = SBOOT_SUCCESS;
 
-	if (sboot_state.is_open == 1) {
+#ifdef CONFIG_SBOOT_TIMING
+	uint32_t timer_begin = get_timer_masked();
+#endif
+
+	if (sboot_state.failed == 1)
+		return SBOOT_TPM_ERROR;
+	if (sboot_state.is_open == 1)
 		return SBOOT_SUCCESS;
-	}
 
 	tpm_result = TlclLibInit();
 	if (tpm_result != SBOOT_SUCCESS && tpm_result != -EBUSY) {
+		sboot_state.failed = 1;
 		puts("sboot: Could not find TPM\n");
-		return SBOOT_TPM_ERROR;
+		goto finished;
 	}
 
 	tpm_result = TlclStartup();
 	if (tpm_result != TPM_SUCCESS && tpm_result != TPM_INVALID_POSTINIT) {
 		/* Invalid Postinit is returned if TPM is already started */
-		return SBOOT_TPM_ERROR;
+		sboot_state.failed = 1;
+		goto finished;
 	}
 
 	/* Continue or state self-test, depending on TPM. */
 	TlclSelfTestFull();
-
 	sboot_state.is_open = 1;
-	return SBOOT_SUCCESS;
+
+finished:
+#ifdef CONFIG_SBOOT_TIMING
+	report_time("init", get_timer_masked() - timer_begin);
+#endif
+	if (tpm_result != SBOOT_SUCCESS)
+		return SBOOT_TPM_ERROR;
+	return tpm_result;
 }
 
 uint8_t sboot_srtm_init(void)
 {
-	uint32_t tpm_result = 0;
+	uint32_t tpm_result = SBOOT_SUCCESS;
 
 	TSS_BOOL disabled, deactivated, nvlocked;
 	uint8_t pcrCheck[20], pcrDefault[20];
 	uint32_t permissions;
 
+#ifdef CONFIG_SBOOT_TIMING
+	uint32_t timer_begin = get_timer_masked();
+#endif
+
 	puts("sboot: initializing SRTM\n");
 
-	if (sboot_init() != SBOOT_SUCCESS)
-		goto error;
+	tpm_result = sboot_init();
+	if (tpm_result != SBOOT_SUCCESS)
+		goto finished;
 
 	TlclSetNvLocked(); /* Enforce security controls on NVRAM. */
 	TlclGetFlags(&disabled, &deactivated, &nvlocked);
@@ -218,7 +232,7 @@ uint8_t sboot_srtm_init(void)
 		 */
 		/* Todo: Set enabled and activated, then try again. */
 		debug("sboot: The TPM is disabled or deactivated.\n");
-		goto error;
+		goto finished;
 	}
 
 	if (nvlocked != 1) {
@@ -228,7 +242,7 @@ uint8_t sboot_srtm_init(void)
 		 * then the defined NVRAM indexes need to be defined with PPREAD|PPWRITE.
 		 */
 		debug("sboot: The TPM NVRAM is not locked.\n");
-		goto error;
+		goto finished;
 	}
 
 	/* Check PCR values, they should be 0, else they will need to be reset.
@@ -239,31 +253,31 @@ uint8_t sboot_srtm_init(void)
 	if (tpm_result != TPM_SUCCESS || memcmp(pcrCheck, pcrDefault, 20) != 0) {
 		debug("sboot: UBOOT PCR is unreadable or extended.\n");
 		tpm_result = SBOOT_TPM_ERROR;
-		goto error;
+		goto finished;
 	}
 	tpm_result = TlclPCRRead(SBOOT_PCR_CHIPSET_CONFIG, (void *) pcrCheck, 20);
 	if (tpm_result != TPM_SUCCESS || memcmp(pcrCheck, pcrDefault, 20) != 0) {
 		debug("sboot: CHIPSET CONFIG PCR is unreadable or extended.\n");
 		tpm_result = SBOOT_TPM_ERROR;
-		goto error;
+		goto finished;
 	}
 	tpm_result = TlclPCRRead(SBOOT_PCR_UBOOT_ENVIRONMENT, (void *) pcrCheck, 20);
 	if (tpm_result != TPM_SUCCESS || memcmp(pcrCheck, pcrDefault, 20) != 0) {
 		debug("sboot: UBOOT ENVIRONMENT PCR is unreadable or extended.\n");
 		tpm_result = SBOOT_TPM_ERROR;
-		goto error;
+		goto finished;
 	}
 	tpm_result = TlclPCRRead(SBOOT_PCR_UBOOT_CONSOLE, (void *) pcrCheck, 20);
 	if (tpm_result != TPM_SUCCESS || memcmp(pcrCheck, pcrDefault, 20) != 0) {
 		debug("sboot: UBOOT CONSOLE PCR is unreadable or extended.\n");
 		tpm_result = SBOOT_TPM_ERROR;
-		goto error;
+		goto finished;
 	}
 	tpm_result = TlclPCRRead(SBOOT_PCR_KERNEL, (void *) pcrCheck, 20);
 	if (tpm_result != TPM_SUCCESS || memcmp(pcrCheck, pcrDefault, 20) != 0) {
 		debug("sboot: KERNEL PCR is unreadable or extended.\n");
 		tpm_result = SBOOT_TPM_ERROR;
-		goto error;
+		goto finished;
 	}
 
 
@@ -271,21 +285,21 @@ uint8_t sboot_srtm_init(void)
 	tpm_result = TlclGetPermissions(SBOOT_NV_INDEX_SEAL_UBOOT, &permissions);
 	if (tpm_result != TPM_SUCCESS) {
 		debug("sboot: failed to get permissions for NVRAM UBOOT_SEAL (index=%d).\n", SBOOT_NV_INDEX_SEAL_UBOOT);
-		goto error;
+		goto finished;
 	}
 	if (permissions != (TPM_NV_PER_PPWRITE|TPM_NV_PER_PPREAD)) {
 		debug("sboot: NVRAM permissions for UBOOT_SEAL are incorrect (perm=%d).\n", permissions);
-		goto error;
+		goto finished;
 	}
 
 	TlclGetPermissions(SBOOT_NV_INDEX_SEAL_OS, &permissions);
 	if (tpm_result != TPM_SUCCESS) {
 		debug("sboot: Failed to get permissions for NVRAM OS_SEAL (index=%d).\n", SBOOT_NV_INDEX_SEAL_OS);
-		goto error;
+		goto finished;
 	}
 	if (permissions != (TPM_NV_PER_PPWRITE|TPM_NV_PER_PPREAD)) {
 		debug("sboot: NVRAM permissions for OS_SEAL are incorrect (perm=%d).\n", permissions);
-		goto error;
+		goto finished;
 	}
 
 	/* Physical presence must match the security controls on NVRAM. */
@@ -294,7 +308,11 @@ uint8_t sboot_srtm_init(void)
 		debug("sboot: Failed to enable Physical Presence\n");
 	}
 
-error:
+finished:
+#ifdef CONFIG_SBOOT_TIMING
+	report_time("srtm_init", get_timer_masked() - timer_begin);
+#endif
+
 	if (tpm_result != TPM_SUCCESS) {
 		puts("sboot: Failed to initialize TPM\n");
 		return SBOOT_TPM_ERROR;
@@ -316,27 +334,40 @@ uint8_t sboot_check(uint16_t nv_index)
 	uint8_t sealData[312];
 	uint8_t unsealData[20];
 
-	if (sboot_init() != SBOOT_SUCCESS)
-		return SBOOT_TPM_ERROR;
+#ifdef CONFIG_SBOOT_TIMING
+	uint32_t timer_begin = get_timer_masked();
+#endif
+
+	result = sboot_init();
+	if (result != SBOOT_SUCCESS)
+		goto finished;
 
 	result = TlclRead(nv_index, sealData, 312);
 	if (result != TPM_SUCCESS) {
 		debug("sboot: failed to read seal data from %d.\n", nv_index);
-		return SBOOT_TPM_ERROR;
+		goto finished;
 	}
 
 	/* no need to check unsealed data */
 	result = sboot_unseal(sealData, 312, unsealData, &unsealDataSize);
 	if (result != SBOOT_SUCCESS) {
 		debug("sboot: failed to unseal.\n");
-		return SBOOT_DATA_ERROR;
+		goto finished;
 	}
 
-#ifdef CONFIG_SBOOT_ENFORCE
-	puts("\n\n(Critical!) System state change detected\n");
-	sboot_finish();
-	hang();
+finished:
+#ifdef CONFIG_SBOOT_TIMING
+	report_time("check", get_timer_masked() - timer_begin);
 #endif
+
+	if (result != SBOOT_SUCCESS) {
+#ifdef CONFIG_SBOOT_ENFORCE
+		puts("\n\n(Critical!) System state change detected\n");
+		sboot_finish();
+		hang();
+#endif
+		return SBOOT_DATA_ERROR;
+	}
 
 	return SBOOT_SUCCESS;
 }
@@ -386,11 +417,19 @@ uint8_t sboot_extend_console(const char *buffer, uint32_t max_size)
 		}
 	}
 
+#ifdef CONFIG_SBOOT_TIMING
+	uint32_t timer_begin = get_timer_masked();
+#endif
+
 	debug("sboot: Extending console with \"%s\" (size=%d).\n", buffer, size);
 
 	sha1_starts(&ctx); /* could be 1 function, sha1_csum */
 	sha1_update(&ctx, (const unsigned char*) buffer, size);
 	sha1_finish(&ctx, digest);
+
+#ifdef CONFIG_SBOOT_TIMING
+	report_time("extend_console", get_timer_masked() - timer_begin);
+#endif
 
 	return sboot_extend(SBOOT_PCR_UBOOT_CONSOLE, digest, out_digest);
 }
@@ -403,11 +442,19 @@ uint8_t sboot_extend_environment(const char *buffer, uint32_t size)
 	uint8_t digest[20], out_digest[20];
 	SHA1_CTX ctx;
 
+#ifdef CONFIG_SBOOT_TIMING
+	uint32_t timer_begin = get_timer_masked();
+#endif
+
 	debug("sboot: Extending env with \"%s\" (size=%d).\n", buffer, size);
 
 	sha1_starts(&ctx); /* could be 1 function, sha1_csum */
 	sha1_update(&ctx, (const unsigned char*) buffer, size);
 	sha1_finish(&ctx, digest);
+
+#ifdef CONFIG_SBOOT_TIMING
+	report_time("extend_environment", get_timer_masked() - timer_begin);
+#endif
 
 	return sboot_extend(SBOOT_PCR_UBOOT_ENVIRONMENT, digest, out_digest);
 }
@@ -423,11 +470,19 @@ uint8_t sboot_extend_os(const uint8_t* start, uint32_t size)
 	if (size == 0)
 		return SBOOT_SUCCESS;
 
+#ifdef CONFIG_SBOOT_TIMING
+	uint32_t timer_begin = get_timer_masked();
+#endif
+
 	debug("sboot: Extending OS (addr=%x, size=%d)\n", (uint32_t) start, size);
 
 	sha1_starts(&ctx);
 	sha1_update(&ctx, start, size);
 	sha1_finish(&ctx, digest);
+
+#ifdef CONFIG_SBOOT_TIMING
+	report_time("extend_os", get_timer_masked() - timer_begin);
+#endif
 
 	return sboot_extend(SBOOT_PCR_KERNEL, digest, out_digest);
 }
@@ -457,6 +512,10 @@ uint8_t sboot_finish(void)
 	debug("sboot: finished; locking Physical Presence.\n");
 	/* sboot_lock_pcrs(); */
 	TlclLockPhysicalPresence();
+
+#ifdef CONFIG_SBOOT_TIMING
+	report_time("total", sboot_state.timer);
+#endif
 
 	return SBOOT_SUCCESS;
 }

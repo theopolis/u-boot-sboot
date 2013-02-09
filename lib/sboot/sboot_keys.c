@@ -61,13 +61,15 @@ uint8_t sboot_verify_digest(const uint8_t *signature, const uint8_t *digest)
 {
 	RSAPublicKey key;
 	uint32_t sig_size;
+	uint16_t nv_index;
 
 	uint8_t result = SBOOT_DATA_ERROR;
 
 #ifndef CONFIG_SBOOT_KEYSTORE_INDEX
 	return result;
 #else
-	result = sboot_signature_key(CONFIG_SBOOT_KEYSTORE_INDEX, &key);
+	nv_index = CONFIG_SBOOT_KEYSTORE_INDEX;
+	result = sboot_signature_key(nv_index, &key);
 #endif
 	if (result != SBOOT_SUCCESS)
 		return SBOOT_DATA_ERROR;
@@ -95,7 +97,7 @@ uint8_t sboot_verify_data(const uint8_t *signature, const uint8_t *start, uint32
 }
 
 __attribute__((unused))
-uint8_t sboot_signature_key(uint16_t nv_index, RSAPublicKey* key)
+uint8_t sboot_signature_key(uint16_t nv_index, RSAPublicKey *key)
 {
 	uint32_t key_size;
 	uint32_t result;
