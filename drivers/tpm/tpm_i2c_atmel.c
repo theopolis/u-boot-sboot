@@ -26,23 +26,25 @@
 #include <common.h>
 #include <i2c.h>
 #include <linux/types.h>
-
-//#include "compatibility.h"
 #include <tpm.h>
-#include <asm/unaligned.h>
+#include <asm-generic/errno.h>
+#include <linux/types.h>
+#include <linux/unaligned/be_byteshift.h>
+
+#include "tpm_private.h"
 
 /** Found in AVR code and in Max's implementation **/
-#ifdef TPM_BUFSIZE
-#undef TPM_BUFISZE
-#endif
-
+#ifndef TPM_BUFSIZE
 #define TPM_BUFSIZE 1024
+#endif
 
 /* Atmel-defined I2C bus ID */
 /* Note: this is defined in board configuration */
-#ifndef CONFIG_TPM_I2C_ADDR
-#define CONFIG_TPM_I2C_ADDR 0x29
+#ifndef CONFIG_TPM_TIS_I2C_SLAVE_ADDRESS
+#define CONFIG_TPM_TIS_I2C_SLAVE_ADDRESS 0x29
 #endif
+
+#define TPM_HEADER_SIZE    10
 
 struct tpm_i2c_atmel_dev {
   uint addr;
@@ -53,7 +55,7 @@ struct tpm_i2c_atmel_dev {
 
 static struct tpm_i2c_atmel_dev tpm_dev = {
     /* Note: replace with defined addr from board configuration */
-    .addr = CONFIG_TPM_I2C_ADDR
+    .addr = CONFIG_TPM_TIS_I2C_SLAVE_ADDRESS
 };
 
 static u8 tpm_i2c_read(u8 *buffer, size_t len);

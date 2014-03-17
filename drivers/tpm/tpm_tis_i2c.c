@@ -7,14 +7,20 @@
 #include <config.h>
 #include <common.h>
 #include <i2c.h>
-#include "tpm.h"
+#include <tpm.h>
+#include <fdtdec.h>
+
+#include "tpm_private.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
 /* Define in board config */
-#ifndef CONFIG_TPM_I2C_BUS
+#ifndef CONFIG_TPM_TIS_I2C_BUS_NUMBER
   #define CONFIG_TPM_I2C_BUS 0
-  #define CONFIG_TPM_I2C_ADDR 0
+#endif
+
+#ifndef CONFIG_TPM_TIS_I2C_SLAVE_ADDRESS
+  #define CONFIG_TPM_TIS_I2C_SLAVE_ADDRESS 0
 #endif
 
 /* TPM configuration */
@@ -73,6 +79,10 @@ static int tpm_decode_config(struct tpm *dev)
 
   node = fdtdec_next_compatible(blob, 0, COMPAT_INFINEON_SLB9635_TPM);
   if (node < 0) {
+    node = fdtdec_next_compatible(blob, 0,
+        COMPAT_INFINEON_SLB9645_TPM);
+  }
+  if (node < 0) {
     debug("%s: Node not found\n", __func__);
     return -1;
   }
@@ -81,14 +91,14 @@ static int tpm_decode_config(struct tpm *dev)
     debug("%s: Cannot find node parent\n", __func__);
     return -1;
   }
-  i2c_bus = i2c_get_bus_num_fdt(blob, parent);
+  i2c_bus = i2c_get_bus_num_fdt(parent);
   if (i2c_bus < 0)
     return -1;
   dev->i2c_bus = i2c_bus;
   dev->slave_addr = fdtdec_get_addr(blob, node, "reg");
 #else
-  dev->i2c_bus = CONFIG_TPM_I2C_BUS;
-  dev->slave_addr = CONFIG_TPM_I2C_ADDR;
+  dev->i2c_bus = CONFIG_TPM_TIS_I2C_BUS_NUMBER;
+  dev->slave_addr = CONFIG_TPM_TIS_I2C_SLAVE_ADDRESS;
 #endif
   return 0;
 }
