@@ -16,7 +16,7 @@ DECLARE_GLOBAL_DATA_PTR;
 
 /* Define in board config */
 #ifndef CONFIG_TPM_TIS_I2C_BUS_NUMBER
-  #define CONFIG_TPM_I2C_BUS 0
+  #define CONFIG_TPM_TIS_I2C_BUS_NUMBER 0
 #endif
 
 #ifndef CONFIG_TPM_TIS_I2C_SLAVE_ADDRESS

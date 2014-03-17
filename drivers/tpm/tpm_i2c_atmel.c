@@ -44,7 +44,8 @@
 #define CONFIG_TPM_TIS_I2C_SLAVE_ADDRESS 0x29
 #endif
 
-#define TPM_HEADER_SIZE    10
+#define TPM_HEADER_SIZE 10
+#define TPM_TIMEOUT     5000
 
 struct tpm_i2c_atmel_dev {
   uint addr;
@@ -69,20 +70,21 @@ static int tpm_tis_i2c_send (struct tpm_chip *chip, u8 *buf, size_t count);
 static u8 tpm_i2c_read(u8 *buffer, size_t len)
 {
   int rc;
-  u32 trapdoor = 0;
-  const u32 trapdoor_limit = 60000; /* not 5min with base 5mil seconds */
+//  u32 trapdoor = 0;
+//  const u32 trapdoor_limit = 60000; /* not 5min with base 5mil seconds */
+  unsigned long start;
 
+  start = get_timer(0);
   do {
     /* Atmel TPM requires RAW reads */
     rc = i2c_read(tpm_dev.addr, 0, 0, buffer, len);
     if (rc == 0x00) /* successful read */
       break;
-    trapdoor++;
-    msleep(5);
-  } while (trapdoor < trapdoor_limit); /*trapdoor_limit*/
+    udelay(60);
+  } while (get_timer(start) < TPM_TIMEOUT); /*trapdoor_limit*/
 
   /** failed to read **/
-  if (trapdoor >= trapdoor_limit)
+  if (rc != 0x00)
     return -EFAULT;
 
   return rc;
