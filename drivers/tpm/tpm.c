@@ -66,6 +66,18 @@ enum tpm_duration {
 #define TPM_CMD_COUNT_BYTE  2
 #define TPM_CMD_ORDINAL_BYTE  6
 
+struct tpm_chip *tpm_register_hardware(const struct tpm_vendor_specific *entry)
+{
+	struct tpm_chip *chip;
+
+	/* Driver specific per-device data */
+	chip = &g_chip;
+	memcpy(&chip->vendor, entry, sizeof(struct tpm_vendor_specific));
+	chip->is_open = 1;
+
+	return chip;
+}
+
 /*
  * Array with one entry per ordinal defining the maximum amount
  * of time the chip could take to return the result.  The ordinal

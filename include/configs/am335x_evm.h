@@ -457,9 +457,12 @@
 #endif  /* NOR support */
 
 #if defined(CONFIG_ATMEL_TPM)
+#define CONFIG_TPM
+#define CONFIG_SHA1
+
 #define CONFIG_CMD_TPM
 #define CONFIG_TPM_I2C_ATMEL
-#define CONFIG_TPM_TIS_I2C_BUS_NUMBER 1
+#define CONFIG_TPM_TIS_I2C_BUS_NUMBER 0x01
 #define CONFIG_TPM_TIS_I2C_SLAVE_ADDRESS 0x29
 #endif /* Atmel TPM (CryptoCape) support */
 
