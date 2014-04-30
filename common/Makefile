@@ -48,6 +48,7 @@ obj-$(CONFIG_ENV_IS_IN_UBI) += env_ubi.o
 obj-$(CONFIG_ENV_IS_NOWHERE) += env_nowhere.o
 
 # command
+obj-$(CONFIG_CMD_AES) += cmd_aes.o
 obj-$(CONFIG_CMD_AMBAPP) += cmd_ambapp.o
 obj-$(CONFIG_SOURCE) += cmd_source.o
 obj-$(CONFIG_CMD_SOURCE) += cmd_source.o
@@ -159,6 +160,9 @@ obj-$(CONFIG_CMD_UBI) += cmd_ubi.o
 obj-$(CONFIG_CMD_UBIFS) += cmd_ubifs.o
 obj-$(CONFIG_CMD_UNIVERSE) += cmd_universe.o
 obj-$(CONFIG_CMD_UNZIP) += cmd_unzip.o
+ifdef CONFIG_LZMA
+obj-$(CONFIG_CMD_LZMADEC) += cmd_lzmadec.o
+endif
 ifdef CONFIG_CMD_USB
 obj-y += cmd_usb.o
 obj-y += usb.o usb_hub.o
@@ -230,6 +234,7 @@ obj-$(SPD) += ddr_spd.o
 obj-$(CONFIG_HWCONFIG) += hwconfig.o
 obj-$(CONFIG_BOUNCE_BUFFER) += bouncebuf.o
 obj-y += console.o
+obj-$(CONFIG_CROS_EC) += cros_ec.o
 obj-y += dlmalloc.o
 obj-y += image.o
 obj-$(CONFIG_OF_LIBFDT) += image-fdt.o

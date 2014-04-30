@@ -171,7 +171,7 @@ LDPPFLAGS += \
 	$(shell $(LD) --version | \
 	  sed -ne 's/GNU ld version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/-DLD_MAJOR=\1 -DLD_MINOR=\2/p')
 
-quiet_cmd_mkimage = UIMAGE  $@
+quiet_cmd_mkimage = MKIMAGE $@
 cmd_mkimage = $(objtree)/tools/mkimage $(MKIMAGEFLAGS_$(@F)) -d $< $@ \
 	$(if $(KBUILD_VERBOSE:1=), >/dev/null)
 
@@ -231,11 +231,11 @@ $(u-boot-spl-dirs):
 	$(Q)$(MAKE) $(build)=$@
 
 quiet_cmd_cpp_lds = LDS     $@
-cmd_cpp_lds = $(CPP) $(cpp_flags) $(LDPPFLAGS) -ansi -D__ASSEMBLY__ \
-		-x assembler-with-cpp -P -o $@ $<
+cmd_cpp_lds = $(CPP) -Wp,-MD,$(depfile) $(cpp_flags) $(LDPPFLAGS) -ansi \
+		-D__ASSEMBLY__ -x assembler-with-cpp -P -o $@ $<
 
 $(obj)/u-boot-spl.lds: $(LDSCRIPT) FORCE
-	$(call if_changed,cpp_lds)
+	$(call if_changed_dep,cpp_lds)
 
 # read all saved command lines
 

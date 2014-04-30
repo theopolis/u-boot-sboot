@@ -3,6 +3,7 @@
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
+#ifndef USE_HOSTCC
 #include <common.h>
 #include <serial.h>
 #include <libfdt.h>
@@ -52,8 +53,10 @@ static const char * const compat_names[COMPAT_COUNT] = {
 	COMPAT(SAMSUNG_EXYNOS5_USB3_PHY, "samsung,exynos5250-usb3-phy"),
 	COMPAT(SAMSUNG_EXYNOS_TMU, "samsung,exynos-tmu"),
 	COMPAT(SAMSUNG_EXYNOS_FIMD, "samsung,exynos-fimd"),
+	COMPAT(SAMSUNG_EXYNOS_MIPI_DSI, "samsung,exynos-mipi-dsi"),
 	COMPAT(SAMSUNG_EXYNOS5_DP, "samsung,exynos5-dp"),
 	COMPAT(SAMSUNG_EXYNOS5_DWMMC, "samsung,exynos5250-dwmmc"),
+	COMPAT(SAMSUNG_EXYNOS_MMC, "samsung,exynos-mmc"),
 	COMPAT(SAMSUNG_EXYNOS_SERIAL, "samsung,exynos4210-uart"),
 	COMPAT(MAXIM_MAX77686_PMIC, "maxim,max77686_pmic"),
 	COMPAT(GENERIC_SPI_FLASH, "spi-flash"),
@@ -61,6 +64,8 @@ static const char * const compat_names[COMPAT_COUNT] = {
 	COMPAT(INFINEON_SLB9635_TPM, "infineon,slb9635-tpm"),
 	COMPAT(INFINEON_SLB9645_TPM, "infineon,slb9645-tpm"),
 	COMPAT(SAMSUNG_EXYNOS5_I2C, "samsung,exynos5-hsi2c"),
+	COMPAT(SANDBOX_HOST_EMULATION, "sandbox,host-emulation"),
+	COMPAT(SANDBOX_LCD_SDL, "sandbox,lcd-sdl"),
 };
 
 const char *fdtdec_get_compatible(enum fdt_compat_id id)
@@ -617,3 +622,46 @@ int fdtdec_decode_region(const void *blob, int node,
 	debug("%s: size=%zx\n", __func__, *size);
 	return 0;
 }
+
+/**
+ * Read a flash entry from the fdt
+ *
+ * @param blob		FDT blob
+ * @param node		Offset of node to read
+ * @param name		Name of node being read
+ * @param entry		Place to put offset and size of this node
+ * @return 0 if ok, -ve on error
+ */
+int fdtdec_read_fmap_entry(const void *blob, int node, const char *name,
+			   struct fmap_entry *entry)
+{
+	u32 reg[2];
+
+	if (fdtdec_get_int_array(blob, node, "reg", reg, 2)) {
+		debug("Node '%s' has bad/missing 'reg' property\n", name);
+		return -FDT_ERR_NOTFOUND;
+	}
+	entry->offset = reg[0];
+	entry->length = reg[1];
+
+	return 0;
+}
+#else
+#include "libfdt.h"
+#include "fdt_support.h"
+
+int fdtdec_get_int(const void *blob, int node, const char *prop_name,
+		int default_val)
+{
+	const int *cell;
+	int len;
+
+	cell = fdt_getprop_w((void *)blob, node, prop_name, &len);
+	if (cell && len >= sizeof(int)) {
+		int val = fdt32_to_cpu(cell[0]);
+
+		return val;
+	}
+	return default_val;
+}
+#endif

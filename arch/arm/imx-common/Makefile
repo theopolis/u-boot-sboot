@@ -32,7 +32,7 @@ $(IMX_CONFIG): %.cfgtmp: % FORCE
 	$(Q)mkdir -p $(dir $@)
 	$(call if_changed_dep,cpp_cfg)
 
-quiet_cmd_mkimage = UIMAGE  $@
+quiet_cmd_mkimage = MKIMAGE $@
 cmd_mkimage = $(objtree)/tools/mkimage $(MKIMAGEFLAGS_$(@F)) -d $< $@ \
 	$(if $(KBUILD_VERBOSE:1=), >/dev/null)
 
@@ -41,6 +41,14 @@ MKIMAGEFLAGS_u-boot.imx = -n $(filter-out $< $(PHONY),$^) -T imximage \
 
 u-boot.imx: u-boot.bin $(IMX_CONFIG) FORCE
 	$(call if_changed,mkimage)
+
+ifeq ($(CONFIG_OF_SEPARATE),y)
+MKIMAGEFLAGS_u-boot-dtb.imx = -n $(filter-out $< $(PHONY),$^) -T imximage \
+	-e $(CONFIG_SYS_TEXT_BASE)
+
+u-boot-dtb.imx: u-boot-dtb.bin $(IMX_CONFIG) FORCE
+	$(call if_changed,mkimage)
+endif
 
 MKIMAGEFLAGS_SPL = -n $(filter-out $< $(PHONY),$^) -T imximage \
 	-e $(CONFIG_SPL_TEXT_BASE)
