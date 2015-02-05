@@ -3,7 +3,7 @@ AT97SC3204T I2C TPM U-boot support
 
 *Note:* This only includes a board config for the BeagleBone: am335x_evm_tpm
 
-Use the beaglebone branch: https://github.com/theopolis/u-boot-sboot/tree/beaglebone
+Also see the standalone reference: https://github.com/theopolis/sboot
 
 ## Instructions:
 
