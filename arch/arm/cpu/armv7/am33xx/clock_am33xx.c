@@ -151,6 +151,7 @@ void enable_basic_clocks(void)
 		&cmper->usb0clkctrl,
 		&cmper->emiffwclkctrl,
 		&cmper->emifclkctrl,
+		&cmper->i2c2clkctrl,
 		0
 	};
 
