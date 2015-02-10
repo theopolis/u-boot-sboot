@@ -1,21 +1,8 @@
 /*
  * Copyright 2011 Freescale Semiconductor, Inc.
- *	Andy Fleming <afleming@freescale.com>
+ *	Andy Fleming <afleming@gmail.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * This file pretty much stolen from Linux's mii.h/ethtool.h/phy.h
  */
@@ -45,13 +32,17 @@
 #define PHY_10G_FEATURES	(PHY_GBIT_FEATURES | \
 				SUPPORTED_10000baseT_Full)
 
+#ifndef PHY_ANEG_TIMEOUT
 #define PHY_ANEG_TIMEOUT	4000
+#endif
 
 
 typedef enum {
 	PHY_INTERFACE_MODE_MII,
 	PHY_INTERFACE_MODE_GMII,
 	PHY_INTERFACE_MODE_SGMII,
+	PHY_INTERFACE_MODE_SGMII_2500,
+	PHY_INTERFACE_MODE_QSGMII,
 	PHY_INTERFACE_MODE_TBI,
 	PHY_INTERFACE_MODE_RMII,
 	PHY_INTERFACE_MODE_RGMII,
@@ -67,6 +58,8 @@ static const char *phy_interface_strings[] = {
 	[PHY_INTERFACE_MODE_MII]		= "mii",
 	[PHY_INTERFACE_MODE_GMII]		= "gmii",
 	[PHY_INTERFACE_MODE_SGMII]		= "sgmii",
+	[PHY_INTERFACE_MODE_SGMII_2500]		= "sgmii-2500",
+	[PHY_INTERFACE_MODE_QSGMII]		= "qsgmii",
 	[PHY_INTERFACE_MODE_TBI]		= "tbi",
 	[PHY_INTERFACE_MODE_RMII]		= "rmii",
 	[PHY_INTERFACE_MODE_RGMII]		= "rgmii",
@@ -136,6 +129,9 @@ struct phy_driver {
 	/* Called when bringing down the controller */
 	int (*shutdown)(struct phy_device *phydev);
 
+	int (*readext)(struct phy_device *phydev, int addr, int devad, int reg);
+	int (*writeext)(struct phy_device *phydev, int addr, int devad, int reg,
+			u16 val);
 	struct list_head list;
 };
 
@@ -171,6 +167,14 @@ struct phy_device {
 	u32 flags;
 };
 
+struct fixed_link {
+	int phy_id;
+	int duplex;
+	int link_speed;
+	int pause;
+	int asym_pause;
+};
+
 static inline int phy_read(struct phy_device *phydev, int devad, int regnum)
 {
 	struct mii_dev *bus = phydev->bus;
@@ -199,6 +203,9 @@ static inline int is_10g_interface(phy_interface_t interface)
 
 int phy_init(void);
 int phy_reset(struct phy_device *phydev);
+struct phy_device *phy_find_by_mask(struct mii_dev *bus, unsigned phy_mask,
+		phy_interface_t interface);
+void phy_connect_dev(struct phy_device *phydev, struct eth_device *dev);
 struct phy_device *phy_connect(struct mii_dev *bus, int addr,
 				struct eth_device *dev,
 				phy_interface_t interface);
@@ -209,6 +216,7 @@ int phy_register(struct phy_driver *drv);
 int genphy_config_aneg(struct phy_device *phydev);
 int genphy_restart_aneg(struct phy_device *phydev);
 int genphy_update_link(struct phy_device *phydev);
+int genphy_parse_link(struct phy_device *phydev);
 int genphy_config(struct phy_device *phydev);
 int genphy_startup(struct phy_device *phydev);
 int genphy_shutdown(struct phy_device *phydev);
@@ -217,9 +225,12 @@ int gen10g_startup(struct phy_device *phydev);
 int gen10g_shutdown(struct phy_device *phydev);
 int gen10g_discover_mmds(struct phy_device *phydev);
 
+int phy_aquantia_init(void);
 int phy_atheros_init(void);
 int phy_broadcom_init(void);
+int phy_cortina_init(void);
 int phy_davicom_init(void);
+int phy_et1011c_init(void);
 int phy_lxt_init(void);
 int phy_marvell_init(void);
 int phy_micrel_init(void);
@@ -229,7 +240,10 @@ int phy_smsc_init(void);
 int phy_teranetics_init(void);
 int phy_vitesse_init(void);
 
+int board_phy_config(struct phy_device *phydev);
+
 /* PHY UIDs for various PHYs that are referenced in external code */
+#define PHY_UID_CS4340  0x13e51002
 #define PHY_UID_TN2020	0x00a19410
 
 #endif

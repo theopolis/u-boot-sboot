@@ -4,19 +4,7 @@
  * Copyright (C) 2006-2008 David Brownell
  * U-boot porting: Lukasz Majewski <l.majewski@samsung.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #undef DEBUG
 
@@ -755,8 +743,8 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			if (!gadget_is_dualspeed(gadget))
 				break;
 			device_qual(cdev);
-			value = min(w_length,
-				sizeof(struct usb_qualifier_descriptor));
+			value = min_t(int, w_length,
+				      sizeof(struct usb_qualifier_descriptor));
 			break;
 		case USB_DT_OTHER_SPEED_CONFIG:
 			if (!gadget_is_dualspeed(gadget))
@@ -772,6 +760,14 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 					w_index, w_value & 0xff);
 			if (value >= 0)
 				value = min(w_length, (u16) value);
+			break;
+		case USB_DT_BOS:
+			/*
+			 * The USB compliance test (USB 2.0 Command Verifier)
+			 * issues this request. We should not run into the
+			 * default path here. But return for now until
+			 * the superspeed support is added.
+			 */
 			break;
 		default:
 			goto unknown;
@@ -858,6 +854,25 @@ unknown:
 			}
 			if (&f->list == &cdev->config->functions)
 				f = NULL;
+			break;
+		/*
+		 * dfu-util (version 0.5) sets bmRequestType.Receipent = Device
+		 * for non-standard request (w_value = 0x21,
+		 * bRequest = GET_DESCRIPTOR in this case).
+		 * When only one interface is registered (as it is done now),
+		 * then this request shall be handled as it was requested for
+		 * interface.
+		 *
+		 * In the below code it is checked if only one interface is
+		 * present and proper function for it is extracted. Due to that
+		 * function's setup (f->setup) is called to handle this
+		 * special non-standard request.
+		 */
+		case USB_RECIP_DEVICE:
+			debug("cdev->config->next_interface_id: %d intf: %d\n",
+			       cdev->config->next_interface_id, intf);
+			if (cdev->config->next_interface_id == 1)
+				f = cdev->config->interface[intf];
 			break;
 		}
 
@@ -978,7 +993,8 @@ static int composite_bind(struct usb_gadget *gadget)
 	if (status < 0)
 		goto fail;
 
-	cdev->desc = *composite->dev;
+	memcpy(&cdev->desc, composite->dev,
+	       sizeof(struct usb_device_descriptor));
 	cdev->desc.bMaxPacketSize0 = gadget->ep0->maxpacket;
 
 	debug("%s: ready\n", composite->name);
@@ -1079,4 +1095,5 @@ void usb_composite_unregister(struct usb_composite_driver *driver)
 	if (composite != driver)
 		return;
 	usb_gadget_unregister_driver(&composite_driver);
+	composite = NULL;
 }

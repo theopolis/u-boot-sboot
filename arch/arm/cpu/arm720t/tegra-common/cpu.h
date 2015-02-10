@@ -1,24 +1,8 @@
 /*
- * (C) Copyright 2010-2011
+ * (C) Copyright 2010-2014
  * NVIDIA Corporation <www.nvidia.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <asm/types.h>
 
@@ -26,7 +10,16 @@
 #define PLL_STABILIZATION_DELAY (300)
 #define IO_STABILIZATION_DELAY	(1000)
 
-#define NVBL_PLLP_KHZ	(216000)
+#if defined(CONFIG_TEGRA20)
+#define NVBL_PLLP_KHZ	216000
+#define CSITE_KHZ	144000
+#elif defined(CONFIG_TEGRA30) || defined(CONFIG_TEGRA114) || \
+	defined(CONFIG_TEGRA124)
+#define NVBL_PLLP_KHZ	408000
+#define CSITE_KHZ	204000
+#else
+#error "Unknown Tegra chip!"
+#endif
 
 #define PLLX_ENABLED		(1 << 30)
 #define CCLK_BURST_POLICY	0x20008888
@@ -44,50 +37,11 @@
 
 #define CORESIGHT_UNLOCK	0xC5ACCE55;
 
-/* AP20-Specific Base Addresses */
-
-/* AP20 Base physical address of SDRAM. */
-#define AP20_BASE_PA_SDRAM      0x00000000
-/* AP20 Base physical address of internal SRAM. */
-#define AP20_BASE_PA_SRAM       0x40000000
-/* AP20 Size of internal SRAM (256KB). */
-#define AP20_BASE_PA_SRAM_SIZE  0x00040000
-/* AP20 Base physical address of flash. */
-#define AP20_BASE_PA_NOR_FLASH  0xD0000000
-/* AP20 Base physical address of boot information table. */
-#define AP20_BASE_PA_BOOT_INFO  AP20_BASE_PA_SRAM
-
-/*
- * Super-temporary stacks for EXTREMELY early startup. The values chosen for
- * these addresses must be valid on ALL SOCs because this value is used before
- * we are able to differentiate between the SOC types.
- *
- * NOTE: The since CPU's stack will eventually be moved from IRAM to SDRAM, its
- *       stack is placed below the AVP stack. Once the CPU stack has been moved,
- *       the AVP is free to use the IRAM the CPU stack previously occupied if
- *       it should need to do so.
- *
- * NOTE: In multi-processor CPU complex configurations, each processor will have
- *       its own stack of size CPU_EARLY_BOOT_STACK_SIZE. CPU 0 will have a
- *       limit of CPU_EARLY_BOOT_STACK_LIMIT. Each successive CPU will have a
- *       stack limit that is CPU_EARLY_BOOT_STACK_SIZE less then the previous
- *       CPU.
- */
-
-/* Common AVP early boot stack limit */
-#define AVP_EARLY_BOOT_STACK_LIMIT	\
-	(AP20_BASE_PA_SRAM + (AP20_BASE_PA_SRAM_SIZE/2))
-/* Common AVP early boot stack size */
-#define AVP_EARLY_BOOT_STACK_SIZE	0x1000
-/* Common CPU early boot stack limit */
-#define CPU_EARLY_BOOT_STACK_LIMIT	\
-	(AVP_EARLY_BOOT_STACK_LIMIT - AVP_EARLY_BOOT_STACK_SIZE)
-/* Common CPU early boot stack size */
-#define CPU_EARLY_BOOT_STACK_SIZE	0x1000
-
 #define EXCEP_VECTOR_CPU_RESET_VECTOR	(NV_PA_EVP_BASE + 0x100)
 #define CSITE_CPU_DBG0_LAR		(NV_PA_CSITE_BASE + 0x10FB0)
 #define CSITE_CPU_DBG1_LAR		(NV_PA_CSITE_BASE + 0x12FB0)
+#define CSITE_CPU_DBG2_LAR		(NV_PA_CSITE_BASE + 0x14FB0)
+#define CSITE_CPU_DBG3_LAR		(NV_PA_CSITE_BASE + 0x16FB0)
 
 #define FLOW_CTLR_HALT_COP_EVENTS	(NV_PA_FLOW_BASE + 4)
 #define FLOW_MODE_STOP			2
@@ -95,6 +49,26 @@
 #define HALT_COP_EVENT_IRQ_1		(1 << 11)
 #define HALT_COP_EVENT_FIQ_1		(1 << 9)
 
-void start_cpu(u32 reset_vector);
-int ap20_cpu_is_cortexa9(void);
+#define FLOW_MODE_NONE		0
+
+#define SIMPLE_PLLX     (CLOCK_ID_XCPU - CLOCK_ID_FIRST_SIMPLE)
+
+struct clk_pll_table {
+	u16	n;
+	u16	m;
+	u8	p;
+	u8	cpcon;
+};
+
+void clock_enable_coresight(int enable);
+void enable_cpu_clock(int enable);
 void halt_avp(void)  __attribute__ ((noreturn));
+void init_pllx(void);
+void powerup_cpu(void);
+void reset_A9_cpu(int reset);
+void start_cpu(u32 reset_vector);
+int tegra_get_chip(void);
+int tegra_get_sku_info(void);
+int tegra_get_chip_sku(void);
+void adjust_pllp_out_freqs(void);
+void pmic_enable_cpu_vdd(void);

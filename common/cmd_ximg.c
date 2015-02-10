@@ -5,23 +5,7 @@
  * (C) Copyright 2003
  * Kai-Uwe Bloem, Auerswald GmbH & Co KG, <linux-development@auerswald.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 
@@ -36,6 +20,7 @@
 #include <bzlib.h>
 #endif
 #include <asm/byteorder.h>
+#include <asm/io.h>
 
 #ifndef CONFIG_SYS_XIMG_LEN
 /* use 8MByte as default max gunzip size */
@@ -47,11 +32,13 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 {
 	ulong		addr = load_addr;
 	ulong		dest = 0;
-	ulong		data, len, count;
+	ulong		data, len;
 	int		verify;
 	int		part = 0;
-	char		pbuf[10];
-	image_header_t	*hdr;
+#if defined(CONFIG_IMAGE_FORMAT_LEGACY)
+	ulong		count;
+	image_header_t	*hdr = NULL;
+#endif
 #if defined(CONFIG_FIT)
 	const char	*uname = NULL;
 	const void*	fit_hdr;
@@ -59,7 +46,9 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 	const void	*fit_data;
 	size_t		fit_len;
 #endif
+#ifdef CONFIG_GZIP
 	uint		unc_len = CONFIG_SYS_XIMG_LEN;
+#endif
 	uint8_t		comp;
 
 	verify = getenv_yesno("verify");
@@ -78,6 +67,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 	}
 
 	switch (genimg_get_format((void *)addr)) {
+#if defined(CONFIG_IMAGE_FORMAT_LEGACY)
 	case IMAGE_FORMAT_LEGACY:
 
 		printf("## Copying part %d from legacy image "
@@ -128,6 +118,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 
 		image_multi_getimg(hdr, part, &data, &len);
 		break;
+#endif
 #if defined(CONFIG_FIT)
 	case IMAGE_FORMAT_FIT:
 		if (uname == NULL) {
@@ -161,7 +152,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 
 		/* verify integrity */
 		if (verify) {
-			if (!fit_image_check_hashes(fit_hdr, noffset)) {
+			if (!fit_image_verify(fit_hdr, noffset)) {
 				puts("Bad Data Hash\n");
 				return 1;
 			}
@@ -225,7 +216,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			}
 			break;
 #endif
-#if defined(CONFIG_BZIP2)
+#if defined(CONFIG_BZIP2) && defined(CONFIG_IMAGE_FORMAT_LEGACY)
 		case IH_COMP_BZIP2:
 			{
 				int i;
@@ -237,7 +228,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 				 * which requires at most 2300 KB of memory.
 				 */
 				i = BZ2_bzBuffToBuffDecompress(
-					(char *)ntohl(hdr->ih_load),
+					map_sysmem(ntohl(hdr->ih_load), 0),
 					&unc_len, (char *)data, len,
 					CONFIG_SYS_MALLOC_LEN < (4096 * 1024),
 					0);
@@ -256,10 +247,10 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 		puts("OK\n");
 	}
 
-	sprintf(pbuf, "%8lx", data);
-	setenv("fileaddr", pbuf);
-	sprintf(pbuf, "%8lx", len);
-	setenv("filesize", pbuf);
+	flush_cache(dest, len);
+
+	setenv_hex("fileaddr", data);
+	setenv_hex("filesize", len);
 
 	return 0;
 }

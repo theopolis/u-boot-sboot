@@ -1,10 +1,7 @@
 /*
  * Copyright (C) 2003 David Brownell
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published
- * by the Free Software Foundation; either version 2.1 of the License, or
- * (at your option) any later version.
+ * SPDX-License-Identifier:	LGPL-2.1+
  *
  * Ported to U-boot by: Thomas Smits <ts.smits@gmail.com> and
  *                      Remy Bohmer <linux@bohmer.net>
@@ -110,6 +107,9 @@ usb_gadget_get_string(struct usb_gadget_strings *table, int id, u8 *buf)
 {
 	struct usb_string	*s;
 	int			len;
+
+	if (!table)
+		return -EINVAL;
 
 	/* descriptor 0 has the language id */
 	if (id == 0) {

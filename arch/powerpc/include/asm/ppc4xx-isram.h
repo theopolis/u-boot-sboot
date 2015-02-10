@@ -1,22 +1,5 @@
-
 /*
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _PPC4xx_ISRAM_H_
@@ -25,8 +8,7 @@
 /*
  * Internal SRAM
  */
-#if defined(CONFIG_440EPX) || defined(CONFIG_440GRX) || \
-    defined(CONFIG_APM821XX)
+#if defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
 #define ISRAM0_DCR_BASE 0x380
 #else
 #define ISRAM0_DCR_BASE 0x020
@@ -43,8 +25,7 @@
 #define ISRAM0_REVID	(ISRAM0_DCR_BASE+0x09)	/* SRAM bus revision id reg */
 #define ISRAM0_DPC	(ISRAM0_DCR_BASE+0x0a)	/* SRAM data parity check reg */
 
-#if defined(CONFIG_460EX) || defined(CONFIG_460GT) || \
-    defined(CONFIG_APM821XX)
+#if defined(CONFIG_460EX) || defined(CONFIG_460GT)
 #define ISRAM1_DCR_BASE 0x0B0
 #define ISRAM1_SB0CR	(ISRAM1_DCR_BASE+0x00)	/* SRAM1 bank config 0*/
 #define ISRAM1_BEAR	(ISRAM1_DCR_BASE+0x04)	/* SRAM1 bus error addr reg */
@@ -58,8 +39,6 @@
 
 #if defined(CONFIG_460EX) || defined(CONFIG_460GT)
 #define ISRAM1_SIZE 0x0984 /* OCM size 64k */
-#elif defined(CONFIG_APM821XX)
-#define ISRAM1_SIZE 0x0784 /* OCM size 32k */
 #endif
 
 /*
@@ -68,7 +47,7 @@
 #if defined (CONFIG_440GX) || \
     defined(CONFIG_440SP) || defined(CONFIG_440SPE) || \
     defined(CONFIG_460EX) || defined(CONFIG_460GT) || \
-    defined(CONFIG_460SX) || defined(CONFIG_APM821XX)
+    defined(CONFIG_460SX)
 #define L2_CACHE_BASE	0x030
 #define L2_CACHE_CFG	(L2_CACHE_BASE+0x00)	/* L2 Cache Config      */
 #define L2_CACHE_CMD	(L2_CACHE_BASE+0x01)	/* L2 Cache Command     */

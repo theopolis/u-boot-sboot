@@ -85,7 +85,7 @@
 #define CONFIG_HOSTNAME		bf527-ezkit
 /* Uncomment next line to use fixed MAC address */
 /* #define CONFIG_ETHADDR	02:80:ad:20:31:e8 */
-
+#define CONFIG_LIB_RAND
 
 /*
  * Flash Settings
@@ -134,8 +134,8 @@
 /*
  * I2C Settings
  */
-#define CONFIG_BFIN_TWI_I2C	1
-#define CONFIG_HARD_I2C		1
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_ADI
 
 
 /*
@@ -149,10 +149,15 @@
 #define CONFIG_MUSB_TIMEOUT 100000
 #endif
 
+/* Don't waste time transferring a logo over the UART */
+#if (CONFIG_BFIN_BOOT_MODE != BFIN_BOOT_UART)
+/*# define CONFIG_VIDEO*/
+#endif
 
 /*
  * Video Settings
  */
+#ifdef CONFIG_VIDEO
 #ifdef CONFIG_BF527_EZKIT_REV_2_1
 # define CONFIG_LQ035Q1_SPI_BUS	0
 # define CONFIG_LQ035Q1_SPI_CS	7
@@ -166,7 +171,7 @@
 #else
 # define EASYLOGO_HEADER <asm/bfin_logo_230x230_lzma.h>
 #endif
-
+#endif /* CONFIG_VIDEO */
 
 /*
  * Misc Settings
@@ -174,12 +179,6 @@
 #define CONFIG_MISC_INIT_R
 #define CONFIG_RTC_BFIN
 #define CONFIG_UART_CONSOLE	1
-
-/* Don't waste time transferring a logo over the UART */
-#if (CONFIG_BFIN_BOOT_MODE != BFIN_BOOT_UART)
-# define CONFIG_VIDEO
-#endif
-
 
 /*
  * Pull in common ADI header for remaining command/environment setup

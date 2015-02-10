@@ -1,22 +1,7 @@
 /*
  * TNETV107X: Clock management APIs
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -31,7 +16,7 @@
 #define BIT(x)			(1 << (x))
 
 #define MAX_PREDIV		64
-#define MAX_POSTDIV		8
+#define MAX_POSTDIV		8UL
 #define MAX_MULT		512
 #define MAX_DIV			(MAX_PREDIV * MAX_POSTDIV)
 
@@ -377,7 +362,7 @@ static void init_pll(const struct pll_init_data *data)
 	pllctl_reg_write(data->pll, ctl, tmp);
 
 	mult = data->pll_freq / fpll;
-	for (mult = MAX(mult, 1); mult <= MAX_MULT; mult++) {
+	for (mult = max(mult, 1UL); mult <= MAX_MULT; mult++) {
 		div = (fpll * mult) / data->pll_freq;
 		if (div < 1 || div > MAX_DIV)
 			continue;

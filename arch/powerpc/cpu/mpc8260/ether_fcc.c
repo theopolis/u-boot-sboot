@@ -6,23 +6,7 @@
  * (C) Copyright 2000 Sysgo Real-Time Solutions, GmbH <www.elinos.com>
  * Marius Groeger <mgroeger@sysgo.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -661,32 +645,7 @@ eth_loopback_test (void)
 
 	/* 28.9 - (1-2): ioports have been set up already */
 
-#if defined(CONFIG_HYMOD)
-	/*
-	 * Attention: this is board-specific
-	 * 0, FCC1
-	 * 1, FCC2
-	 * 2, FCC3
-	 */
-#       define FCC_START_LOOP 0
-#       define FCC_END_LOOP   2
-
-	/*
-	 * Attention: this is board-specific
-	 * - FCC1 Rx-CLK is CLK10
-	 * - FCC1 Tx-CLK is CLK11
-	 * - FCC2 Rx-CLK is CLK13
-	 * - FCC2 Tx-CLK is CLK14
-	 * - FCC3 Rx-CLK is CLK15
-	 * - FCC3 Tx-CLK is CLK16
-	 */
-
-	/* 28.9 - (3): connect FCC's tx and rx clocks */
-	immr->im_cpmux.cmx_uar = 0;
-	immr->im_cpmux.cmx_fcr = CMXFCR_RF1CS_CLK10|CMXFCR_TF1CS_CLK11|\
-	    CMXFCR_RF2CS_CLK13|CMXFCR_TF2CS_CLK14|\
-	    CMXFCR_RF3CS_CLK15|CMXFCR_TF3CS_CLK16;
-#elif defined(CONFIG_SACSng)
+#if defined(CONFIG_SACSng)
 	/*
 	 * Attention: this is board-specific
 	 * 1, FCC2

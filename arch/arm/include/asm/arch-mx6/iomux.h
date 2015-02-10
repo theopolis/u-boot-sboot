@@ -1,21 +1,56 @@
 /*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301, USA.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_ARCH_IOMUX_H__
 #define __ASM_ARCH_IOMUX_H__
+
+#define MX6_IOMUXC_GPR4		0x020e0010
+#define MX6_IOMUXC_GPR6		0x020e0018
+#define MX6_IOMUXC_GPR7		0x020e001c
+
+/*
+ * IOMUXC_GPR1 bit fields
+ */
+#define IOMUXC_GPR1_OTG_ID_ENET_RX_ERR	(0<<13)
+#define IOMUXC_GPR1_OTG_ID_GPIO1	(1<<13)
+#define IOMUXC_GPR1_OTG_ID_MASK		(1<<13)
+#define IOMUXC_GPR1_REF_SSP_EN			(1 << 16)
+#define IOMUXC_GPR1_TEST_POWERDOWN		(1 << 18)
+
+/*
+ * IOMUXC_GPR5 bit fields
+ */
+#define IOMUXC_GPR5_PCIE_BTNRST			(1 << 19)
+#define IOMUXC_GPR5_PCIE_PERST			(1 << 18)
+
+/*
+ * IOMUXC_GPR8 bit fields
+ */
+#define IOMUXC_GPR8_PCS_TX_DEEMPH_GEN1_MASK		(0x3f << 0)
+#define IOMUXC_GPR8_PCS_TX_DEEMPH_GEN1_OFFSET		0
+#define IOMUXC_GPR8_PCS_TX_DEEMPH_GEN2_3P5DB_MASK	(0x3f << 6)
+#define IOMUXC_GPR8_PCS_TX_DEEMPH_GEN2_3P5DB_OFFSET	6
+#define IOMUXC_GPR8_PCS_TX_DEEMPH_GEN2_6DB_MASK		(0x3f << 12)
+#define IOMUXC_GPR8_PCS_TX_DEEMPH_GEN2_6DB_OFFSET	12
+#define IOMUXC_GPR8_PCS_TX_SWING_FULL_MASK		(0x7f << 18)
+#define IOMUXC_GPR8_PCS_TX_SWING_FULL_OFFSET		18
+#define IOMUXC_GPR8_PCS_TX_SWING_LOW_MASK		(0x7f << 25)
+#define IOMUXC_GPR8_PCS_TX_SWING_LOW_OFFSET		25
+
+/*
+ * IOMUXC_GPR12 bit fields
+ */
+#define IOMUXC_GPR12_RX_EQ_2			(0x2 << 0)
+#define IOMUXC_GPR12_RX_EQ_MASK			(0x7 << 0)
+#define IOMUXC_GPR12_LOS_LEVEL_9		(0x9 << 4)
+#define IOMUXC_GPR12_LOS_LEVEL_MASK		(0x1f << 4)
+#define IOMUXC_GPR12_APPS_LTSSM_ENABLE		(1 << 10)
+#define IOMUXC_GPR12_DEVICE_TYPE_EP		(0x0 << 12)
+#define IOMUXC_GPR12_DEVICE_TYPE_RC		(0x4 << 12)
+#define IOMUXC_GPR12_DEVICE_TYPE_MASK		(0xf << 12)
+#define IOMUXC_GPR12_TEST_POWERDOWN		(1 << 30)
+
 /*
  * IOMUXC_GPR13 bit fields
  */
@@ -33,6 +68,21 @@
 #define IOMUXC_GPR13_SATA_PHY_3_MASK	(0x1f<<7)
 #define IOMUXC_GPR13_SATA_PHY_2_MASK	(0x1f<<2)
 #define IOMUXC_GPR13_SATA_PHY_1_MASK	(3<<0)
+
+#define IOMUX_GPR1_FEC_CLOCK_MUX1_SEL_MASK (0x3 << 17)
+#define IOMUX_GPR1_FEC_CLOCK_MUX2_SEL_MASK (0x1 << 14)
+#define IOMUX_GPR1_FEC_MASK    (IOMUX_GPR1_FEC_CLOCK_MUX1_SEL_MASK \
+				| IOMUX_GPR1_FEC_CLOCK_MUX2_SEL_MASK)
+
+#define IOMUX_GPR1_FEC1_CLOCK_MUX1_SEL_MASK (0x1 << 17)
+#define IOMUX_GPR1_FEC1_CLOCK_MUX2_SEL_MASK (0x1 << 13)
+#define IOMUX_GPR1_FEC1_MASK	(IOMUX_GPR1_FEC1_CLOCK_MUX1_SEL_MASK \
+				| IOMUX_GPR1_FEC1_CLOCK_MUX2_SEL_MASK)
+
+#define IOMUX_GPR1_FEC2_CLOCK_MUX1_SEL_MASK (0x1 << 18)
+#define IOMUX_GPR1_FEC2_CLOCK_MUX2_SEL_MASK (0x1 << 14)
+#define IOMUX_GPR1_FEC2_MASK	(IOMUX_GPR1_FEC2_CLOCK_MUX1_SEL_MASK \
+				| IOMUX_GPR1_FEC2_CLOCK_MUX2_SEL_MASK)
 
 #define IOMUXC_GPR13_SATA_PHY_8_RXEQ_0P5DB	(0<<24)
 #define IOMUXC_GPR13_SATA_PHY_8_RXEQ_1P0DB	(1<<24)

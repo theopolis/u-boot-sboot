@@ -9,23 +9,7 @@
  * based on - Driver for MV64360X ethernet ports
  * Copyright (C) 2002 rabeeh@galileo.co.il
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -40,19 +24,25 @@
 #include <asm/arch/cpu.h>
 
 #if defined(CONFIG_KIRKWOOD)
-#include <asm/arch/kirkwood.h>
+#include <asm/arch/soc.h>
 #elif defined(CONFIG_ORION5X)
 #include <asm/arch/orion5x.h>
+#elif defined(CONFIG_DOVE)
+#include <asm/arch/dove.h>
 #endif
 
 #include "mvgbe.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
+#ifndef CONFIG_MVGBE_PORTS
+# define CONFIG_MVGBE_PORTS {0, 0}
+#endif
+
 #define MV_PHY_ADR_REQUEST 0xee
 #define MVGBE_SMI_REG (((struct mvgbe_registers *)MVGBE0_BASE)->smi)
 
-#if defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
+#if defined(CONFIG_PHYLIB) || defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
 /*
  * smi_reg_read - miiphy_read callback function.
  *
@@ -181,6 +171,25 @@ static int smi_reg_write(const char *devname, u8 phy_adr, u8 reg_ofs, u16 data)
 	MVGBE_REG_WR(MVGBE_SMI_REG, smi_reg);
 
 	return 0;
+}
+#endif
+
+#if defined(CONFIG_PHYLIB)
+int mvgbe_phy_read(struct mii_dev *bus, int phy_addr, int dev_addr,
+		   int reg_addr)
+{
+	u16 data;
+	int ret;
+	ret = smi_reg_read(bus->name, phy_addr, reg_addr, &data);
+	if (ret)
+		return ret;
+	return data;
+}
+
+int mvgbe_phy_write(struct mii_dev *bus, int phy_addr, int dev_addr,
+		    int reg_addr, u16 data)
+{
+	return smi_reg_write(bus->name, phy_addr, reg_addr, data);
 }
 #endif
 
@@ -415,8 +424,9 @@ static int mvgbe_init(struct eth_device *dev)
 {
 	struct mvgbe_device *dmvgbe = to_mvgbe(dev);
 	struct mvgbe_registers *regs = dmvgbe->regs;
-#if (defined (CONFIG_MII) || defined (CONFIG_CMD_MII)) \
-	 && defined (CONFIG_SYS_FAULT_ECHO_LINK_DOWN)
+#if (defined(CONFIG_MII) || defined(CONFIG_CMD_MII)) &&  \
+	!defined(CONFIG_PHYLIB) &&			 \
+	defined(CONFIG_SYS_FAULT_ECHO_LINK_DOWN)
 	int i;
 #endif
 	/* setup RX rings */
@@ -467,8 +477,9 @@ static int mvgbe_init(struct eth_device *dev)
 	/* Enable port Rx. */
 	MVGBE_REG_WR(regs->rqc, (1 << RXUQ));
 
-#if (defined (CONFIG_MII) || defined (CONFIG_CMD_MII)) \
-	 && defined (CONFIG_SYS_FAULT_ECHO_LINK_DOWN)
+#if (defined(CONFIG_MII) || defined(CONFIG_CMD_MII)) && \
+	!defined(CONFIG_PHYLIB) && \
+	defined(CONFIG_SYS_FAULT_ECHO_LINK_DOWN)
 	/* Wait up to 5s for the link status */
 	for (i = 0; i < 5; i++) {
 		u16 phyadr;
@@ -647,6 +658,45 @@ static int mvgbe_recv(struct eth_device *dev)
 	return 0;
 }
 
+#if defined(CONFIG_PHYLIB)
+int mvgbe_phylib_init(struct eth_device *dev, int phyid)
+{
+	struct mii_dev *bus;
+	struct phy_device *phydev;
+	int ret;
+
+	bus = mdio_alloc();
+	if (!bus) {
+		printf("mdio_alloc failed\n");
+		return -ENOMEM;
+	}
+	bus->read = mvgbe_phy_read;
+	bus->write = mvgbe_phy_write;
+	sprintf(bus->name, dev->name);
+
+	ret = mdio_register(bus);
+	if (ret) {
+		printf("mdio_register failed\n");
+		free(bus);
+		return -ENOMEM;
+	}
+
+	/* Set phy address of the port */
+	mvgbe_phy_write(bus, MV_PHY_ADR_REQUEST, 0, MV_PHY_ADR_REQUEST, phyid);
+
+	phydev = phy_connect(bus, phyid, dev, PHY_INTERFACE_MODE_RGMII);
+	if (!phydev) {
+		printf("phy_connect failed\n");
+		return -ENODEV;
+	}
+
+	phy_config(phydev);
+	phy_startup(phydev);
+
+	return 0;
+}
+#endif
+
 int mvgbe_initialize(bd_t *bis)
 {
 	struct mvgbe_device *dmvgbe;
@@ -729,7 +779,9 @@ error1:
 
 		eth_register(dev);
 
-#if defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
+#if defined(CONFIG_PHYLIB)
+		mvgbe_phylib_init(dev, PHY_BASE_ADR + devnum);
+#elif defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
 		miiphy_register(dev->name, smi_reg_read, smi_reg_write);
 		/* Set phy address of the port */
 		miiphy_write(dev->name, MV_PHY_ADR_REQUEST,

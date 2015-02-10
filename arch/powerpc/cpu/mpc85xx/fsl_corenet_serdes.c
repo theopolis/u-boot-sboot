@@ -1,23 +1,7 @@
 /*
  * Copyright 2009-2011 Freescale Semiconductor, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -102,6 +86,10 @@ static const struct {
 	{ 21, 167, FSL_SRDS_BANK_3 },
 	{ 22, 168, FSL_SRDS_BANK_3 },
 	{ 23, 169, FSL_SRDS_BANK_3 },
+#endif
+#if SRDS_MAX_BANK > 3
+	{ 24, 175, FSL_SRDS_BANK_4 },
+	{ 25, 176, FSL_SRDS_BANK_4 },
 #endif
 };
 
@@ -513,7 +501,7 @@ void fsl_serdes_init(void)
 	size_t arglen;
 #endif
 #ifdef CONFIG_SYS_P4080_ERRATUM_SERDES_A001
-	int need_serdes_a001;	/* TRUE == need work-around for SERDES A001 */
+	int need_serdes_a001;	/* true == need work-around for SERDES A001 */
 #endif
 #ifdef CONFIG_SYS_P4080_ERRATUM_SERDES8
 	char buffer[HWCONFIG_BUFFER_SIZE];
@@ -870,3 +858,20 @@ void fsl_serdes_init(void)
 	}
 #endif
 }
+
+const char *serdes_clock_to_string(u32 clock)
+{
+	switch (clock) {
+	case SRDS_PLLCR0_RFCK_SEL_100:
+		return "100";
+	case SRDS_PLLCR0_RFCK_SEL_125:
+		return "125";
+	case SRDS_PLLCR0_RFCK_SEL_156_25:
+		return "156.25";
+	case SRDS_PLLCR0_RFCK_SEL_161_13:
+		return "161.1328123";
+	default:
+		return "150";
+	}
+}
+

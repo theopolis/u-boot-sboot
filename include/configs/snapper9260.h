@@ -5,23 +5,7 @@
  *   Author: Andre Renaud <andre@bluewatersys.com>
  *   Author: Ryan Mallon <ryan@bluewatersys.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -29,14 +13,19 @@
 
 /* SoC type is defined in boards.cfg */
 #include <asm/hardware.h>
-#include <asm/sizes.h>
+#include <linux/sizes.h>
 
-#define CONFIG_SYS_TEXT_BASE		0x20000000
+#define CONFIG_SYS_TEXT_BASE		0x21f00000
 
 /* ARM asynchronous clock */
 #define CONFIG_SYS_AT91_MAIN_CLOCK	18432000 /* External Crystal, in Hz */
 #define CONFIG_SYS_AT91_SLOW_CLOCK	32768
-#define CONFIG_SYS_HZ			1000
+#define CONFIG_SYS_GENERIC_BOARD
+#define CONFIG_DM
+#define CONFIG_CMD_DM
+#define CONFIG_DM_GPIO
+#define CONFIG_DM_SERIAL
+#define CONFIG_SYS_MALLOC_F_LEN		(1 << 10)
 
 /* CPU */
 #define CONFIG_ARCH_CPU_INIT
@@ -45,7 +34,6 @@
 #define CONFIG_SETUP_MEMORY_TAGS
 #define CONFIG_INITRD_TAG
 #define CONFIG_SKIP_LOWLEVEL_INIT
-#define CONFIG_SKIP_RELOCATE_UBOOT
 #define CONFIG_DISPLAY_CPUINFO
 #define CONFIG_FIT
 
@@ -76,11 +64,13 @@
 #define CONFIG_RMII
 #define CONFIG_NET_RETRY_COUNT		20
 #define CONFIG_RESET_PHY_R
+#define CONFIG_AT91_WANTS_COMMON_PHY
 #define CONFIG_TFTP_PORT
 #define CONFIG_TFTP_TSIZE
 
 /* USB */
 #define CONFIG_USB_ATMEL
+#define CONFIG_USB_ATMEL_CLK_SEL_PLLB
 #define CONFIG_USB_OHCI_NEW
 #define CONFIG_DOS_PARTITION
 #define CONFIG_SYS_USB_OHCI_CPU_INIT
@@ -90,7 +80,6 @@
 #define CONFIG_USB_STORAGE
 
 /* GPIOs and IO expander */
-#define CONFIG_AT91_LEGACY
 #define CONFIG_ATMEL_LEGACY
 #define CONFIG_AT91_GPIO
 #define CONFIG_AT91_GPIO_PULLUP		1
@@ -100,17 +89,19 @@
 
 /* UARTs/Serial console */
 #define CONFIG_ATMEL_USART
+#ifndef CONFIG_DM_SERIAL
 #define CONFIG_USART_BASE		ATMEL_BASE_DBGU
 #define CONFIG_USART_ID			ATMEL_ID_SYS
+#endif
 #define CONFIG_BAUDRATE			115200
 #define CONFIG_SYS_PROMPT		"Snapper> "
 
 /* I2C - Bit-bashed */
-#define CONFIG_SOFT_I2C
-#define CONFIG_SYS_I2C_SPEED		100000
-#define CONFIG_SYS_I2C_SLAVE		0x7F
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_SOFT		/* I2C bit-banged */
+#define CONFIG_SYS_I2C_SOFT_SPEED	100000
+#define CONFIG_SYS_I2C_SOFT_SLAVE	0x7F
 #define CONFIG_SOFT_I2C_READ_REPEATED_START
-#define CONFIG_I2C_MULTI_BUS
 #define I2C_INIT do {							\
 		at91_set_gpio_output(AT91_PIN_PA23, 1);			\
 		at91_set_gpio_output(AT91_PIN_PA24, 1);			\
@@ -175,7 +166,7 @@
 #define CONFIG_CMD_DHCP
 #define CONFIG_CMD_FAT
 #define CONFIG_CMD_I2C
-#undef CONFIG_CMD_GPIO
+#define CONFIG_CMD_GPIO
 #define CONFIG_CMD_USB
 #define CONFIG_CMD_MII
 #define CONFIG_CMD_NAND

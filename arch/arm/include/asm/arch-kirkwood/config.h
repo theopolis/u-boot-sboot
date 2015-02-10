@@ -3,23 +3,7 @@
  * Marvell Semiconductor <www.marvell.com>
  * Written-by: Lei Wen <leiwen@marvell.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -39,8 +23,7 @@
 #error "SOC Name not defined"
 #endif /* CONFIG_KW88F6281 */
 
-#include <asm/arch/kirkwood.h>
-#define CONFIG_ARM926EJS	1	/* Basic Architecture */
+#include <asm/arch/soc.h>
 #define CONFIG_SYS_CACHELINE_SIZE	32
 				/* default Dcache Line length for kirkwood */
 #define CONFIG_MD5	/* get_random_hex on krikwood needs MD5 support */
@@ -54,7 +37,7 @@
  * CONFIG_SYS_KWD_CONFIG should be defined in board specific header file
  */
 #ifndef CONFIG_SYS_KWD_CONFIG
-#define	CONFIG_SYS_KWD_CONFIG	$(SRCTREE)/$(CONFIG_BOARDDIR)/kwbimage.cfg
+#define	CONFIG_SYS_KWD_CONFIG	$(CONFIG_BOARDDIR)/kwbimage.cfg
 #endif /* CONFIG_SYS_KWD_CONFIG */
 
 /* Kirkwood has 2k of Security SRAM, use it for SP */
@@ -144,8 +127,9 @@
  * I2C related stuff
  */
 #ifdef CONFIG_CMD_I2C
-#ifndef CONFIG_SOFT_I2C
-#define CONFIG_I2C_MVTWSI
+#ifndef CONFIG_SYS_I2C_SOFT
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_MVTWSI
 #endif
 #define CONFIG_SYS_I2C_SLAVE		0x0
 #define CONFIG_SYS_I2C_SPEED		100000

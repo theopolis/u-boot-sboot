@@ -2,20 +2,7 @@
  * (C) Copyright 2012 SAMSUNG Electronics
  * Jaehoon Chung <jh80.chung@samsung.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,  MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __DWMMC_HW_H
@@ -123,6 +110,8 @@
 #define MSIZE(x)		((x) << 28)
 #define RX_WMARK(x)		((x) << 16)
 #define TX_WMARK(x)		(x)
+#define RX_WMARK_SHIFT		16
+#define RX_WMARK_MASK		(0xfff << RX_WMARK_SHIFT)
 
 #define DWMCI_IDMAC_OWN		(1 << 31)
 #define DWMCI_IDMAC_CH		(1 << 4)
@@ -134,6 +123,12 @@
 #define DWMCI_BMOD_IDMAC_FB	(1 << 1)
 #define DWMCI_BMOD_IDMAC_EN	(1 << 7)
 
+/* UHS register */
+#define DWMCI_DDR_MODE	(1 << 16)
+
+/* quirks */
+#define DWMCI_QUIRK_DISABLE_SMU		(1 << 0)
+
 struct dwmci_host {
 	char *name;
 	void *ioaddr;
@@ -142,13 +137,19 @@ struct dwmci_host {
 	unsigned int version;
 	unsigned int clock;
 	unsigned int bus_hz;
+	unsigned int div;
 	int dev_index;
+	int dev_id;
 	int buswidth;
+	u32 clksel_val;
 	u32 fifoth_val;
 	struct mmc *mmc;
 
 	void (*clksel)(struct dwmci_host *host);
-	unsigned int (*mmc_clk)(int dev_index);
+	void (*board_init)(struct dwmci_host *host);
+	unsigned int (*get_mmc_clk)(struct dwmci_host *host);
+
+	struct mmc_config cfg;
 };
 
 struct dwmci_idmac {
@@ -156,7 +157,7 @@ struct dwmci_idmac {
 	u32 cnt;
 	u32 addr;
 	u32 next_addr;
-};
+} __aligned(ARCH_DMA_MINALIGN);
 
 static inline void dwmci_writel(struct dwmci_host *host, int reg, u32 val)
 {

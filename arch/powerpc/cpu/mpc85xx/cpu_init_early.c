@@ -1,20 +1,7 @@
 /*
  * Copyright 2009-2012 Freescale Semiconductor, Inc
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -25,7 +12,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#if defined(CONFIG_SYS_FSL_ERRATUM_IFC_A003399) && !defined(CONFIG_SYS_RAMBOOT)
+#ifdef CONFIG_A003399_NOR_WORKAROUND
 void setup_ifc(void)
 {
 	struct fsl_ifc *ifc_regs = (void *)CONFIG_SYS_IFC_ADDR;
@@ -83,23 +70,23 @@ void setup_ifc(void)
 #endif
 
 	/* Change flash's physical address */
-	out_be32(&(ifc_regs->cspr_cs[0].cspr), CONFIG_SYS_CSPR0);
-	out_be32(&(ifc_regs->csor_cs[0].csor), CONFIG_SYS_CSOR0);
-	out_be32(&(ifc_regs->amask_cs[0].amask), CONFIG_SYS_AMASK0);
+	ifc_out32(&(ifc_regs->cspr_cs[0].cspr), CONFIG_SYS_CSPR0);
+	ifc_out32(&(ifc_regs->csor_cs[0].csor), CONFIG_SYS_CSOR0);
+	ifc_out32(&(ifc_regs->amask_cs[0].amask), CONFIG_SYS_AMASK0);
 
 	return ;
 }
 #endif
 
 /* We run cpu_init_early_f in AS = 1 */
-void cpu_init_early_f(void)
+void cpu_init_early_f(void *fdt)
 {
 	u32 mas0, mas1, mas2, mas3, mas7;
 	int i;
 #ifdef CONFIG_SYS_FSL_ERRATUM_P1010_A003549
 	ccsr_gur_t *gur = (void *)(CONFIG_SYS_MPC85xx_GUTS_ADDR);
 #endif
-#if defined(CONFIG_SYS_FSL_ERRATUM_IFC_A003399) && !defined(CONFIG_SYS_RAMBOOT)
+#ifdef CONFIG_A003399_NOR_WORKAROUND
 	ccsr_l2cache_t *l2cache = (void *)CONFIG_SYS_MPC85xx_L2_ADDR;
 	u32  *dst, *src;
 	void (*setup_ifc_sram)(void);
@@ -114,6 +101,14 @@ void cpu_init_early_f(void)
 	 */
 	for (i = 0; i < sizeof(gd_t); i++)
 		((char *)gd)[i] = 0;
+
+#ifdef CONFIG_QEMU_E500
+	/*
+	 * CONFIG_SYS_CCSRBAR_PHYS below may use gd->fdt_blob on ePAPR systems,
+	 * so we need to populate it before it accesses it.
+	 */
+	gd->fdt_blob = fdt;
+#endif
 
 	mas0 = MAS0_TLBSEL(1) | MAS0_ESEL(13);
 	mas1 = MAS1_VALID | MAS1_TID(0) | MAS1_TS | MAS1_TSIZE(BOOKE_PAGESZ_1M);
@@ -138,7 +133,7 @@ void cpu_init_early_f(void)
  * Work Around for IFC Erratum A003399, issue will hit only when execution
  * from NOR Flash
  */
-#if defined(CONFIG_SYS_FSL_ERRATUM_IFC_A003399) && !defined(CONFIG_SYS_RAMBOOT)
+#ifdef CONFIG_A003399_NOR_WORKAROUND
 #define SRAM_BASE_ADDR	(0x00000000)
 	/* TLB for SRAM */
 	mas0 = MAS0_TLBSEL(1) | MAS0_ESEL(9);
@@ -166,9 +161,12 @@ void cpu_init_early_f(void)
 	setup_ifc_sram = (void *)SRAM_BASE_ADDR;
 	dst = (u32 *) SRAM_BASE_ADDR;
 	src = (u32 *) setup_ifc;
-	for (i = 0; i < 1024; i++)
+	for (i = 0; i < 1024; i++) {
+		/* cppcheck-suppress nullPointer */
 		*dst++ = *src++;
+	}
 
+	/* cppcheck-suppress nullPointer */
 	setup_ifc_sram();
 
 	/* CLEANUP */
@@ -180,11 +178,10 @@ void cpu_init_early_f(void)
 
 	invalidate_tlb(1);
 
-#if defined(CONFIG_SECURE_BOOT)
-	/* Disable the TLBs created by ISBC */
-	for (i = CONFIG_SYS_ISBC_START_TLB;
-	     i < CONFIG_SYS_ISBC_START_TLB + CONFIG_SYS_ISBC_NUM_TLBS; i++)
-			disable_tlb(i);
+#if defined(CONFIG_SYS_PPC_E500_DEBUG_TLB) && \
+	!(defined(CONFIG_SPL_INIT_MINIMAL) && defined(CONFIG_SPL_BUILD)) && \
+	!defined(CONFIG_NAND_SPL)
+	disable_tlb(CONFIG_SYS_PPC_E500_DEBUG_TLB);
 #endif
 
 	init_tlbs();

@@ -2,23 +2,7 @@
  * (C) Copyright 2000
  * Paolo Scaffardi, AIRVENT SAM s.p.a - RIMINI(ITALY), arsenio@tin.it
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 U-Boot console handling
@@ -41,7 +25,7 @@ stdout or stderr) to any device you see in that list simply by
 assigning its name to the corresponding environment variable. For
 example:
 
-    setenv stdin wl_kbd		<- To use the wireless keyboard
+    setenv stdin serial		<- To use the serial input
     setenv stdout video		<- To use the video console
 
 Do a simple "saveenv" to save the console settings in the environment
@@ -115,4 +99,3 @@ The driver has been tested with the following configurations (see
 CREDITS for other contact informations):
 
 - MPC823FADS with AD7176 on a PAL TV (YCbYCr)	- arsenio@tin.it
-- GENIETV    with AD7177 on a PAL TV (YCbYCr)	- arsenio@tin.it

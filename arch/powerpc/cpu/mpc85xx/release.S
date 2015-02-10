@@ -2,31 +2,13 @@
  * Copyright 2008-2012 Freescale Semiconductor, Inc.
  * Kumar Gala <kumar.gala@freescale.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm-offsets.h>
 #include <config.h>
 #include <mpc85xx.h>
 #include <version.h>
-
-#define _LINUX_CONFIG_H 1	/* avoid reading Linux autoconf.h file	*/
 
 #include <ppc_asm.tmpl>
 #include <ppc_defs.h>
@@ -69,9 +51,9 @@ __secondary_start_page:
 #endif
 
 #ifdef CONFIG_SYS_FSL_ERRATUM_CPU_A003999
-	mfspr	r3,977
+	mfspr	r3,SPRN_HDBCR1
 	oris	r3,r3,0x0100
-	mtspr	977,r3
+	mtspr	SPRN_HDBCR1,r3
 #endif
 
 #ifdef CONFIG_SYS_FSL_ERRATUM_A004510
@@ -93,10 +75,10 @@ __secondary_start_page:
 1:	/* Erratum says set bits 55:60 to 001001 */
 	msync
 	isync
-	mfspr	r3,976
+	mfspr	r3,SPRN_HDBCR0
 	li	r4,0x48
 	rlwimi	r3,r4,0,0x1f8
-	mtspr	976,r3
+	mtspr	SPRN_HDBCR0,r3
 	isync
 2:
 #endif
@@ -154,16 +136,12 @@ __secondary_start_page:
 	ori	r3,r3,toreset(__spin_table_addr)@l
 	lwz	r3,0(r3)
 
-	/*
-	 * r10 has the base address for the entry.
-	 * we cannot access it yet before setting up a new TLB
-	 */
 	mfspr	r0,SPRN_PIR
-#if	defined(CONFIG_E6500)
+#ifdef CONFIG_SYS_FSL_QORIQ_CHASSIS2
 /*
- * PIR definition for E6500
+ * PIR definition for Chassis 2
  * 0-17 Reserved (logic 0s)
- * 8-19 CHIP_ID,    2'b00      - SoC 1
+ * 18-19 CHIP_ID,    2'b00      - SoC 1
  *                  all others - reserved
  * 20-24 CLUSTER_ID 5'b00000   - CCM 1
  *                  all others - reserved
@@ -177,32 +155,33 @@ __secondary_start_page:
  *                       2'b11 - core 3
  * 29-31 THREAD_ID       3'b000 - thread 0
  *                       3'b001 - thread 1
+ *
+ * Power-on PIR increments threads by 0x01, cores within a cluster by 0x08
+ * and clusters by 0x20.
+ *
+ * We renumber PIR so that all threads in the system are consecutive.
  */
-	rlwinm  r4,r0,29,25,31
+
+	rlwinm	r8,r0,29,0x03	/* r8 = core within cluster */
+	srwi	r10,r0,5	/* r10 = cluster */
+
+	mulli	r5,r10,CONFIG_SYS_FSL_CORES_PER_CLUSTER
+	add	r5,r5,r8	/* for spin table index */
+	mulli	r4,r5,CONFIG_SYS_FSL_THREADS_PER_CORE	/* for PIR */
 #elif	defined(CONFIG_E500MC)
 	rlwinm	r4,r0,27,27,31
+	mr	r5,r4
 #else
 	mr	r4,r0
+	mr	r5,r4
 #endif
-	slwi	r8,r4,6	/* spin table is padded to 64 byte */
-	add	r10,r3,r8
 
-#ifdef CONFIG_E6500
-	mfspr	r0,SPRN_PIR
 	/*
-	 * core 0 thread 0: pir reset value 0x00, new pir 0
-	 * core 0 thread 1: pir reset value 0x01, new pir 1
-	 * core 1 thread 0: pir reset value 0x08, new pir 2
-	 * core 1 thread 1: pir reset value 0x09, new pir 3
-	 * core 2 thread 0: pir reset value 0x10, new pir 4
-	 * core 2 thread 1: pir reset value 0x11, new pir 5
-	 * etc.
-	 *
-	 * Only thread 0 of each core will be running, updating PIR doesn't
-	 * need to deal with the thread bits.
+	 * r10 has the base address for the entry.
+	 * we cannot access it yet before setting up a new TLB
 	 */
-	rlwinm	r4,r0,30,24,30
-#endif
+	slwi	r8,r5,6	/* spin table is padded to 64 byte */
+	add	r10,r3,r8
 
 	mtspr	SPRN_PIR,r4	/* write to PIR register */
 
@@ -243,6 +222,21 @@ __secondary_start_page:
 	oris	r3,r3,(L1CSR2_DCWS)@h
 	mtspr	L1CSR2,r3
 2:
+#endif
+
+#ifdef CONFIG_SYS_FSL_ERRATUM_A005812
+	/*
+	 * A-005812 workaround sets bit 32 of SPR 976 for SoCs running in
+	 * write shadow mode. This code should run after other code setting
+	 * DCWS.
+	 */
+	mfspr	r3,L1CSR2
+	andis.	r3,r3,(L1CSR2_DCWS)@h
+	beq	1f
+	mfspr	r3, SPRN_HDBCR0
+	oris	r3, r3, 0x8000
+	mtspr	SPRN_HDBCR0, r3
+1:
 #endif
 
 #ifdef CONFIG_BACKSIDE_L2_CACHE
@@ -410,9 +404,6 @@ __second_half_boot_page:
 	andi.	r11,r4,1
 	bne	3b
 	isync
-
-	/* setup IVORs to match fixed offsets */
-#include "fixed_ivor.S"
 
 	/* get the upper bits of the addr */
 	lwz	r11,ENTRY_ADDR_UPPER(r10)

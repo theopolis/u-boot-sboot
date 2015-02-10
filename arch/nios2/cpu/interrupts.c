@@ -5,28 +5,11 @@
  * (C) Copyright 2004, Psyent Corporation <www.psyent.com>
  * Scott McNutt <smcnutt@psyent.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 
-#include <nios2.h>
-#include <nios2-io.h>
+#include <asm/nios2.h>
 #include <asm/types.h>
 #include <asm/io.h>
 #include <asm/ptrace.h>
@@ -36,6 +19,25 @@
 #ifdef CONFIG_STATUS_LED
 #include <status_led.h>
 #endif
+
+typedef volatile struct {
+	unsigned	status;			/* Timer status reg */
+	unsigned	control;		/* Timer control reg */
+	unsigned	periodl;		/* Timeout period low */
+	unsigned	periodh;		/* Timeout period high */
+	unsigned	snapl;			/* Snapshot low */
+	unsigned	snaph;			/* Snapshot high */
+} nios_timer_t;
+
+/* status register */
+#define NIOS_TIMER_TO		(1 << 0)	/* Timeout */
+#define NIOS_TIMER_RUN		(1 << 1)	/* Timer running */
+
+/* control register */
+#define NIOS_TIMER_ITO		(1 << 0)	/* Timeout int ena */
+#define NIOS_TIMER_CONT		(1 << 1)	/* Continuous mode */
+#define NIOS_TIMER_START	(1 << 2)	/* Start timer */
+#define NIOS_TIMER_STOP		(1 << 3)	/* Stop timer */
 
 #if defined(CONFIG_SYS_NIOS_TMRBASE) && !defined(CONFIG_SYS_NIOS_TMRIRQ)
 #error CONFIG_SYS_NIOS_TMRIRQ not defined (see documentation)

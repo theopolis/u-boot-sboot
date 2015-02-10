@@ -64,7 +64,7 @@
 #define ATMEL_SPI_CSRx_DLYBCT(x)	((x) << 24)
 
 /* Bits in VERSION */
-#define ATMEL_SPI_VERSION_REV(x)	((x) << 0)
+#define ATMEL_SPI_VERSION_REV(x)	((x) & 0xfff)
 #define ATMEL_SPI_VERSION_MFN(x)	((x) << 16)
 
 /* Constants for CSRx:BITS */
@@ -94,3 +94,7 @@ static inline struct atmel_spi_slave *to_atmel_spi(struct spi_slave *slave)
 	readl(as->regs + ATMEL_SPI_##reg)
 #define spi_writel(as, reg, value)				\
 	writel(value, as->regs + ATMEL_SPI_##reg)
+
+#if !defined(CONFIG_SYS_SPI_WRITE_TOUT)
+#define CONFIG_SYS_SPI_WRITE_TOUT	(5 * CONFIG_SYS_HZ)
+#endif

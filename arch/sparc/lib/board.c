@@ -6,23 +6,7 @@
  * (C) Copyright 2007
  * Daniel Hellstrom, Gaisler Research, daniel@gaisler.com.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -189,7 +173,6 @@ void board_init_f(ulong bootflag)
 	bd->bi_sramstart = CONFIG_SYS_SRAM_BASE;
 	bd->bi_sramsize = CONFIG_SYS_SRAM_SIZE;
 #endif
-	bd->bi_baudrate = CONFIG_BAUDRATE;
 	bd->bi_bootflags = bootflag;	/* boot / reboot flag (for LynxOS)    */
 
 	gd->flags |= GD_FLG_RELOC;	/* tell others: relocation done */
@@ -271,7 +254,6 @@ void board_init_f(ulong bootflag)
 	/* The Malloc area is immediately below the monitor copy in RAM */
 	mem_malloc_init(CONFIG_SYS_MALLOC_BASE,
 			CONFIG_SYS_MALLOC_END - CONFIG_SYS_MALLOC_BASE);
-	malloc_bin_reloc();
 
 #if !defined(CONFIG_SYS_NO_FLASH)
 	puts("Flash: ");
@@ -410,15 +392,6 @@ void board_init_f(ulong bootflag)
 		main_loop();
 	}
 
-}
-
-void hang(void)
-{
-	puts("### ERROR ### Please RESET the board ###\n");
-#ifdef CONFIG_SHOW_BOOT_PROGRESS
-	bootstage_error(BOOTSTAGE_ID_NEED_RESET);
-#endif
-	for (;;) ;
 }
 
 /************************************************************************/

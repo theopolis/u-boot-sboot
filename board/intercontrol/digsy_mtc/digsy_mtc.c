@@ -13,23 +13,7 @@
  * (C) Copyright 2009
  * Grzegorz Bernacki, Semihalf, gjb@semihalf.com
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -470,7 +454,7 @@ int update_flash_size (int flash_size)
 }
 #endif /* defined(CONFIG_SYS_UPDATE_FLASH_SIZE) */
 
-void ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, bd_t *bd)
 {
 	int phy_addr = CONFIG_PHY_ADDR;
 	char eth_path[] = "/soc5200@f0000000/mdio@3000/ethernet-phy@0";
@@ -494,5 +478,7 @@ void ft_board_setup(void *blob, bd_t *bd)
 #endif
 	/* fix up the phy address */
 	do_fixup_by_path(blob, eth_path, "reg", &phy_addr, sizeof(int), 0);
+
+	return 0;
 }
 #endif /* defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP) */

@@ -1,24 +1,7 @@
 /*
  * (C) Copyright 2007-2009 DENX Software Engineering
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -99,7 +82,19 @@ long int fixed_sdram(ddr512x_config_t *mddrc_config,
 	sync_law(&im->sysconf.ddrlaw.ar);
 
 	/* DDR Enable */
-	out_be32(&im->mddrc.ddr_sys_config, MDDRC_SYS_CFG_EN);
+	/*
+	 * the "enable" combination: DRAM controller out of reset,
+	 * clock enabled, command mode -- BUT leave CKE low for now
+	 */
+	i = MDDRC_SYS_CFG_EN & ~MDDRC_SYS_CFG_CKE_MASK;
+	out_be32(&im->mddrc.ddr_sys_config, i);
+	/* maintain 200 microseconds of stable power and clock */
+	udelay(200);
+	/* apply a NOP, it shouldn't harm */
+	out_be32(&im->mddrc.ddr_command, CONFIG_SYS_DDRCMD_NOP);
+	/* now assert CKE (high) */
+	i |= MDDRC_SYS_CFG_CKE_MASK;
+	out_be32(&im->mddrc.ddr_sys_config, i);
 
 	/* Initialize DDR Priority Manager */
 	out_be32(&im->mddrc.prioman_config1, CONFIG_SYS_MDDRCGRP_PM_CFG1);
@@ -147,6 +142,9 @@ long int fixed_sdram(ddr512x_config_t *mddrc_config,
 	/* Start MDDRC */
 	out_be32(&im->mddrc.ddr_time_config0, mddrc_config->ddr_time_config0);
 	out_be32(&im->mddrc.ddr_sys_config, mddrc_config->ddr_sys_config);
+
+	/* Allow for the DLL to startup before accessing data */
+	udelay(10);
 
 	msize = get_ram_size(CONFIG_SYS_DDR_BASE, CONFIG_SYS_MAX_RAM_SIZE);
 	/* Fix DDR Local Window for new size */

@@ -2,6 +2,7 @@
 #define _LINUX_FB_H
 
 #include <linux/types.h>
+#include <linux/list.h>
 
 /* Definitions of frame buffers						*/
 
@@ -610,6 +611,8 @@ struct fb_videomode {
 	u32 vmode;
 	u32 flag;
 };
+
+int board_video_skip(void);
 
 #endif /* __KERNEL__ */
 

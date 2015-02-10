@@ -3,20 +3,7 @@
  * Copyright (C) 2009 Kuninori Morimoto <morimoto.kuninori@renesas.com>
  * Copyright (C) 2011 Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -54,7 +41,7 @@ static void debug_led(u8 led)
 int board_late_init(void)
 {
 	u8 mac[6];
-	char env_mac[17];
+	char env_mac[18];
 
 	udelay(1000);
 
@@ -70,8 +57,7 @@ int board_late_init(void)
 
 	outl(inl(MSTPCR2) & ~0x10000000, MSTPCR2);
 
-	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
-	i2c_set_bus_num(CONFIG_SYS_I2C_MODULE); /* Use I2C 1 */
+	i2c_set_bus_num(1); /* Use I2C 1 */
 
 	/* Read MAC address */
 	i2c_read(0x50, 0x10, 0, mac, 6);
@@ -90,7 +76,7 @@ int board_init(void)
 {
 
 	/* LED (PTG) */
-	outw((inw(PGCR) & ~0xFF) | 0x66, PGCR);
+	outw((inw(PGCR) & ~0xFF) | 0x55, PGCR);
 	outw((inw(HIZCRA) & ~0x02), HIZCRA);
 
 	debug_led(1 << 0);
@@ -111,7 +97,7 @@ int board_init(void)
 	/* USB host */
 	outw((inw(PBCR) & ~0x300) | 0x100, PBCR);
 	outb((inb(PBDR) & ~0x10) | 0x10, PBDR);
-	outl(inl(MSTPCR2) & 0x100000, MSTPCR2);
+	outl(inl(MSTPCR2) & ~0x100000, MSTPCR2);
 	outw(0x0600, UPONCR0);
 
 	debug_led(1 << 3);

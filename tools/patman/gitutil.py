@@ -1,33 +1,50 @@
 # Copyright (c) 2011 The Chromium OS Authors.
 #
-# See file CREDITS for list of people who contributed to this
-# project.
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307 USA
+# SPDX-License-Identifier:	GPL-2.0+
 #
 
 import command
 import re
 import os
 import series
-import settings
 import subprocess
 import sys
 import terminal
 
+import checkpatch
+import settings
+
+# True to use --no-decorate - we check this in Setup()
+use_no_decorate = True
+
+def LogCmd(commit_range, git_dir=None, oneline=False, reverse=False,
+           count=None):
+    """Create a command to perform a 'git log'
+
+    Args:
+        commit_range: Range expression to use for log, None for none
+        git_dir: Path to git repositiory (None to use default)
+        oneline: True to use --oneline, else False
+        reverse: True to reverse the log (--reverse)
+        count: Number of commits to list, or None for no limit
+    Return:
+        List containing command and arguments to run
+    """
+    cmd = ['git']
+    if git_dir:
+        cmd += ['--git-dir', git_dir]
+    cmd += ['--no-pager', 'log', '--no-color']
+    if oneline:
+        cmd.append('--oneline')
+    if use_no_decorate:
+        cmd.append('--no-decorate')
+    if reverse:
+        cmd.append('--reverse')
+    if count is not None:
+        cmd.append('-n%d' % count)
+    if commit_range:
+        cmd.append(commit_range)
+    return cmd
 
 def CountCommitsToBranch():
     """Returns number of commits between HEAD and the tracking branch.
@@ -38,11 +55,199 @@ def CountCommitsToBranch():
     Return:
         Number of patches that exist on top of the branch
     """
-    pipe = [['git', 'log', '--no-color', '--oneline', '@{upstream}..'],
+    pipe = [LogCmd('@{upstream}..', oneline=True),
             ['wc', '-l']]
-    stdout = command.RunPipe(pipe, capture=True, oneline=True)
+    stdout = command.RunPipe(pipe, capture=True, oneline=True).stdout
     patch_count = int(stdout)
     return patch_count
+
+def NameRevision(commit_hash):
+    """Gets the revision name for a commit
+
+    Args:
+        commit_hash: Commit hash to look up
+
+    Return:
+        Name of revision, if any, else None
+    """
+    pipe = ['git', 'name-rev', commit_hash]
+    stdout = command.RunPipe([pipe], capture=True, oneline=True).stdout
+
+    # We expect a commit, a space, then a revision name
+    name = stdout.split(' ')[1].strip()
+    return name
+
+def GuessUpstream(git_dir, branch):
+    """Tries to guess the upstream for a branch
+
+    This lists out top commits on a branch and tries to find a suitable
+    upstream. It does this by looking for the first commit where
+    'git name-rev' returns a plain branch name, with no ! or ^ modifiers.
+
+    Args:
+        git_dir: Git directory containing repo
+        branch: Name of branch
+
+    Returns:
+        Tuple:
+            Name of upstream branch (e.g. 'upstream/master') or None if none
+            Warning/error message, or None if none
+    """
+    pipe = [LogCmd(branch, git_dir=git_dir, oneline=True, count=100)]
+    result = command.RunPipe(pipe, capture=True, capture_stderr=True,
+                             raise_on_error=False)
+    if result.return_code:
+        return None, "Branch '%s' not found" % branch
+    for line in result.stdout.splitlines()[1:]:
+        commit_hash = line.split(' ')[0]
+        name = NameRevision(commit_hash)
+        if '~' not in name and '^' not in name:
+            if name.startswith('remotes/'):
+                name = name[8:]
+            return name, "Guessing upstream as '%s'" % name
+    return None, "Cannot find a suitable upstream for branch '%s'" % branch
+
+def GetUpstream(git_dir, branch):
+    """Returns the name of the upstream for a branch
+
+    Args:
+        git_dir: Git directory containing repo
+        branch: Name of branch
+
+    Returns:
+        Tuple:
+            Name of upstream branch (e.g. 'upstream/master') or None if none
+            Warning/error message, or None if none
+    """
+    try:
+        remote = command.OutputOneLine('git', '--git-dir', git_dir, 'config',
+                                       'branch.%s.remote' % branch)
+        merge = command.OutputOneLine('git', '--git-dir', git_dir, 'config',
+                                      'branch.%s.merge' % branch)
+    except:
+        upstream, msg = GuessUpstream(git_dir, branch)
+        return upstream, msg
+
+    if remote == '.':
+        return merge
+    elif remote and merge:
+        leaf = merge.split('/')[-1]
+        return '%s/%s' % (remote, leaf), None
+    else:
+        raise ValueError, ("Cannot determine upstream branch for branch "
+                "'%s' remote='%s', merge='%s'" % (branch, remote, merge))
+
+
+def GetRangeInBranch(git_dir, branch, include_upstream=False):
+    """Returns an expression for the commits in the given branch.
+
+    Args:
+        git_dir: Directory containing git repo
+        branch: Name of branch
+    Return:
+        Expression in the form 'upstream..branch' which can be used to
+        access the commits. If the branch does not exist, returns None.
+    """
+    upstream, msg = GetUpstream(git_dir, branch)
+    if not upstream:
+        return None, msg
+    rstr = '%s%s..%s' % (upstream, '~' if include_upstream else '', branch)
+    return rstr, msg
+
+def CountCommitsInRange(git_dir, range_expr):
+    """Returns the number of commits in the given range.
+
+    Args:
+        git_dir: Directory containing git repo
+        range_expr: Range to check
+    Return:
+        Number of patches that exist in the supplied rangem or None if none
+        were found
+    """
+    pipe = [LogCmd(range_expr, git_dir=git_dir, oneline=True)]
+    result = command.RunPipe(pipe, capture=True, capture_stderr=True,
+                             raise_on_error=False)
+    if result.return_code:
+        return None, "Range '%s' not found or is invalid" % range_expr
+    patch_count = len(result.stdout.splitlines())
+    return patch_count, None
+
+def CountCommitsInBranch(git_dir, branch, include_upstream=False):
+    """Returns the number of commits in the given branch.
+
+    Args:
+        git_dir: Directory containing git repo
+        branch: Name of branch
+    Return:
+        Number of patches that exist on top of the branch, or None if the
+        branch does not exist.
+    """
+    range_expr, msg = GetRangeInBranch(git_dir, branch, include_upstream)
+    if not range_expr:
+        return None, msg
+    return CountCommitsInRange(git_dir, range_expr)
+
+def CountCommits(commit_range):
+    """Returns the number of commits in the given range.
+
+    Args:
+        commit_range: Range of commits to count (e.g. 'HEAD..base')
+    Return:
+        Number of patches that exist on top of the branch
+    """
+    pipe = [LogCmd(commit_range, oneline=True),
+            ['wc', '-l']]
+    stdout = command.RunPipe(pipe, capture=True, oneline=True).stdout
+    patch_count = int(stdout)
+    return patch_count
+
+def Checkout(commit_hash, git_dir=None, work_tree=None, force=False):
+    """Checkout the selected commit for this build
+
+    Args:
+        commit_hash: Commit hash to check out
+    """
+    pipe = ['git']
+    if git_dir:
+        pipe.extend(['--git-dir', git_dir])
+    if work_tree:
+        pipe.extend(['--work-tree', work_tree])
+    pipe.append('checkout')
+    if force:
+        pipe.append('-f')
+    pipe.append(commit_hash)
+    result = command.RunPipe([pipe], capture=True, raise_on_error=False,
+                             capture_stderr=True)
+    if result.return_code != 0:
+        raise OSError, 'git checkout (%s): %s' % (pipe, result.stderr)
+
+def Clone(git_dir, output_dir):
+    """Checkout the selected commit for this build
+
+    Args:
+        commit_hash: Commit hash to check out
+    """
+    pipe = ['git', 'clone', git_dir, '.']
+    result = command.RunPipe([pipe], capture=True, cwd=output_dir,
+                             capture_stderr=True)
+    if result.return_code != 0:
+        raise OSError, 'git clone: %s' % result.stderr
+
+def Fetch(git_dir=None, work_tree=None):
+    """Fetch from the origin repo
+
+    Args:
+        commit_hash: Commit hash to check out
+    """
+    pipe = ['git']
+    if git_dir:
+        pipe.extend(['--git-dir', git_dir])
+    if work_tree:
+        pipe.extend(['--work-tree', work_tree])
+    pipe.append('fetch')
+    result = command.RunPipe([pipe], capture=True, capture_stderr=True)
+    if result.return_code != 0:
+        raise OSError, 'git fetch: %s' % result.stderr
 
 def CreatePatches(start, count, series):
     """Create a series of patches from the top of the current branch.
@@ -76,90 +281,7 @@ def CreatePatches(start, count, series):
     else:
        return None, files
 
-def ApplyPatch(verbose, fname):
-    """Apply a patch with git am to test it
-
-    TODO: Convert these to use command, with stderr option
-
-    Args:
-        fname: filename of patch file to apply
-    """
-    cmd = ['git', 'am', fname]
-    pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-    stdout, stderr = pipe.communicate()
-    re_error = re.compile('^error: patch failed: (.+):(\d+)')
-    for line in stderr.splitlines():
-        if verbose:
-            print line
-        match = re_error.match(line)
-        if match:
-            print GetWarningMsg('warning', match.group(1), int(match.group(2)),
-                    'Patch failed')
-    return pipe.returncode == 0, stdout
-
-def ApplyPatches(verbose, args, start_point):
-    """Apply the patches with git am to make sure all is well
-
-    Args:
-        verbose: Print out 'git am' output verbatim
-        args: List of patch files to apply
-        start_point: Number of commits back from HEAD to start applying.
-            Normally this is len(args), but it can be larger if a start
-            offset was given.
-    """
-    error_count = 0
-    col = terminal.Color()
-
-    # Figure out our current position
-    cmd = ['git', 'name-rev', 'HEAD', '--name-only']
-    pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    stdout, stderr = pipe.communicate()
-    if pipe.returncode:
-        str = 'Could not find current commit name'
-        print col.Color(col.RED, str)
-        print stdout
-        return False
-    old_head = stdout.splitlines()[0]
-
-    # Checkout the required start point
-    cmd = ['git', 'checkout', 'HEAD~%d' % start_point]
-    pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-    stdout, stderr = pipe.communicate()
-    if pipe.returncode:
-        str = 'Could not move to commit before patch series'
-        print col.Color(col.RED, str)
-        print stdout, stderr
-        return False
-
-    # Apply all the patches
-    for fname in args:
-        ok, stdout = ApplyPatch(verbose, fname)
-        if not ok:
-            print col.Color(col.RED, 'git am returned errors for %s: will '
-                    'skip this patch' % fname)
-            if verbose:
-                print stdout
-            error_count += 1
-            cmd = ['git', 'am', '--skip']
-            pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-            stdout, stderr = pipe.communicate()
-            if pipe.returncode != 0:
-                print col.Color(col.RED, 'Unable to skip patch! Aborting...')
-                print stdout
-                break
-
-    # Return to our previous position
-    cmd = ['git', 'checkout', old_head]
-    pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = pipe.communicate()
-    if pipe.returncode:
-        print col.Color(col.RED, 'Could not move back to head commit')
-        print stdout, stderr
-    return error_count == 0
-
-def BuildEmailList(in_list, tag=None, alias=None):
+def BuildEmailList(in_list, tag=None, alias=None, raise_on_error=True):
     """Build a list of email addresses based on an input list.
 
     Takes a list of email addresses and aliases, and turns this into a list
@@ -172,6 +294,9 @@ def BuildEmailList(in_list, tag=None, alias=None):
     Args:
         in_list:        List of aliases/email addresses
         tag:            Text to put before each address
+        alias:          Alias dictionary
+        raise_on_error: True to raise an error when an alias fails to match,
+                False to just print a message.
 
     Returns:
         List of email addresses
@@ -193,7 +318,7 @@ def BuildEmailList(in_list, tag=None, alias=None):
     quote = '"' if tag and tag[0] == '-' else ''
     raw = []
     for item in in_list:
-        raw += LookupEmail(item, alias)
+        raw += LookupEmail(item, alias, raise_on_error=raise_on_error)
     result = []
     for item in raw:
         if not item in result:
@@ -202,8 +327,8 @@ def BuildEmailList(in_list, tag=None, alias=None):
         return ['%s %s%s%s' % (tag, quote, email, quote) for email in result]
     return result
 
-def EmailPatches(series, cover_fname, args, dry_run, cc_fname,
-        self_only=False, alias=None):
+def EmailPatches(series, cover_fname, args, dry_run, raise_on_error, cc_fname,
+        self_only=False, alias=None, in_reply_to=None):
     """Email a patch series.
 
     Args:
@@ -211,11 +336,19 @@ def EmailPatches(series, cover_fname, args, dry_run, cc_fname,
         cover_fname: filename of cover letter
         args: list of filenames of patch files
         dry_run: Just return the command that would be run
+        raise_on_error: True to raise an error when an alias fails to match,
+                False to just print a message.
         cc_fname: Filename of Cc file for per-commit Cc
         self_only: True to just email to yourself as a test
+        in_reply_to: If set we'll pass this to git as --in-reply-to.
+            Should be a message ID that this is in reply to.
 
     Returns:
         Git command that was/would be run
+
+    # For the duration of this doctest pretend that we ran patman with ./patman
+    >>> _old_argv0 = sys.argv[0]
+    >>> sys.argv[0] = './patman'
 
     >>> alias = {}
     >>> alias['fred'] = ['f.bloggs@napier.co.nz']
@@ -227,34 +360,47 @@ def EmailPatches(series, cover_fname, args, dry_run, cc_fname,
     >>> series = series.Series()
     >>> series.to = ['fred']
     >>> series.cc = ['mary']
-    >>> EmailPatches(series, 'cover', ['p1', 'p2'], True, 'cc-fname', False, \
-            alias)
+    >>> EmailPatches(series, 'cover', ['p1', 'p2'], True, True, 'cc-fname', \
+            False, alias)
     'git send-email --annotate --to "f.bloggs@napier.co.nz" --cc \
 "m.poppins@cloud.net" --cc-cmd "./patman --cc-cmd cc-fname" cover p1 p2'
-    >>> EmailPatches(series, None, ['p1'], True, 'cc-fname', False, alias)
+    >>> EmailPatches(series, None, ['p1'], True, True, 'cc-fname', False, \
+            alias)
     'git send-email --annotate --to "f.bloggs@napier.co.nz" --cc \
 "m.poppins@cloud.net" --cc-cmd "./patman --cc-cmd cc-fname" p1'
     >>> series.cc = ['all']
-    >>> EmailPatches(series, 'cover', ['p1', 'p2'], True, 'cc-fname', True, \
-            alias)
+    >>> EmailPatches(series, 'cover', ['p1', 'p2'], True, True, 'cc-fname', \
+            True, alias)
     'git send-email --annotate --to "this-is-me@me.com" --cc-cmd "./patman \
 --cc-cmd cc-fname" cover p1 p2'
-    >>> EmailPatches(series, 'cover', ['p1', 'p2'], True, 'cc-fname', False, \
-            alias)
+    >>> EmailPatches(series, 'cover', ['p1', 'p2'], True, True, 'cc-fname', \
+            False, alias)
     'git send-email --annotate --to "f.bloggs@napier.co.nz" --cc \
 "f.bloggs@napier.co.nz" --cc "j.bloggs@napier.co.nz" --cc \
 "m.poppins@cloud.net" --cc-cmd "./patman --cc-cmd cc-fname" cover p1 p2'
+
+    # Restore argv[0] since we clobbered it.
+    >>> sys.argv[0] = _old_argv0
     """
-    to = BuildEmailList(series.get('to'), '--to', alias)
+    to = BuildEmailList(series.get('to'), '--to', alias, raise_on_error)
     if not to:
-        print ("No recipient, please add something like this to a commit\n"
-            "Series-to: Fred Bloggs <f.blogs@napier.co.nz>")
-        return
-    cc = BuildEmailList(series.get('cc'), '--cc', alias)
+        git_config_to = command.Output('git', 'config', 'sendemail.to')
+        if not git_config_to:
+            print ("No recipient.\n"
+                   "Please add something like this to a commit\n"
+                   "Series-to: Fred Bloggs <f.blogs@napier.co.nz>\n"
+                   "Or do something like this\n"
+                   "git config sendemail.to u-boot@lists.denx.de")
+            return
+    cc = BuildEmailList(list(set(series.get('cc')) - set(series.get('to'))),
+                        '--cc', alias, raise_on_error)
     if self_only:
-        to = BuildEmailList([os.getenv('USER')], '--to', alias)
+        to = BuildEmailList([os.getenv('USER')], '--to', alias, raise_on_error)
         cc = []
     cmd = ['git', 'send-email', '--annotate']
+    if in_reply_to:
+        cmd.append('--in-reply-to="%s"' % in_reply_to)
+
     cmd += to
     cmd += cc
     cmd += ['--cc-cmd', '"%s --cc-cmd %s"' % (sys.argv[0], cc_fname)]
@@ -267,13 +413,16 @@ def EmailPatches(series, cover_fname, args, dry_run, cc_fname,
     return str
 
 
-def LookupEmail(lookup_name, alias=None, level=0):
+def LookupEmail(lookup_name, alias=None, raise_on_error=True, level=0):
     """If an email address is an alias, look it up and return the full name
 
     TODO: Why not just use git's own alias feature?
 
     Args:
         lookup_name: Alias or email address to look up
+        alias: Dictionary containing aliases (None to use settings default)
+        raise_on_error: True to raise an error when an alias fails to match,
+                False to just print a message.
 
     Returns:
         tuple:
@@ -307,6 +456,15 @@ def LookupEmail(lookup_name, alias=None, level=0):
     Traceback (most recent call last):
     ...
     OSError: Recursive email alias at 'other'
+    >>> LookupEmail('odd', alias, raise_on_error=False)
+    Alias 'odd' not found
+    []
+    >>> # In this case the loop part will effectively be ignored.
+    >>> LookupEmail('loop', alias, raise_on_error=False)
+    Recursive email alias at 'other'
+    Recursive email alias at 'john'
+    Recursive email alias at 'mary'
+    ['j.bloggs@napier.co.nz', 'm.poppins@cloud.net']
     """
     if not alias:
         alias = settings.alias
@@ -315,16 +473,27 @@ def LookupEmail(lookup_name, alias=None, level=0):
         return [lookup_name]
 
     lookup_name = lookup_name.lower()
-
-    if level > 10:
-        raise OSError, "Recursive email alias at '%s'" % lookup_name
+    col = terminal.Color()
 
     out_list = []
+    if level > 10:
+        msg = "Recursive email alias at '%s'" % lookup_name
+        if raise_on_error:
+            raise OSError, msg
+        else:
+            print col.Color(col.RED, msg)
+            return out_list
+
     if lookup_name:
         if not lookup_name in alias:
-            raise ValueError, "Alias '%s' not found" % lookup_name
+            msg = "Alias '%s' not found" % lookup_name
+            if raise_on_error:
+                raise ValueError, msg
+            else:
+                print col.Color(col.RED, msg)
+                return out_list
         for item in alias[lookup_name]:
-            todo = LookupEmail(item, alias, level + 1)
+            todo = LookupEmail(item, alias, raise_on_error, level + 1)
             for new_item in todo:
                 if not new_item in out_list:
                     out_list.append(new_item)
@@ -340,8 +509,8 @@ def GetTopLevel():
 
     This test makes sure that we are running tests in the right subdir
 
-    >>> os.path.realpath(os.getcwd()) == \
-            os.path.join(GetTopLevel(), 'tools', 'scripts', 'patman')
+    >>> os.path.realpath(os.path.dirname(__file__)) == \
+            os.path.join(GetTopLevel(), 'tools', 'patman')
     True
     """
     return command.OutputOneLine('git', 'rev-parse', '--show-toplevel')
@@ -352,7 +521,8 @@ def GetAliasFile():
     Returns:
         Filename of git alias file, or None if none
     """
-    fname = command.OutputOneLine('git', 'config', 'sendemail.aliasesfile')
+    fname = command.OutputOneLine('git', 'config', 'sendemail.aliasesfile',
+            raise_on_error=False)
     if fname:
         fname = os.path.join(GetTopLevel(), fname.strip())
     return fname
@@ -377,12 +547,23 @@ def GetDefaultUserEmail():
 
 def Setup():
     """Set up git utils, by reading the alias files."""
-    settings.Setup('')
-
     # Check for a git alias file also
+    global use_no_decorate
+
     alias_fname = GetAliasFile()
     if alias_fname:
         settings.ReadGitAliases(alias_fname)
+    cmd = LogCmd(None, count=0)
+    use_no_decorate = (command.RunPipe([cmd], raise_on_error=False)
+                       .return_code == 0)
+
+def GetHead():
+    """Get the hash of the current HEAD
+
+    Returns:
+        Hash of HEAD
+    """
+    return command.OutputOneLine('git', 'show', '-s', '--pretty=format:%H')
 
 if __name__ == "__main__":
     import doctest

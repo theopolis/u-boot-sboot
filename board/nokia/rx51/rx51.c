@@ -19,23 +19,7 @@
  *	Richard Woodruff <r-woodruff2@ti.com>
  *	Syed Mohammed Khasim <khasim@ti.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -332,10 +316,10 @@ void *video_hw_init(void)
 static void twl4030_regulator_set_mode(u8 id, u8 mode)
 {
 	u16 msg = MSG_SINGULAR(DEV_GRP_P1, id, mode);
-	twl4030_i2c_write_u8(TWL4030_CHIP_PM_MASTER, msg >> 8,
-			TWL4030_PM_MASTER_PB_WORD_MSB);
-	twl4030_i2c_write_u8(TWL4030_CHIP_PM_MASTER, msg & 0xff,
-			TWL4030_PM_MASTER_PB_WORD_LSB);
+	twl4030_i2c_write_u8(TWL4030_CHIP_PM_MASTER,
+			     TWL4030_PM_MASTER_PB_WORD_MSB, msg >> 8);
+	twl4030_i2c_write_u8(TWL4030_CHIP_PM_MASTER,
+			     TWL4030_PM_MASTER_PB_WORD_LSB, msg & 0xff);
 }
 
 static void omap3_emu_romcode_call(u32 service_id, u32 *parameters)
@@ -406,12 +390,12 @@ int misc_init_r(void)
 				TWL4030_PM_RECEIVER_DEV_GRP_P1);
 
 	/* store I2C access state */
-	twl4030_i2c_read_u8(TWL4030_CHIP_PM_MASTER, &state,
-			TWL4030_PM_MASTER_PB_CFG);
+	twl4030_i2c_read_u8(TWL4030_CHIP_PM_MASTER, TWL4030_PM_MASTER_PB_CFG,
+			    &state);
 
 	/* enable I2C access to powerbus (needed for twl4030 regulator) */
-	twl4030_i2c_write_u8(TWL4030_CHIP_PM_MASTER, 0x02,
-			TWL4030_PM_MASTER_PB_CFG);
+	twl4030_i2c_write_u8(TWL4030_CHIP_PM_MASTER, TWL4030_PM_MASTER_PB_CFG,
+			     0x02);
 
 	/* set VAUX3, VSIM and VMMC1 state to active - enable eMMC memory */
 	twl4030_regulator_set_mode(RES_VAUX3, RES_STATE_ACTIVE);
@@ -419,8 +403,8 @@ int misc_init_r(void)
 	twl4030_regulator_set_mode(RES_VMMC1, RES_STATE_ACTIVE);
 
 	/* restore I2C access state */
-	twl4030_i2c_write_u8(TWL4030_CHIP_PM_MASTER, state,
-			TWL4030_PM_MASTER_PB_CFG);
+	twl4030_i2c_write_u8(TWL4030_CHIP_PM_MASTER, TWL4030_PM_MASTER_PB_CFG,
+			     state);
 
 	/* set env variable attkernaddr for relocated kernel */
 	sprintf(buf, "%#x", KERNEL_ADDRESS);
@@ -438,8 +422,12 @@ int misc_init_r(void)
 	/*
 	 * Cortex-A8(r1p0..r1p2) errata 430973 workaround
 	 * Set IBE bit in Auxiliary Control Register
+	 *
+	 * Call this routine only on real secure device
+	 * Qemu does not implement secure PPA and crash
 	 */
-	omap3_update_aux_cr_secure_rx51(1 << 6, 0);
+	if (get_device_type() == HS_DEVICE)
+		omap3_update_aux_cr_secure_rx51(1 << 6, 0);
 
 	return 0;
 }
@@ -475,14 +463,14 @@ void hw_watchdog_reset(void)
 		return;
 
 	/* read actual watchdog timeout */
-	twl4030_i2c_read_u8(TWL4030_CHIP_PM_RECEIVER, &timeout,
-			TWL4030_PM_RECEIVER_WATCHDOG_CFG);
+	twl4030_i2c_read_u8(TWL4030_CHIP_PM_RECEIVER,
+			    TWL4030_PM_RECEIVER_WATCHDOG_CFG, &timeout);
 
 	/* timeout 0 means watchdog is disabled */
 	/* reset watchdog timeout to 31s (maximum) */
 	if (timeout != 0)
-		twl4030_i2c_write_u8(TWL4030_CHIP_PM_RECEIVER, 31,
-				TWL4030_PM_RECEIVER_WATCHDOG_CFG);
+		twl4030_i2c_write_u8(TWL4030_CHIP_PM_RECEIVER,
+				     TWL4030_PM_RECEIVER_WATCHDOG_CFG, 31);
 
 	/* store last watchdog reset time */
 	twl_wd_time = get_timer(0);
@@ -531,8 +519,8 @@ int rx51_kp_init(void)
 {
 	int ret = 0;
 	u8 ctrl;
-	ret = twl4030_i2c_read_u8(TWL4030_CHIP_KEYPAD, &ctrl,
-		TWL4030_KEYPAD_KEYP_CTRL_REG);
+	ret = twl4030_i2c_read_u8(TWL4030_CHIP_KEYPAD,
+				  TWL4030_KEYPAD_KEYP_CTRL_REG, &ctrl);
 
 	if (ret)
 		return ret;
@@ -541,18 +529,18 @@ int rx51_kp_init(void)
 	ctrl |= TWL4030_KEYPAD_CTRL_KBD_ON;
 	ctrl |= TWL4030_KEYPAD_CTRL_SOFT_NRST;
 	ctrl |= TWL4030_KEYPAD_CTRL_SOFTMODEN;
-	ret |= twl4030_i2c_write_u8(TWL4030_CHIP_KEYPAD, ctrl,
-				TWL4030_KEYPAD_KEYP_CTRL_REG);
+	ret |= twl4030_i2c_write_u8(TWL4030_CHIP_KEYPAD,
+				    TWL4030_KEYPAD_KEYP_CTRL_REG, ctrl);
 	/* enable key event status */
-	ret |= twl4030_i2c_write_u8(TWL4030_CHIP_KEYPAD, 0xfe,
-				TWL4030_KEYPAD_KEYP_IMR1);
+	ret |= twl4030_i2c_write_u8(TWL4030_CHIP_KEYPAD,
+				    TWL4030_KEYPAD_KEYP_IMR1, 0xfe);
 	/* enable interrupt generation on rising and falling */
 	/* this is a workaround for qemu twl4030 emulation */
-	ret |= twl4030_i2c_write_u8(TWL4030_CHIP_KEYPAD, 0x57,
-				TWL4030_KEYPAD_KEYP_EDR);
+	ret |= twl4030_i2c_write_u8(TWL4030_CHIP_KEYPAD,
+				    TWL4030_KEYPAD_KEYP_EDR, 0x57);
 	/* enable ISR clear on read */
-	ret |= twl4030_i2c_write_u8(TWL4030_CHIP_KEYPAD, 0x05,
-				TWL4030_KEYPAD_KEYP_SIH_CTRL);
+	ret |= twl4030_i2c_write_u8(TWL4030_CHIP_KEYPAD,
+				    TWL4030_KEYPAD_KEYP_SIH_CTRL, 0x05);
 	return 0;
 }
 
@@ -601,7 +589,7 @@ static void rx51_kp_fill(u8 k, u8 mods)
  * Routine: rx51_kp_tstc
  * Description: Test if key was pressed (from buffer).
  */
-int rx51_kp_tstc(void)
+int rx51_kp_tstc(struct stdio_dev *sdev)
 {
 	u8 c, r, dk, i;
 	u8 intr;
@@ -615,8 +603,8 @@ int rx51_kp_tstc(void)
 	for (i = 0; i < 2; i++) {
 
 		/* check interrupt register for events */
-		twl4030_i2c_read_u8(TWL4030_CHIP_KEYPAD, &intr,
-				TWL4030_KEYPAD_KEYP_ISR1+(2*i));
+		twl4030_i2c_read_u8(TWL4030_CHIP_KEYPAD,
+				    TWL4030_KEYPAD_KEYP_ISR1 + (2 * i), &intr);
 
 		/* no event */
 		if (!(intr&1))
@@ -657,10 +645,10 @@ int rx51_kp_tstc(void)
  * Routine: rx51_kp_getc
  * Description: Get last pressed key (from buffer).
  */
-int rx51_kp_getc(void)
+int rx51_kp_getc(struct stdio_dev *sdev)
 {
 	keybuf_head %= KEYBUF_SIZE;
-	while (!rx51_kp_tstc())
+	while (!rx51_kp_tstc(sdev))
 		WATCHDOG_RESET();
 	return keybuf[keybuf_head++];
 }
@@ -671,7 +659,13 @@ int rx51_kp_getc(void)
  */
 int board_mmc_init(bd_t *bis)
 {
-	omap_mmc_init(0, 0, 0);
-	omap_mmc_init(1, 0, 0);
+	omap_mmc_init(0, 0, 0, -1, -1);
+	omap_mmc_init(1, 0, 0, -1, -1);
 	return 0;
+}
+
+void board_mmc_power_init(void)
+{
+	twl4030_power_mmc_init(0);
+	twl4030_power_mmc_init(1);
 }

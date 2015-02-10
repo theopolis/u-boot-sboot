@@ -2,26 +2,10 @@
  *  (C) Copyright 2010,2011
  *  NVIDIA Corporation <www.nvidia.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#ifndef __H_
+#ifndef _TPS6586X_H_
 #define _TPS6586X_H_
 
 enum {
@@ -60,9 +44,9 @@ int tps6586x_adjust_sm0_sm1(int sm0_target, int sm1_target, int step, int rate,
  * Set up the TPS6586X I2C bus number. This will be used for all operations
  * on the device. This function must be called before using other functions.
  *
- * @param bus	I2C bus number containing the TPS6586X chip
+ * @param bus	I2C bus containing the TPS6586X chip
  * @return 0 (always succeeds)
  */
-int tps6586x_init(int bus);
+int tps6586x_init(struct udevice *bus);
 
 #endif	/* _TPS6586X_H_ */

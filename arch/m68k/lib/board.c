@@ -5,23 +5,7 @@
  * (C) Copyright 2000-2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -47,16 +31,13 @@
 #endif
 #include <net.h>
 #include <serial.h>
-#if defined(CONFIG_CMD_BEDBUG)
-#include <cmd_bedbug.h>
-#endif
 #ifdef CONFIG_SYS_ALLOC_DPRAM
 #include <commproc.h>
 #endif
 #include <version.h>
 
 #if defined(CONFIG_HARD_I2C) || \
-    defined(CONFIG_SOFT_I2C)
+	defined(CONFIG_SYS_I2C)
 #include <i2c.h>
 #endif
 
@@ -77,9 +58,10 @@ static char *failed = "*** failed ***\n";
 #include <environment.h>
 
 extern ulong __init_end;
-extern ulong __bss_end__;
+extern ulong __bss_end;
 
 #if defined(CONFIG_WATCHDOG)
+# undef INIT_FUNC_WATCHDOG_INIT
 # define INIT_FUNC_WATCHDOG_INIT	watchdog_init,
 # define WATCHDOG_DISABLE		watchdog_disable
 
@@ -141,11 +123,15 @@ static int init_func_ram (void)
 
 /***********************************************************************/
 
-#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SOFT_I2C)
+#if defined(CONFIG_HARD_I2C) ||	defined(CONFIG_SYS_I2C)
 static int init_func_i2c (void)
 {
 	puts ("I2C:   ");
+#ifdef CONFIG_SYS_I2C
+	i2c_init_all();
+#else
 	i2c_init (CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
+#endif
 	puts ("ready\n");
 	return (0);
 }
@@ -177,7 +163,7 @@ init_fnc_t *init_sequence[] = {
 	display_options,
 	checkcpu,
 	checkboard,
-#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SOFT_I2C)
+#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SYS_I2C)
 	init_func_i2c,
 #endif
 #if defined(CONFIG_HARD_SPI)
@@ -244,7 +230,7 @@ board_init_f (ulong bootflag)
 	 *	- monitor code
 	 *	- board info struct
 	 */
-	len = (ulong)&__bss_end__ - CONFIG_SYS_MONITOR_BASE;
+	len = (ulong)&__bss_end - CONFIG_SYS_MONITOR_BASE;
 
 	addr = CONFIG_SYS_SDRAM_BASE + gd->ram_size;
 
@@ -349,11 +335,10 @@ board_init_f (ulong bootflag)
 	bd->bi_pcifreq = gd->pci_clk;		/* PCI Freq in Hz */
 #endif
 #ifdef CONFIG_EXTRA_CLOCK
-	bd->bi_inpfreq = gd->inp_clk;		/* input Freq in Hz */
-	bd->bi_vcofreq = gd->vco_clk;		/* vco Freq in Hz */
-	bd->bi_flbfreq = gd->flb_clk;		/* flexbus Freq in Hz */
+	bd->bi_inpfreq = gd->arch.inp_clk;		/* input Freq in Hz */
+	bd->bi_vcofreq = gd->arch.vco_clk;		/* vco Freq in Hz */
+	bd->bi_flbfreq = gd->arch.flb_clk;		/* flexbus Freq in Hz */
 #endif
-	bd->bi_baudrate = gd->baudrate;	/* Console Baudrate     */
 
 #ifdef CONFIG_SYS_EXTBDINFO
 	strncpy (bd->bi_s_version, "1.2", sizeof (bd->bi_s_version));
@@ -402,13 +387,13 @@ void board_init_r (gd_t *id, ulong dest_addr)
 
 	gd->flags |= GD_FLG_RELOC;	/* tell others: relocation done */
 
-	debug ("Now running in RAM - U-Boot at: %08lx\n", dest_addr);
-
 	WATCHDOG_RESET ();
 
 	gd->reloc_off =  dest_addr - CONFIG_SYS_MONITOR_BASE;
 
 	serial_initialize();
+
+	debug("Now running in RAM - U-Boot at: %08lx\n", dest_addr);
 
 	monitor_flash_len = (ulong)&__init_end - dest_addr;
 
@@ -449,7 +434,6 @@ void board_init_r (gd_t *id, ulong dest_addr)
 	/* The Malloc area is immediately below the monitor copy in DRAM */
 	mem_malloc_init (CONFIG_SYS_MONITOR_BASE + gd->reloc_off -
 			TOTAL_MALLOC_LEN, TOTAL_MALLOC_LEN);
-	malloc_bin_reloc ();
 
 #if !defined(CONFIG_SYS_NO_FLASH)
 	puts ("Flash: ");
@@ -499,6 +483,11 @@ void board_init_r (gd_t *id, ulong dest_addr)
 	spi_init_f ();
 # endif
 	spi_init_r ();
+#endif
+
+#if defined(CONFIG_SYS_I2C)
+	/* Adjust I2C subsystem pointers after relocation */
+	i2c_reloc_fixup();
 #endif
 
 	/* relocate environment function pointers etc. */
@@ -610,11 +599,6 @@ void board_init_r (gd_t *id, ulong dest_addr)
 	last_stage_init ();
 #endif
 
-#if defined(CONFIG_CMD_BEDBUG)
-	WATCHDOG_RESET ();
-	bedbug_init ();
-#endif
-
 #if defined(CONFIG_PRAM) || defined(CONFIG_LOGBUFFER)
 	/*
 	 * Export available size of memory for Linux,
@@ -636,13 +620,6 @@ void board_init_r (gd_t *id, ulong dest_addr)
 	}
 #endif
 
-#ifdef CONFIG_MODEM_SUPPORT
- {
-	 extern int do_mdm_init;
-	 do_mdm_init = gd->do_mdm_init;
- }
-#endif
-
 #ifdef CONFIG_WATCHDOG
 	/* disable watchdog if environment is set */
 	if ((s = getenv ("watchdog")) != NULL) {
@@ -662,11 +639,4 @@ void board_init_r (gd_t *id, ulong dest_addr)
 	}
 
 	/* NOTREACHED - no way out of command loop except booting */
-}
-
-
-void hang(void)
-{
-	puts ("### ERROR ### Please RESET the board ###\n");
-	for (;;);
 }

@@ -4,23 +4,7 @@
  *
  * Copyright (C) 2012 Stefan Roese <sr@denx.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -36,7 +20,6 @@
 #include <asm/arch/hardware.h>
 
 /* Timer, HZ specific defines */
-#define CONFIG_SYS_HZ				1000
 #define CONFIG_SYS_HZ_CLOCK			8300000
 
 #define	CONFIG_SYS_TEXT_BASE			0x00800040
@@ -91,18 +74,18 @@
 /* Ethernet config options */
 #define CONFIG_MII
 #define CONFIG_DESIGNWARE_ETH
-#define CONFIG_DW_SEARCH_PHY
 #define CONFIG_NET_MULTI
+#define CONFIG_PHYLIB
 #define CONFIG_PHY_RESET_DELAY			10000		/* in usec */
-#define CONFIG_DW_AUTONEG
 #define CONFIG_PHY_ADDR		0	/* PHY address */
 #define CONFIG_PHY_GIGE			/* Include GbE speed/duplex detection */
 
 #define CONFIG_SPEAR_GPIO
 
 /* I2C config options */
-#define CONFIG_HARD_I2C
-#define CONFIG_DW_I2C
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_DW
+#define CONFIG_SYS_I2C_BASE			0xD0200000
 #define CONFIG_SYS_I2C_SPEED			400000
 #define CONFIG_SYS_I2C_SLAVE			0x02
 #define CONFIG_I2C_CHIPADDRESS			0x50
@@ -124,6 +107,7 @@
 #define CONFIG_CMD_DHCP
 #define CONFIG_CMD_ENV
 #define CONFIG_CMD_FPGA
+#define CONFIG_CMD_FPGA_LOADMK
 #define CONFIG_CMD_GPIO
 #define CONFIG_CMD_I2C
 #define CONFIG_CMD_MEMORY
@@ -188,7 +172,6 @@
 #define CONFIG_SYS_BARGSIZE			CONFIG_SYS_CBSIZE
 #define CONFIG_SYS_LOAD_ADDR			0x00800000
 #define CONFIG_SYS_CONSOLE_INFO_QUIET
-#define CONFIG_SYS_64BIT_VSPRINTF
 
 /* Use last 2 lwords in internal SRAM for bootcounter */
 #define CONFIG_BOOTCOUNT_LIMIT
@@ -198,26 +181,24 @@
 #define CONFIG_UBI_PART				ubi0
 #define CONFIG_UBIFS_VOLUME			rootfs
 
-#define xstr(s)	str(s)
-#define str(s)	#s
-
 #define MTDIDS_DEFAULT		"nand0=nand"
 #define MTDPARTS_DEFAULT	"mtdparts=nand:64M(ubi0),64M(ubi1)"
 
 #define	CONFIG_EXTRA_ENV_SETTINGS					\
 	"u-boot_addr=1000000\0"						\
-	"u-boot=" xstr(CONFIG_HOSTNAME) "/u-boot.spr\0"			\
+	"u-boot=" __stringify(CONFIG_HOSTNAME) "/u-boot.spr\0"		\
 	"load=tftp ${u-boot_addr} ${u-boot}\0"				\
-	"update=protect off " xstr(CONFIG_SYS_MONITOR_BASE) " +${filesize};"\
-		"erase " xstr(CONFIG_SYS_MONITOR_BASE) " +${filesize};"	\
-		"cp.b ${u-boot_addr} " xstr(CONFIG_SYS_MONITOR_BASE)	\
+	"update=protect off " __stringify(CONFIG_SYS_MONITOR_BASE)	\
+		" +${filesize};"					\
+		"erase " __stringify(CONFIG_SYS_MONITOR_BASE) " +${filesize};" \
+		"cp.b ${u-boot_addr} " __stringify(CONFIG_SYS_MONITOR_BASE) \
 		" ${filesize};"						\
-		"protect on " xstr(CONFIG_SYS_MONITOR_BASE)		\
+		"protect on " __stringify(CONFIG_SYS_MONITOR_BASE)	\
 		" +${filesize}\0"					\
 	"upd=run load update\0"						\
-	"ubifs=" xstr(CONFIG_HOSTNAME) "/ubifs.img\0"			\
-	"part=" xstr(CONFIG_UBI_PART) "\0"				\
-	"vol=" xstr(CONFIG_UBIFS_VOLUME) "\0"				\
+	"ubifs=" __stringify(CONFIG_HOSTNAME) "/ubifs.img\0"		\
+	"part=" __stringify(CONFIG_UBI_PART) "\0"			\
+	"vol=" __stringify(CONFIG_UBIFS_VOLUME) "\0"			\
 	"load_ubifs=tftp ${kernel_addr} ${ubifs}\0"			\
 	"update_ubifs=ubi part ${part};ubi write ${kernel_addr} ${vol}"	\
 		" ${filesize}\0"					\
@@ -240,11 +221,12 @@
 		"saveenv;boot\0"					\
 	"ubifsargs=set bootargs ubi.mtd=ubi${boot_part} "		\
 		"root=ubi0:rootfs rootfstype=ubifs\0"			\
-	"kernel=" xstr(CONFIG_HOSTNAME) "/uImage\0"			\
+	"kernel=" __stringify(CONFIG_HOSTNAME) "/uImage\0"		\
 	"kernel_fs=/boot/uImage \0"					\
 	"kernel_addr=1000000\0"						\
-	"dtb=" xstr(CONFIG_HOSTNAME) "/" xstr(CONFIG_HOSTNAME) ".dtb\0"	\
-	"dtb_fs=/boot/" xstr(CONFIG_HOSTNAME) ".dtb\0"			\
+	"dtb=" __stringify(CONFIG_HOSTNAME) "/"				\
+		__stringify(CONFIG_HOSTNAME) ".dtb\0"			\
+	"dtb_fs=/boot/" __stringify(CONFIG_HOSTNAME) ".dtb\0"		\
 	"dtb_addr=1800000\0"						\
 	"load_kernel=tftp ${kernel_addr} ${kernel}\0"			\
 	"load_dtb=tftp ${dtb_addr} ${dtb}\0"				\
@@ -262,7 +244,7 @@
 	"nand_ubifs=run ubifs_mount ubifs_load ubifsargs addip"		\
 		" addcon addmisc addmtd;"				\
 		"bootm ${kernel_addr} - ${dtb_addr}\0"			\
-	"ubifs_mount=ubi part ubi${boot_part};ubifsmount rootfs\0"	\
+	"ubifs_mount=ubi part ubi${boot_part};ubifsmount ubi:rootfs\0"	\
 	"ubifs_load=ubifsload ${kernel_addr} ${kernel_fs};"		\
 		"ubifsload ${dtb_addr} ${dtb_fs};\0"			\
 	"nand_ubifs=run ubifs_mount ubifs_load ubifsargs addip addcon "	\
@@ -291,7 +273,6 @@
 /*
  * SPL related defines
  */
-#define CONFIG_SPL
 #define CONFIG_SPL_TEXT_BASE	0xd2800b00
 #define	CONFIG_SPL_START_S_PATH	"arch/arm/cpu/arm926ejs/spear"
 #define CONFIG_SPL_LDSCRIPT	"arch/arm/cpu/arm926ejs/spear/u-boot-spl.lds"

@@ -3,23 +3,7 @@
  * Copyright (C) 2004-2007, 2012 Freescale Semiconductor, Inc.
  * TsiChung Liew (Tsi-Chung.Liew@freescale.com)
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -122,17 +106,17 @@ void setup_5441x_clocks(void)
 
 	vco =  ((in_be32(&pll->pcr) & PLL_CR_FBKDIV_BITS) + 1) *
 		CONFIG_SYS_INPUT_CLKSRC;
-	gd->vco_clk = vco;
+	gd->arch.vco_clk = vco;
 
-	gd->inp_clk = CONFIG_SYS_INPUT_CLKSRC;	/* Input clock */
+	gd->arch.inp_clk = CONFIG_SYS_INPUT_CLKSRC;	/* Input clock */
 
 	pdr = in_be32(&pll->pdr);
 	temp = (pdr & PLL_DR_OUTDIV1_BITS) + 1;
 	gd->cpu_clk = vco / temp;	/* cpu clock */
-	gd->flb_clk = vco / temp;	/* FlexBus clock */
-	gd->flb_clk >>= 1;
-	if (in_be16(ccm->misccr2) & 2)		/* fsys/4 */
-		gd->flb_clk >>= 1;
+	gd->arch.flb_clk = vco / temp;	/* FlexBus clock */
+	gd->arch.flb_clk >>= 1;
+	if (in_be16(&ccm->misccr2) & 2)		/* fsys/4 */
+		gd->arch.flb_clk >>= 1;
 
 	temp = ((pdr & PLL_DR_OUTDIV2_BITS) >> 5) + 1;
 	gd->bus_clk = vco / temp;	/* bus clock */
@@ -233,7 +217,7 @@ void setup_5445x_clocks(void)
 
 			out_be32(&pll->pcr, pcrvalue);
 		}
-		gd->vco_clk = vco;	/* Vco clock */
+		gd->arch.vco_clk = vco;	/* Vco clock */
 	} else if (bootmode == 2) {
 		/* Normal mode */
 		vco =  ((in_be32(&pll->pcr) & 0xFF000000) >> 24) * CONFIG_SYS_INPUT_CLKSRC;
@@ -244,17 +228,17 @@ void setup_5445x_clocks(void)
 			out_be32(&pll->pcr, pcrvalue);
 			vco = ((in_be32(&pll->pcr) & 0xFF000000) >> 24) * CONFIG_SYS_INPUT_CLKSRC;
 		}
-		gd->vco_clk = vco;	/* Vco clock */
+		gd->arch.vco_clk = vco;	/* Vco clock */
 	} else if (bootmode == 3) {
 		/* serial mode */
 		vco =  ((in_be32(&pll->pcr) & 0xFF000000) >> 24) * CONFIG_SYS_INPUT_CLKSRC;
-		gd->vco_clk = vco;	/* Vco clock */
+		gd->arch.vco_clk = vco;	/* Vco clock */
 	}
 
 	if ((in_be16(&ccm->ccr) & CCM_MISCCR_LIMP) == CCM_MISCCR_LIMP) {
 		/* Limp mode */
 	} else {
-		gd->inp_clk = CONFIG_SYS_INPUT_CLKSRC;	/* Input clock */
+		gd->arch.inp_clk = CONFIG_SYS_INPUT_CLKSRC; /* Input clock */
 
 		temp = (in_be32(&pll->pcr) & PLL_PCR_OUTDIV1_MASK) + 1;
 		gd->cpu_clk = vco / temp;	/* cpu clock */
@@ -263,7 +247,7 @@ void setup_5445x_clocks(void)
 		gd->bus_clk = vco / temp;	/* bus clock */
 
 		temp = ((in_be32(&pll->pcr) & PLL_PCR_OUTDIV3_MASK) >> 8) + 1;
-		gd->flb_clk = vco / temp;	/* FlexBus clock */
+		gd->arch.flb_clk = vco / temp;	/* FlexBus clock */
 
 #ifdef CONFIG_PCI
 		if (bPci) {
@@ -273,8 +257,8 @@ void setup_5445x_clocks(void)
 #endif
 	}
 
-#ifdef CONFIG_FSL_I2C
-	gd->i2c1_clk = gd->bus_clk;
+#ifdef CONFIG_SYS_I2C_FSL
+	gd->arch.i2c1_clk = gd->bus_clk;
 #endif
 }
 #endif
@@ -289,8 +273,8 @@ int get_clocks(void)
 	setup_5445x_clocks();
 #endif
 
-#ifdef CONFIG_FSL_I2C
-	gd->i2c1_clk = gd->bus_clk;
+#ifdef CONFIG_SYS_FSL_I2C
+	gd->arch.i2c1_clk = gd->bus_clk;
 #endif
 
 	return (0);

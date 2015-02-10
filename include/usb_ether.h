@@ -1,22 +1,7 @@
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
- * See file CREDITS for list of people who contributed to this
- * project.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __USB_ETHER_H__
@@ -55,23 +40,31 @@ struct ueth_data {
 };
 
 /*
- * Function definitions for each USB ethernet driver go here, bracketed by
- * #ifdef CONFIG_USB_ETHER_xxx...#endif
+ * Function definitions for each USB ethernet driver go here
+ * (declaration is unconditional, compilation is conditional)
  */
-#ifdef CONFIG_USB_ETHER_ASIX
 void asix_eth_before_probe(void);
 int asix_eth_probe(struct usb_device *dev, unsigned int ifnum,
 		      struct ueth_data *ss);
 int asix_eth_get_info(struct usb_device *dev, struct ueth_data *ss,
 		      struct eth_device *eth);
-#endif
 
-#ifdef CONFIG_USB_ETHER_SMSC95XX
+void ax88179_eth_before_probe(void);
+int ax88179_eth_probe(struct usb_device *dev, unsigned int ifnum,
+		      struct ueth_data *ss);
+int ax88179_eth_get_info(struct usb_device *dev, struct ueth_data *ss,
+		      struct eth_device *eth);
+
+void mcs7830_eth_before_probe(void);
+int mcs7830_eth_probe(struct usb_device *dev, unsigned int ifnum,
+		      struct ueth_data *ss);
+int mcs7830_eth_get_info(struct usb_device *dev, struct ueth_data *ss,
+			 struct eth_device *eth);
+
 void smsc95xx_eth_before_probe(void);
 int smsc95xx_eth_probe(struct usb_device *dev, unsigned int ifnum,
 			struct ueth_data *ss);
 int smsc95xx_eth_get_info(struct usb_device *dev, struct ueth_data *ss,
 			struct eth_device *eth);
-#endif
 
 #endif /* __USB_ETHER_H__ */

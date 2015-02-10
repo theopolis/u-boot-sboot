@@ -3,23 +3,7 @@
  * (C) Copyright 2007
  * Daniel Hellstrom, Gaisler Research, daniel@gaisler.com.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -95,11 +79,15 @@ void arch_lmb_reserve(struct lmb *lmb)
 int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t * images)
 {
 	char *bootargs;
-	ulong initrd_start, initrd_end;
 	ulong rd_len;
 	void (*kernel) (struct linux_romvec *, void *);
-	struct lmb *lmb = &images->lmb;
 	int ret;
+
+	/*
+	 * allow the PREP bootm subcommand, it is required for bootm to work
+	 */
+	if (flag & BOOTM_STATE_OS_PREP)
+		return 0;
 
 	if ((flag != 0) && (flag != BOOTM_STATE_OS_GO))
 		return 1;
@@ -131,24 +119,23 @@ int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t * im
 	 * extracted and is writeable.
 	 */
 
+	ret = image_setup_linux(images);
+	if (ret) {
+		puts("### Failed to relocate RAM disk\n");
+		goto error;
+	}
+
 	/* Calc length of RAM disk, if zero no ramdisk available */
 	rd_len = images->rd_end - images->rd_start;
 
 	if (rd_len) {
-		ret = boot_ramdisk_high(lmb, images->rd_start, rd_len,
-					&initrd_start, &initrd_end);
-		if (ret) {
-			puts("### Failed to relocate RAM disk\n");
-			goto error;
-		}
-
 		/* Update SPARC kernel header so that Linux knows
 		 * what is going on and where to find RAM disk.
 		 *
 		 * Set INITRD Image address relative to RAM Start
 		 */
 		linux_hdr->hdr_input.ver_0203.sparc_ramdisk_image =
-		    initrd_start - CONFIG_SYS_RAM_BASE;
+			images->initrd_start - CONFIG_SYS_RAM_BASE;
 		linux_hdr->hdr_input.ver_0203.sparc_ramdisk_size = rd_len;
 		/* Clear READ ONLY flag if set to non-zero */
 		linux_hdr->hdr_input.ver_0203.root_flags = 1;

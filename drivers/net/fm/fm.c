@@ -2,20 +2,7 @@
  * Copyright 2009-2011 Freescale Semiconductor, Inc.
  *	Dave Liu <daveliu@freescale.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <malloc.h>
@@ -362,18 +349,17 @@ static void fm_init_qmi(struct fm_qmi_common *qmi)
 int fm_init_common(int index, struct ccsr_fman *reg)
 {
 	int rc;
-	char env_addr[32];
 #if defined(CONFIG_SYS_QE_FMAN_FW_IN_NOR)
-	void *addr = (void *)CONFIG_SYS_QE_FMAN_FW_ADDR;
+	void *addr = (void *)CONFIG_SYS_FMAN_FW_ADDR;
 #elif defined(CONFIG_SYS_QE_FMAN_FW_IN_NAND)
 	size_t fw_length = CONFIG_SYS_QE_FMAN_FW_LENGTH;
 	void *addr = malloc(CONFIG_SYS_QE_FMAN_FW_LENGTH);
 
-	rc = nand_read(&nand_info[0], (loff_t)CONFIG_SYS_QE_FMAN_FW_ADDR,
+	rc = nand_read(&nand_info[0], (loff_t)CONFIG_SYS_FMAN_FW_ADDR,
 		       &fw_length, (u_char *)addr);
 	if (rc == -EUCLEAN) {
 		printf("NAND read of FMAN firmware at offset 0x%x failed %d\n",
-			CONFIG_SYS_QE_FMAN_FW_ADDR, rc);
+			CONFIG_SYS_FMAN_FW_ADDR, rc);
 	}
 #elif defined(CONFIG_SYS_QE_FW_IN_SPIFLASH)
 	struct spi_flash *ucode_flash;
@@ -385,7 +371,7 @@ int fm_init_common(int index, struct ccsr_fman *reg)
 	if (!ucode_flash)
 		printf("SF: probe for ucode failed\n");
 	else {
-		ret = spi_flash_read(ucode_flash, CONFIG_SYS_QE_FMAN_FW_ADDR,
+		ret = spi_flash_read(ucode_flash, CONFIG_SYS_FMAN_FW_ADDR,
 				CONFIG_SYS_QE_FMAN_FW_LENGTH, addr);
 		if (ret)
 			printf("SF: read for ucode failed\n");
@@ -395,7 +381,7 @@ int fm_init_common(int index, struct ccsr_fman *reg)
 	int dev = CONFIG_SYS_MMC_ENV_DEV;
 	void *addr = malloc(CONFIG_SYS_QE_FMAN_FW_LENGTH);
 	u32 cnt = CONFIG_SYS_QE_FMAN_FW_LENGTH / 512;
-	u32 blk = CONFIG_SYS_QE_FMAN_FW_ADDR / 512;
+	u32 blk = CONFIG_SYS_FMAN_FW_ADDR / 512;
 	struct mmc *mmc = find_mmc_device(CONFIG_SYS_MMC_ENV_DEV);
 
 	if (!mmc)
@@ -409,15 +395,16 @@ int fm_init_common(int index, struct ccsr_fman *reg)
 		flush_cache((ulong)addr, cnt * 512);
 	}
 #elif defined(CONFIG_SYS_QE_FMAN_FW_IN_REMOTE)
-	void *addr = (void *)CONFIG_SYS_QE_FMAN_FW_ADDR;
+	void *addr = (void *)CONFIG_SYS_FMAN_FW_ADDR;
+#else
+	void *addr = NULL;
 #endif
 
 	/* Upload the Fman microcode if it's present */
 	rc = fman_upload_firmware(index, &reg->fm_imem, addr);
 	if (rc)
 		return rc;
-	sprintf(env_addr, "0x%lx", (long unsigned int)addr);
-	setenv("fman_ucode", env_addr);
+	setenv_addr("fman_ucode", addr);
 
 	fm_init_muram(index, &reg->muram);
 	fm_init_qmi(&reg->fm_qmi_common);

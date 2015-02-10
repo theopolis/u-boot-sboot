@@ -2,23 +2,7 @@
  * (C) Copyright 2007 - 2008
  * Heiko Schocher, DENX Software Engineering, hs@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -31,10 +15,7 @@
 #include <libfdt.h>
 #endif
 
-#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SOFT_I2C)
 #include <i2c.h>
-#endif
-
 #include "../common/common.h"
 
 /*
@@ -319,11 +300,9 @@ phys_size_t initdram(int board_type)
 	out_8(&memctl->memc_psrt, CONFIG_SYS_PSRT);
 	out_be16(&memctl->memc_mptpr, CONFIG_SYS_MPTPR);
 
-#ifndef CONFIG_SYS_RAMBOOT
 	/* 60x SDRAM setup:
 	 */
 	psize = probe_sdram(memctl);
-#endif /* CONFIG_SYS_RAMBOOT */
 
 	icache_enable();
 
@@ -370,7 +349,7 @@ static void set_pin(int state, unsigned long mask);
  * will toggle once what forces the mgocge3un part to restart
  * immediately.
  */
-void handle_mgcoge3un_reset(void)
+static void handle_mgcoge3un_reset(void)
 {
 	char *bobcatreset = getenv("bobcatreset");
 	if (bobcatreset) {
@@ -384,6 +363,14 @@ void handle_mgcoge3un_reset(void)
 	}
 }
 #endif
+
+int ethernet_present(void)
+{
+	struct km_bec_fpga *base =
+		(struct km_bec_fpga *)CONFIG_SYS_KMBEC_FPGA_BASE;
+
+	return in_8(&base->bprth) & PIGGY_PRESENT;
+}
 
 /*
  * Early board initalization.
@@ -471,8 +458,10 @@ static void setports(int gpio)
 }
 #endif
 #if defined(CONFIG_OF_BOARD_SETUP) && defined(CONFIG_OF_LIBFDT)
-void ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, bd_t *bd)
 {
 	ft_cpu_setup(blob, bd);
+
+	return 0;
 }
 #endif /* defined(CONFIG_OF_BOARD_SETUP) && defined(CONFIG_OF_LIBFDT) */

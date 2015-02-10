@@ -1,26 +1,48 @@
 /*
  * National Semiconductor PHY drivers
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * Copyright 2010-2011 Freescale Semiconductor, Inc.
  * author Andy Fleming
- *
  */
 #include <phy.h>
+
+/* NatSemi DP83630 */
+
+#define DP83630_PHY_PAGESEL_REG		0x13
+#define DP83630_PHY_PTP_COC_REG		0x14
+#define DP83630_PHY_PTP_CLKOUT_EN	(1<<15)
+#define DP83630_PHY_RBR_REG		0x17
+
+static int dp83630_config(struct phy_device *phydev)
+{
+	int ptp_coc_reg;
+
+	phy_write(phydev, MDIO_DEVAD_NONE, MII_BMCR, BMCR_RESET);
+	phy_write(phydev, MDIO_DEVAD_NONE, DP83630_PHY_PAGESEL_REG, 0x6);
+	ptp_coc_reg = phy_read(phydev, MDIO_DEVAD_NONE,
+			       DP83630_PHY_PTP_COC_REG);
+	ptp_coc_reg &= ~DP83630_PHY_PTP_CLKOUT_EN;
+	phy_write(phydev, MDIO_DEVAD_NONE, DP83630_PHY_PTP_COC_REG,
+		  ptp_coc_reg);
+	phy_write(phydev, MDIO_DEVAD_NONE, DP83630_PHY_PAGESEL_REG, 0);
+
+	genphy_config_aneg(phydev);
+
+	return 0;
+}
+
+static struct phy_driver DP83630_driver = {
+	.name = "NatSemi DP83630",
+	.uid = 0x20005ce1,
+	.mask = 0xfffffff0,
+	.features = PHY_BASIC_FEATURES,
+	.config = &dp83630_config,
+	.startup = &genphy_startup,
+	.shutdown = &genphy_shutdown,
+};
+
 
 /* DP83865 Link and Auto-Neg Status Register */
 #define MIIM_DP83865_LANR      0x11
@@ -90,6 +112,7 @@ static struct phy_driver DP83865_driver = {
 
 int phy_natsemi_init(void)
 {
+	phy_register(&DP83630_driver);
 	phy_register(&DP83865_driver);
 
 	return 0;

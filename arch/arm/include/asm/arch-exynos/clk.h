@@ -2,21 +2,7 @@
  * (C) Copyright 2010 Samsung Electronics
  * Minkyu Kang <mk7.kang@samsung.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_ARM_ARCH_CLK_H_
@@ -28,6 +14,19 @@
 #define HPLL	3
 #define VPLL	4
 #define BPLL	5
+#define RPLL	6
+#define SPLL	7
+
+#define MASK_PRE_RATIO(x)	(0xff << ((x << 4) + 8))
+#define MASK_RATIO(x)		(0xf << (x << 4))
+#define SET_PRE_RATIO(x, y)	((y & 0xff) << ((x << 4) + 8))
+#define SET_RATIO(x, y)		((y & 0xf) << (x << 4))
+
+enum pll_src_bit {
+	EXYNOS_SRC_MPLL = 6,
+	EXYNOS_SRC_EPLL,
+	EXYNOS_SRC_VPLL,
+};
 
 unsigned long get_pll_clk(int pllreg);
 unsigned long get_arm_clk(void);
@@ -39,9 +38,19 @@ void set_mmc_clk(int dev_index, unsigned int div);
 unsigned long get_lcd_clk(void);
 void set_lcd_clk(void);
 void set_mipi_clk(void);
-void set_i2s_clk_source(void);
-int set_i2s_clk_prescaler(unsigned int src_frq, unsigned int dst_frq);
+int set_i2s_clk_source(unsigned int i2s_id);
+int set_i2s_clk_prescaler(unsigned int src_frq, unsigned int dst_frq,
+				unsigned int i2s_id);
 int set_epll_clk(unsigned long rate);
 int set_spi_clk(int periph_id, unsigned int rate);
+
+/**
+ * get the clk frequency of the required peripheral
+ *
+ * @param peripheral	Peripheral id
+ *
+ * @return frequency of the peripheral clk
+ */
+unsigned long clock_get_periph_rate(int peripheral);
 
 #endif

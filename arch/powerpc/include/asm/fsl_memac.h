@@ -2,20 +2,7 @@
  * Copyright 2012 Freescale Semiconductor, Inc.
  *	Roy Zang <tie-fei.zang@freescale.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __MEMAC_H__
@@ -172,6 +159,7 @@ struct memac {
 #define MEMAC_CMD_CFG_RX_EN		0x00000002 /* MAC Rx path enable */
 #define MEMAC_CMD_CFG_TX_EN		0x00000001 /* MAC Tx path enable */
 #define MEMAC_CMD_CFG_RXTX_EN	(MEMAC_CMD_CFG_RX_EN | MEMAC_CMD_CFG_TX_EN)
+#define MEMAC_CMD_CFG_NO_LEN_CHK 0x20000 /* Payload length check disable */
 
 /* HASHTABLE_CTRL - Hashtable control register */
 #define HASHTABLE_CTRL_MCAST_EN	0x00000200 /* enable mulitcast Rx hash */
@@ -222,6 +210,10 @@ struct memac {
 
 /* IF_MODE - Interface Mode Register */
 #define IF_MODE_EN_AUTO	0x00008000 /* 1 - Enable automatic speed selection */
+#define IF_MODE_SETSP_100M	0x00000000 /* 00 - 100Mbps RGMII */
+#define IF_MODE_SETSP_10M	0x00002000 /* 01 - 10Mbps RGMII */
+#define IF_MODE_SETSP_1000M	0x00004000 /* 10 - 1000Mbps RGMII */
+#define IF_MODE_SETSP_MASK	0x00006000 /* setsp mask bits */
 #define IF_MODE_XGMII	0x00000000 /* 00- XGMII(10) interface mode */
 #define IF_MODE_GMII		0x00000002 /* 10- GMII interface mode */
 #define IF_MODE_MASK	0x00000003 /* mask for mode interface mode */
@@ -252,6 +244,7 @@ struct memac_mdio_controller {
 #define MDIO_STAT_PRE		(1 << 5)
 #define MDIO_STAT_ENC		(1 << 6)
 #define MDIO_STAT_HOLD_15_CLK	(7 << 2)
+#define MDIO_STAT_NEG		(1 << 23)
 
 #define MDIO_CTL_DEV_ADDR(x)	(x & 0x1f)
 #define MDIO_CTL_PORT_ADDR(x)	((x & 0x1f) << 5)

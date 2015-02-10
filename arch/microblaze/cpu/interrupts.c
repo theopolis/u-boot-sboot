@@ -5,23 +5,7 @@
  * Michal  SIMEK <monstr@monstr.eu>
  * Yasushi SHOJI <yashi@atmark-techno.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -30,10 +14,9 @@
 #include <asm/microblaze_intc.h>
 #include <asm/asm.h>
 
-#undef DEBUG_INT
-
 void enable_interrupts(void)
 {
+	debug("Enable interrupts for the whole CPU\n");
 	MSRSET(0x2);
 }
 
@@ -66,12 +49,11 @@ static void enable_one_interrupt(int irq)
 	offset <<= irq;
 	mask = intc->ier;
 	intc->ier = (mask | offset);
-#ifdef DEBUG_INT
-	printf("Enable one interrupt irq %x - mask %x,ier %x\n", offset, mask,
-		intc->ier);
-	printf("INTC isr %x, ier %x, iar %x, mer %x\n", intc->isr, intc->ier,
-		intc->iar, intc->mer);
-#endif
+
+	debug("Enable one interrupt irq %x - mask %x,ier %x\n", offset, mask,
+	      intc->ier);
+	debug("INTC isr %x, ier %x, iar %x, mer %x\n", intc->isr, intc->ier,
+	      intc->iar, intc->mer);
 }
 
 static void disable_one_interrupt(int irq)
@@ -82,12 +64,11 @@ static void disable_one_interrupt(int irq)
 	offset <<= irq;
 	mask = intc->ier;
 	intc->ier = (mask & ~offset);
-#ifdef DEBUG_INT
-	printf("Disable one interrupt irq %x - mask %x,ier %x\n", irq, mask,
-		intc->ier);
-	printf("INTC isr %x, ier %x, iar %x, mer %x\n", intc->isr, intc->ier,
-		intc->iar, intc->mer);
-#endif
+
+	debug("Disable one interrupt irq %x - mask %x,ier %x\n", irq, mask,
+	      intc->ier);
+	debug("INTC isr %x, ier %x, iar %x, mer %x\n", intc->isr, intc->ier,
+	      intc->iar, intc->mer);
 }
 
 int install_interrupt_handler(int irq, interrupt_handler_t *hdlr, void *arg)
@@ -104,12 +85,12 @@ int install_interrupt_handler(int irq, interrupt_handler_t *hdlr, void *arg)
 		act->handler = hdlr;
 		act->arg = arg;
 		act->count = 0;
-		enable_one_interrupt (irq);
+		enable_one_interrupt(irq);
 		return 0;
 	}
 
 	/* Disable */
-	act->handler = (interrupt_handler_t *) def_hdlr;
+	act->handler = (interrupt_handler_t *)def_hdlr;
 	act->arg = (void *)irq;
 	disable_one_interrupt(irq);
 	return 1;
@@ -123,18 +104,17 @@ static void intc_init(void)
 	intc->iar = 0xFFFFFFFF;
 	/* XIntc_Start - hw_interrupt enable and all interrupt enable */
 	intc->mer = 0x3;
-#ifdef DEBUG_INT
-	printf("INTC isr %x, ier %x, iar %x, mer %x\n", intc->isr, intc->ier,
-		intc->iar, intc->mer);
-#endif
+
+	debug("INTC isr %x, ier %x, iar %x, mer %x\n", intc->isr, intc->ier,
+	      intc->iar, intc->mer);
 }
 
-int interrupts_init(void)
+int interrupt_init(void)
 {
 	int i;
 
 #if defined(CONFIG_SYS_INTC_0_ADDR) && defined(CONFIG_SYS_INTC_0_NUM)
-	intc = (microblaze_intc_t *) (CONFIG_SYS_INTC_0_ADDR);
+	intc = (microblaze_intc_t *)CONFIG_SYS_INTC_0_ADDR;
 	irq_no = CONFIG_SYS_INTC_0_NUM;
 #endif
 	if (irq_no) {
@@ -146,7 +126,7 @@ int interrupts_init(void)
 
 		/* initialize irq list */
 		for (i = 0; i < irq_no; i++) {
-			vecs[i].handler = (interrupt_handler_t *) def_hdlr;
+			vecs[i].handler = (interrupt_handler_t *)def_hdlr;
 			vecs[i].arg = (void *)i;
 			vecs[i].count = 0;
 		}
@@ -163,31 +143,29 @@ void interrupt_handler(void)
 {
 	int irqs = intc->ivr;	/* find active interrupt */
 	int mask = 1;
-#ifdef DEBUG_INT
 	int value;
-	printf ("INTC isr %x, ier %x, iar %x, mer %x\n", intc->isr, intc->ier,
-		intc->iar, intc->mer);
-	R14(value);
-	printf ("Interrupt handler on %x line, r14 %x\n", irqs, value);
-#endif
 	struct irq_action *act = vecs + irqs;
 
-#ifdef DEBUG_INT
-	printf
-	    ("Jumping to interrupt handler rutine addr %x,count %x,arg %x\n",
-	     act->handler, act->count, act->arg);
+	debug("INTC isr %x, ier %x, iar %x, mer %x\n", intc->isr, intc->ier,
+	      intc->iar, intc->mer);
+#ifdef DEBUG
+	R14(value);
 #endif
-	act->handler (act->arg);
+	debug("Interrupt handler on %x line, r14 %x\n", irqs, value);
+
+	debug("Jumping to interrupt handler rutine addr %x,count %x,arg %x\n",
+	      (u32)act->handler, act->count, (u32)act->arg);
+	act->handler(act->arg);
 	act->count++;
 
 	intc->iar = mask << irqs;
 
-#ifdef DEBUG_INT
-	printf ("Dump INTC reg, isr %x, ier %x, iar %x, mer %x\n", intc->isr,
-		intc->ier, intc->iar, intc->mer);
+	debug("Dump INTC reg, isr %x, ier %x, iar %x, mer %x\n", intc->isr,
+	      intc->ier, intc->iar, intc->mer);
+#ifdef DEBUG
 	R14(value);
-	printf ("Interrupt handler on %x line, r14 %x\n", irqs, value);
 #endif
+	debug("Interrupt handler on %x line, r14 %x\n", irqs, value);
 }
 
 #if defined(CONFIG_CMD_IRQ)
@@ -202,10 +180,10 @@ int do_irqinfo(cmd_tbl_t *cmdtp, int flag, int argc, const char *argv[])
 		      "-----------------------------\n");
 
 		for (i = 0; i < irq_no; i++) {
-			if (act->handler != (interrupt_handler_t *) def_hdlr) {
+			if (act->handler != (interrupt_handler_t *)def_hdlr) {
 				printf("%02d  %08x  %08x  %d\n", i,
-					(int)act->handler, (int)act->arg,
-								act->count);
+				       (int)act->handler, (int)act->arg,
+				       act->count);
 			}
 			act++;
 		}

@@ -2,23 +2,7 @@
  * (C) Copyright 2000
  * Subodh Nijsure, SkyStream Networks, snijsure@skystream.com
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -191,7 +175,7 @@ static int do_reginfo(cmd_tbl_t *cmdtp, int flag, int argc,
 
 #elif defined(CONFIG_BLACKFIN)
 	puts("\nSystem Configuration registers\n");
-
+#ifndef __ADSPBF60x__
 	puts("\nPLL Registers\n");
 	printf("\tPLL_DIV:   0x%04x   PLL_CTL:      0x%04x\n",
 		bfin_read_PLL_DIV(), bfin_read_PLL_CTL());
@@ -227,7 +211,24 @@ static int do_reginfo(cmd_tbl_t *cmdtp, int flag, int argc,
 	printf("\tEBIU_SDSTAT:  0x%04x   EBIU_SDGCTL:  0x%08x\n",
 		bfin_read_EBIU_SDSTAT(), bfin_read_EBIU_SDGCTL());
 # endif
+#else
+	puts("\nCGU Registers\n");
+	printf("\tCGU_DIV:   0x%08x   CGU_CTL:      0x%08x\n",
+		bfin_read_CGU_DIV(), bfin_read_CGU_CTL());
+	printf("\tCGU_STAT:  0x%08x   CGU_LOCKCNT:  0x%08x\n",
+		bfin_read_CGU_STAT(), bfin_read_CGU_CLKOUTSEL());
 
+	puts("\nSMC DDR Registers\n");
+	printf("\tDDR_CFG:   0x%08x   DDR_TR0:      0x%08x\n",
+		bfin_read_DMC0_CFG(), bfin_read_DMC0_TR0());
+	printf("\tDDR_TR1:   0x%08x   DDR_TR2:      0x%08x\n",
+		bfin_read_DMC0_TR1(), bfin_read_DMC0_TR2());
+	printf("\tDDR_MR:    0x%08x   DDR_EMR1:     0x%08x\n",
+		bfin_read_DMC0_MR(), bfin_read_DMC0_EMR1());
+	printf("\tDDR_CTL:   0x%08x   DDR_STAT:     0x%08x\n",
+		bfin_read_DMC0_CTL(), bfin_read_DMC0_STAT());
+	printf("\tDDR_DLLCTL:0x%08x\n", bfin_read_DMC0_DLLCTL());
+#endif
 #endif /* CONFIG_BLACKFIN */
 
 	return 0;

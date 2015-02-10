@@ -2,23 +2,7 @@
  * (C) Copyright 2012
  * Joe Hershberger, National Instruments, joe.hershberger@ni.com
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ENV_CALLBACK_H__
@@ -41,6 +25,12 @@
 #define SILENT_CALLBACK
 #endif
 
+#ifdef CONFIG_SPLASHIMAGE_GUARD
+#define SPLASHIMAGE_CALLBACK "splashimage:splashimage,"
+#else
+#define SPLASHIMAGE_CALLBACK
+#endif
+
 /*
  * This list of callback bindings is static, but may be overridden by defining
  * a new association in the ".callbacks" environment variable.
@@ -51,6 +41,7 @@
 	"bootfile:bootfile," \
 	"loadaddr:loadaddr," \
 	SILENT_CALLBACK \
+	SPLASHIMAGE_CALLBACK \
 	"stdin:console,stdout:console,stderr:console," \
 	CONFIG_ENV_CALLBACK_LIST_STATIC
 
@@ -60,7 +51,6 @@ struct env_clbk_tbl {
 		int flags);
 };
 
-struct env_clbk_tbl *find_env_callback(const char *);
 void env_callback_init(ENTRY *var_entry);
 
 /*
@@ -70,13 +60,13 @@ void env_callback_init(ENTRY *var_entry);
  */
 #ifdef CONFIG_SPL_BUILD
 #define U_BOOT_ENV_CALLBACK(name, callback) \
-	static inline void _u_boot_env_noop_##name(void) \
+	static inline __maybe_unused void _u_boot_env_noop_##name(void) \
 	{ \
 		(void)callback; \
 	}
 #else
 #define U_BOOT_ENV_CALLBACK(name, callback) \
-	ll_entry_declare(struct env_clbk_tbl, name, env_clbk, env_clbk) = \
+	ll_entry_declare(struct env_clbk_tbl, name, env_clbk) = \
 	{#name, callback}
 #endif
 

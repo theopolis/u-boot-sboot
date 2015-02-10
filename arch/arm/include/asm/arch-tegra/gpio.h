@@ -1,27 +1,13 @@
 /*
  * Copyright (c) 2011, Google Inc. All rights reserved.
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _TEGRA_GPIO_H_
 #define _TEGRA_GPIO_H_
 
+#define TEGRA_GPIOS_PER_PORT	8
+#define TEGRA_PORTS_PER_BANK	4
 #define MAX_NUM_GPIOS           (TEGRA_GPIO_PORTS * TEGRA_GPIO_BANKS * 8)
 #define GPIO_NAME_SIZE		20	/* gpio_request max label len */
 
@@ -30,11 +16,32 @@
 #define GPIO_FULLPORT(x)	((x) >> 3)
 #define GPIO_BIT(x)		((x) & 0x7)
 
-/*
- * Tegra-specific GPIO API
+enum tegra_gpio_init {
+	TEGRA_GPIO_INIT_IN,
+	TEGRA_GPIO_INIT_OUT0,
+	TEGRA_GPIO_INIT_OUT1,
+};
+
+struct tegra_gpio_config {
+	u32 gpio:16;
+	u32 init:2;
+};
+
+/**
+ * tegra_spl_gpio_direction_output() - set the output value of a GPIO
+ *
+ * This function is only used from SPL on seaboard, which needs to enable a
+ * GPIO to get the UART running. It could be done in U-Boot rather than SPL,
+ * but for now, this gets it working
  */
+int tegra_spl_gpio_direction_output(int gpio, int value);
 
-void gpio_info(void);
+/**
+ * Configure a list of GPIOs
+ *
+ * @param config	List of GPIO configurations
+ * @param len		Number of config items in list
+ */
+void gpio_config_table(const struct tegra_gpio_config *config, int len);
 
-#define gpio_status()	gpio_info()
 #endif	/* TEGRA_GPIO_H_ */

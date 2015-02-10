@@ -2,23 +2,7 @@
  * (C) Copyright 2002
  * Daniel Engström, Omicron Ceti AB, <daniel@omicron.se>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -26,7 +10,6 @@
 #include <stdio_dev.h>
 #include <i8042.h>
 #include <asm/ptrace.h>
-#include <asm/realmode.h>
 #include <asm/io.h>
 #include <asm/pci.h>
 
@@ -121,7 +104,7 @@ static void __video_putc(const char c, int *x, int *y)
 	}
 }
 
-static void video_putc(const char c)
+static void video_putc(struct stdio_dev *dev, const char c)
 {
 	int x, y, pos;
 
@@ -140,7 +123,7 @@ static void video_putc(const char c)
 	outb_p(0xff & (pos >> 1), vidport+1);
 }
 
-static void video_puts(const char *s)
+static void video_puts(struct stdio_dev *dev, const char *s)
 {
 	int x, y, pos;
 	char c;
@@ -195,8 +178,6 @@ int video_init(void)
 	vga_dev.flags = DEV_FLAGS_OUTPUT | DEV_FLAGS_SYSTEM;
 	vga_dev.putc  = video_putc;        /* 'putc' function */
 	vga_dev.puts  = video_puts;        /* 'puts' function */
-	vga_dev.tstc  = NULL;              /* 'tstc' function */
-	vga_dev.getc  = NULL;              /* 'getc' function */
 
 	if (stdio_register(&vga_dev) == 0)
 		return 1;
@@ -208,8 +189,6 @@ int video_init(void)
 	strcpy(kbd_dev.name, "kbd");
 	kbd_dev.ext   = 0;
 	kbd_dev.flags = DEV_FLAGS_INPUT | DEV_FLAGS_SYSTEM;
-	kbd_dev.putc  = NULL;        /* 'putc' function */
-	kbd_dev.puts  = NULL;        /* 'puts' function */
 	kbd_dev.tstc  = i8042_tstc;  /* 'tstc' function */
 	kbd_dev.getc  = i8042_getc;  /* 'getc' function */
 
@@ -222,10 +201,5 @@ int video_init(void)
 
 int drv_video_init(void)
 {
-#ifndef CONFIG_X86_NO_REAL_MODE
-	if (video_bios_init())
-		return 1;
-#endif
-
 	return video_init();
 }

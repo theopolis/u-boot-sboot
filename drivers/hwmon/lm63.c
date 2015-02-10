@@ -3,23 +3,7 @@
  * Dirk Eibach,  Guntermann & Drunck GmbH, eibach@gdsys.de
  * based on lm75.c by Bill Hunter
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -133,8 +117,7 @@ int dtt_init_one(int sensor)
 	/*
 	 * Setup PWM Lookup-Table
 	 */
-	for (i = 0; i < sizeof(pwm_lookup) / sizeof(struct pwm_lookup_entry);
-	     i++) {
+	for (i = 0; i < ARRAY_SIZE(pwm_lookup); i++) {
 		int address = DTT_PWM_LOOKUP_BASE + 2 * i;
 		val = pwm_lookup[i].temp;
 		if (is_lm64(sensor))

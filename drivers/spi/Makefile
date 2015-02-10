@@ -2,66 +2,50 @@
 # (C) Copyright 2000-2007
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 #
-# See file CREDITS for list of people who contributed to this
-# project.
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307 USA
+# SPDX-License-Identifier:	GPL-2.0+
 #
 
-include $(TOPDIR)/config.mk
+# There are many options which enable SPI, so make this library available
+ifdef CONFIG_DM_SPI
+obj-y += spi-uclass.o
+obj-$(CONFIG_SANDBOX) += spi-emul-uclass.o
+obj-$(CONFIG_SOFT_SPI) += soft_spi.o
+else
+obj-y += spi.o
+obj-$(CONFIG_SOFT_SPI) += soft_spi_legacy.o
+endif
 
-LIB	:= $(obj)libspi.o
-
-COBJS-$(CONFIG_ALTERA_SPI) += altera_spi.o
-COBJS-$(CONFIG_ANDES_SPI) += andes_spi.o
-COBJS-$(CONFIG_ARMADA100_SPI) += armada100_spi.o
-COBJS-$(CONFIG_ATMEL_DATAFLASH_SPI) += atmel_dataflash_spi.o
-COBJS-$(CONFIG_ATMEL_SPI) += atmel_spi.o
-COBJS-$(CONFIG_BFIN_SPI) += bfin_spi.o
-COBJS-$(CONFIG_CF_SPI) += cf_spi.o
-COBJS-$(CONFIG_CF_QSPI) += cf_qspi.o
-COBJS-$(CONFIG_DAVINCI_SPI) += davinci_spi.o
-COBJS-$(CONFIG_EXYNOS_SPI) += exynos_spi.o
-COBJS-$(CONFIG_KIRKWOOD_SPI) += kirkwood_spi.o
-COBJS-$(CONFIG_MPC52XX_SPI) += mpc52xx_spi.o
-COBJS-$(CONFIG_MPC8XXX_SPI) += mpc8xxx_spi.o
-COBJS-$(CONFIG_MXC_SPI) += mxc_spi.o
-COBJS-$(CONFIG_MXS_SPI) += mxs_spi.o
-COBJS-$(CONFIG_OC_TINY_SPI) += oc_tiny_spi.o
-COBJS-$(CONFIG_OMAP3_SPI) += omap3_spi.o
-COBJS-$(CONFIG_SOFT_SPI) += soft_spi.o
-COBJS-$(CONFIG_SH_SPI) += sh_spi.o
-COBJS-$(CONFIG_FSL_ESPI) += fsl_espi.o
-COBJS-$(CONFIG_TEGRA_SPI) += tegra_spi.o
-COBJS-$(CONFIG_XILINX_SPI) += xilinx_spi.o
-
-COBJS	:= $(COBJS-y)
-SRCS	:= $(COBJS:.o=.c)
-OBJS	:= $(addprefix $(obj),$(COBJS))
-
-all:	$(LIB)
-
-$(LIB):	$(obj).depend $(OBJS)
-	$(call cmd_link_o_target, $(OBJS))
-
-#########################################################################
-
-# defines $(obj).depend target
-include $(SRCTREE)/rules.mk
-
-sinclude $(obj).depend
-
-#########################################################################
+obj-$(CONFIG_EP93XX_SPI) += ep93xx_spi.o
+obj-$(CONFIG_ALTERA_SPI) += altera_spi.o
+obj-$(CONFIG_ANDES_SPI) += andes_spi.o
+obj-$(CONFIG_ARMADA100_SPI) += armada100_spi.o
+obj-$(CONFIG_ATMEL_DATAFLASH_SPI) += atmel_dataflash_spi.o
+obj-$(CONFIG_ATMEL_SPI) += atmel_spi.o
+obj-$(CONFIG_BFIN_SPI) += bfin_spi.o
+obj-$(CONFIG_BFIN_SPI6XX) += bfin_spi6xx.o
+obj-$(CONFIG_CADENCE_QSPI) += cadence_qspi.o cadence_qspi_apb.o
+obj-$(CONFIG_CF_SPI) += cf_spi.o
+obj-$(CONFIG_CF_QSPI) += cf_qspi.o
+obj-$(CONFIG_DAVINCI_SPI) += davinci_spi.o
+obj-$(CONFIG_DESIGNWARE_SPI) += designware_spi.o
+obj-$(CONFIG_EXYNOS_SPI) += exynos_spi.o
+obj-$(CONFIG_FTSSP010_SPI) += ftssp010_spi.o
+obj-$(CONFIG_ICH_SPI) +=  ich.o
+obj-$(CONFIG_KIRKWOOD_SPI) += kirkwood_spi.o
+obj-$(CONFIG_MPC52XX_SPI) += mpc52xx_spi.o
+obj-$(CONFIG_MPC8XXX_SPI) += mpc8xxx_spi.o
+obj-$(CONFIG_MXC_SPI) += mxc_spi.o
+obj-$(CONFIG_MXS_SPI) += mxs_spi.o
+obj-$(CONFIG_OC_TINY_SPI) += oc_tiny_spi.o
+obj-$(CONFIG_OMAP3_SPI) += omap3_spi.o
+obj-$(CONFIG_SANDBOX_SPI) += sandbox_spi.o
+obj-$(CONFIG_SH_SPI) += sh_spi.o
+obj-$(CONFIG_SH_QSPI) += sh_qspi.o
+obj-$(CONFIG_FSL_ESPI) += fsl_espi.o
+obj-$(CONFIG_TEGRA20_SFLASH) += tegra20_sflash.o
+obj-$(CONFIG_TEGRA20_SLINK) += tegra20_slink.o
+obj-$(CONFIG_TEGRA114_SPI) += tegra114_spi.o
+obj-$(CONFIG_TI_QSPI) += ti_qspi.o
+obj-$(CONFIG_XILINX_SPI) += xilinx_spi.o
+obj-$(CONFIG_ZYNQ_SPI) += zynq_spi.o
+obj-$(CONFIG_FSL_QSPI) += fsl_qspi.o

@@ -1,24 +1,7 @@
 /*
  * (C) Copyright 2007-2009 DENX Software Engineering
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -37,25 +20,6 @@
 #include <linux/mtd/nand.h>
 
 DECLARE_GLOBAL_DATA_PTR;
-
-/* Clocks in use */
-#define SCCR1_CLOCKS_EN	(CLOCK_SCCR1_CFG_EN |				\
-			 CLOCK_SCCR1_DDR_EN |				\
-			 CLOCK_SCCR1_FEC_EN |				\
-			 CLOCK_SCCR1_LPC_EN |				\
-			 CLOCK_SCCR1_NFC_EN |				\
-			 CLOCK_SCCR1_PATA_EN |				\
-			 CLOCK_SCCR1_PCI_EN |				\
-			 CLOCK_SCCR1_PSC_EN(CONFIG_PSC_CONSOLE) |	\
-			 CLOCK_SCCR1_PSCFIFO_EN |			\
-			 CLOCK_SCCR1_TPR_EN)
-
-#define SCCR2_CLOCKS_EN	(CLOCK_SCCR2_DIU_EN |		\
-			 CLOCK_SCCR2_I2C_EN |		\
-			 CLOCK_SCCR2_MEM_EN |		\
-			 CLOCK_SCCR2_SPDIF_EN |  	\
-			 CLOCK_SCCR2_USB1_EN | 		\
-			 CLOCK_SCCR2_USB2_EN)
 
 void __mpc5121_nfc_select_chip(struct mtd_info *mtd, int chip);
 
@@ -83,20 +47,6 @@ void mpc5121_nfc_select_chip(struct mtd_info *mtd, int chip)
 
 int board_early_init_f(void)
 {
-	volatile immap_t *im = (immap_t *) CONFIG_SYS_IMMR;
-	u32 spridr;
-
-	/*
-	 * Initialize Local Window for the CPLD registers access (CS2 selects
-	 * the CPLD chip)
-	 */
-	out_be32(&im->sysconf.lpcs2aw,
-		CSAW_START(CONFIG_SYS_CPLD_BASE) |
-		CSAW_STOP(CONFIG_SYS_CPLD_BASE, CONFIG_SYS_CPLD_SIZE)
-	);
-	out_be32(&im->lpc.cs_cfg[2], CONFIG_SYS_CS2_CFG);
-	sync_law(&im->sysconf.lpcs2aw);
-
 	/*
 	 * Disable Boot NOR FLASH write protect - CPLD Reg 8 NOR FLASH Control
 	 *
@@ -114,25 +64,6 @@ int board_early_init_f(void)
 		out_8((u8 *)(CONFIG_SYS_CPLD_BASE + 0x08), 0x32);
 	}
 #endif
-	/*
-	 * Configure Flash Speed
-	 */
-	out_be32(&im->lpc.cs_cfg[0], CONFIG_SYS_CS0_CFG);
-
-	spridr = in_be32(&im->sysconf.spridr);
-
-	if (SVR_MJREV (spridr) >= 2)
-		out_be32 (&im->lpc.altr, CONFIG_SYS_CS_ALETIMING);
-
-	/*
-	 * Enable clocks
-	 */
-	out_be32 (&im->clk.sccr[0], SCCR1_CLOCKS_EN);
-	out_be32 (&im->clk.sccr[1], SCCR2_CLOCKS_EN);
-#if defined(CONFIG_IIM) || defined(CONFIG_CMD_FUSE)
-	setbits_be32 (&im->clk.sccr[1], CLOCK_SCCR2_IIM_EN);
-#endif
-
 	return 0;
 }
 
@@ -344,8 +275,10 @@ int checkboard (void)
 }
 
 #if defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP)
-void ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, bd_t *bd)
 {
 	ft_cpu_setup(blob, bd);
+
+	return 0;
 }
 #endif /* defined(CONFIG_OF_LIBFDT) && defined(CONFIG_OF_BOARD_SETUP) */

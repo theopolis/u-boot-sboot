@@ -2,23 +2,7 @@
  * (C) Copyright 2004, Psyent Corporation <www.psyent.com>
  * Scott McNutt <smcnutt@psyent.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm-offsets.h>
@@ -99,12 +83,12 @@ _cur:	movhi	r5, %hi(_cur - _start)
 3:
 
 	/* ZERO BSS/SBSS -- bss and sbss are assumed to be adjacent
-	 * and between __bss_start and __bss_end__.
+	 * and between __bss_start and __bss_end.
 	 */
 	 movhi	r5, %hi(__bss_start)
 	 ori	r5, r5, %lo(__bss_start)
-	 movhi	r6, %hi(__bss_end__)
-	 ori	r6, r6, %lo(__bss_end__)
+	 movhi	r6, %hi(__bss_end)
+	 ori	r6, r6, %lo(__bss_end)
 	 beq	r5, r6, 5f
 
 4:	stwio	r0, 0(r5)
@@ -150,17 +134,43 @@ _reloc:
 	mov	fp, sp
 
 	/*
-	 * Call board_init -- never returns
+	 * Call board_init_f -- never returns
 	 */
-	movhi	r4, %hi(board_init@h)
-	ori	r4, r4, %lo(board_init@h)
-	callr	r4
+	mov	r4, r0
+	movhi	r2, %hi(board_init_f@h)
+	ori	r2, r2, %lo(board_init_f@h)
+	callr	r2
 
 	/* NEVER RETURNS -- but branch to the _start just
 	 * in case ;-)
 	 */
 	br	_start
 
+
+
+/*
+ * relocate_code -- Nios2 handles the relocation above. But
+ * the generic board code monkeys with the heap, stack, etc.
+ * (it makes some assumptions that may not be appropriate
+ * for Nios). Nevertheless, we capitulate here.
+ *
+ * We'll call the board_init_r from here since this isn't
+ * supposed to return.
+ *
+ * void relocate_code (ulong sp, gd_t *global_data,
+ *			ulong reloc_addr)
+ *			__attribute__ ((noreturn));
+ */
+	.text
+	.global relocate_code
+
+relocate_code:
+	mov	sp, r4		/* Set the new sp */
+	mov	r4, r5
+	movhi	r8, %hi(board_init_r@h)
+	ori	r8, r8, %lo(board_init_r@h)
+	callr	r8
+	ret
 
 /*
  * dly_clks -- Nios2 (like Nios1) doesn't have a timebase in

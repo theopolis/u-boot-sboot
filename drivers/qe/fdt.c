@@ -4,23 +4,7 @@
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -28,6 +12,7 @@
 #include <fdt_support.h>
 #include "qe.h"
 
+#ifdef CONFIG_QE
 DECLARE_GLOBAL_DATA_PTR;
 
 /*
@@ -75,16 +60,17 @@ error:
 void ft_qe_setup(void *blob)
 {
 	do_fixup_by_prop_u32(blob, "device_type", "qe", 4,
-		"bus-frequency", gd->qe_clk, 1);
+		"bus-frequency", gd->arch.qe_clk, 1);
 	do_fixup_by_prop_u32(blob, "device_type", "qe", 4,
-		"brg-frequency", gd->brg_clk, 1);
+		"brg-frequency", gd->arch.brg_clk, 1);
 	do_fixup_by_compat_u32(blob, "fsl,qe",
-		"clock-frequency", gd->qe_clk, 1);
+		"clock-frequency", gd->arch.qe_clk, 1);
 	do_fixup_by_compat_u32(blob, "fsl,qe",
-		"bus-frequency", gd->qe_clk, 1);
+		"bus-frequency", gd->arch.qe_clk, 1);
 	do_fixup_by_compat_u32(blob, "fsl,qe",
-		"brg-frequency", gd->brg_clk, 1);
+		"brg-frequency", gd->arch.brg_clk, 1);
 	do_fixup_by_compat_u32(blob, "fsl,qe-gtm",
-		"clock-frequency", gd->qe_clk / 2, 1);
+		"clock-frequency", gd->arch.qe_clk / 2, 1);
 	fdt_fixup_qe_firmware(blob);
 }
+#endif

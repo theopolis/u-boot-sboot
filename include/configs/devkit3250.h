@@ -3,27 +3,14 @@
  *
  * Copyright (C) 2011 Vladimir Zapolskiy <vz@mleia.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301, USA.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_DEVKIT3250_H__
 #define __CONFIG_DEVKIT3250_H__
 
 /* SoC and board defines */
-#include <asm/sizes.h>
+#include <linux/sizes.h>
 #include <asm/arch/cpu.h>
 
 /*
@@ -42,7 +29,6 @@
  */
 #define CONFIG_NR_DRAM_BANKS		1
 #define CONFIG_SYS_MALLOC_LEN		SZ_1M
-#define CONFIG_SYS_GBL_DATA_SIZE	128
 #define CONFIG_SYS_SDRAM_BASE		EMC_DYCS0_BASE
 #define CONFIG_SYS_SDRAM_SIZE		SZ_64M
 #define CONFIG_SYS_TEXT_BASE		0x83FA0000
@@ -74,7 +60,6 @@
  * U-Boot General Configurations
  */
 #define CONFIG_SYS_LONGHELP
-#define CONFIG_SYS_PROMPT		"=> "
 #define CONFIG_SYS_CBSIZE		1024
 #define CONFIG_SYS_PBSIZE		\
 	(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)

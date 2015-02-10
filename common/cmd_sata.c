@@ -7,20 +7,7 @@
  * Copyright (C) 2008 Freescale Semiconductor, Inc.
  *		Dave Liu <daveliu@freescale.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -44,6 +31,7 @@ int __sata_initialize(void)
 		sata_dev_desc[i].type = DEV_TYPE_HARDDISK;
 		sata_dev_desc[i].lba = 0;
 		sata_dev_desc[i].blksz = 512;
+		sata_dev_desc[i].log2blksz = LOG2(sata_dev_desc[i].blksz);
 		sata_dev_desc[i].block_read = sata_read;
 		sata_dev_desc[i].block_write = sata_write;
 
@@ -60,6 +48,20 @@ int __sata_initialize(void)
 }
 int sata_initialize(void) __attribute__((weak,alias("__sata_initialize")));
 
+__weak int __sata_stop(void)
+{
+	int i, err = 0;
+
+	for (i = 0; i < CONFIG_SYS_SATA_MAX_DEVICE; i++)
+		err |= reset_sata(i);
+
+	if (err)
+		printf("Could not reset some SATA devices\n");
+
+	return err;
+}
+int sata_stop(void) __attribute__((weak, alias("__sata_stop")));
+
 #ifdef CONFIG_PARTITIONS
 block_dev_desc_t *sata_get_dev(int dev)
 {
@@ -71,8 +73,15 @@ static int do_sata(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	int rc = 0;
 
-	if (argc == 2 && strcmp(argv[1], "init") == 0)
+	if (argc == 2 && strcmp(argv[1], "stop") == 0)
+		return sata_stop();
+
+	if (argc == 2 && strcmp(argv[1], "init") == 0) {
+		if (sata_curr_device != -1)
+			sata_stop();
+
 		return sata_initialize();
+	}
 
 	/* If the user has not yet run `sata init`, do it now */
 	if (sata_curr_device == -1)
@@ -196,7 +205,8 @@ static int do_sata(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 U_BOOT_CMD(
 	sata, 5, 1, do_sata,
 	"SATA sub system",
-	"sata init - init SATA sub system\n"
+	"init - init SATA sub system\n"
+	"sata stop - disable SATA sub system\n"
 	"sata info - show available SATA devices\n"
 	"sata device [dev] - show or set current device\n"
 	"sata part [dev] - print partition table\n"

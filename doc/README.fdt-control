@@ -1,23 +1,7 @@
 #
 # Copyright (c) 2011 The Chromium OS Authors.
 #
-# See file CREDITS for list of people who contributed to this
-# project.
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundatio; either version 2 of
-# the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307 USA
+# SPDX-License-Identifier:	GPL-2.0+
 #
 
 Device Tree Control in U-Boot
@@ -49,6 +33,12 @@ the features of each board in the device tree file, and have a single
 generic source base.
 
 To enable this feature, add CONFIG_OF_CONTROL to your board config file.
+It is currently supported on ARM, x86 and Microblaze - other architectures
+will need to add code to their arch/xxx/lib/board.c file to locate the
+FDT. Alternatively you can enable generic board support on your board
+(with CONFIG_SYS_GENERIC_BOARD) if this is available (as it is for
+PowerPC). For ARM, Tegra and Exynos5 have device trees available for
+common devices.
 
 
 What is a Flat Device Tree?
@@ -76,11 +66,11 @@ Tools
 
 To use this feature you will need to get the device tree compiler here:
 
-	git://jdl.com/software/dtc.git
+	git://git.kernel.org/pub/scm/utils/dtc/dtc.git
 
 For example:
 
-	$ git clone git://jdl.com/software/dtc.git
+	$ git clone git://git.kernel.org/pub/scm/utils/dtc/dtc.git
 	$ cd dtc
 	$ make
 	$ sudo make install
@@ -99,7 +89,8 @@ Then run the compiler (your version will vary):
 	*   Bad configuration:	0
 	* Strange test result:	0
 
-You will also find a useful ftdump utility for decoding a binary file.
+You will also find a useful fdtdump utility for decoding a binary file, as
+well as fdtget/fdtput for reading and writing properties in a binary file.
 
 
 Where do I get an fdt file for my board?
@@ -128,11 +119,11 @@ file into
 	board/<vendor>/dts/<name>.dts
 
 This should include your CPU or SOC's device tree file, placed in
-arch/<arch>/dts, and then make any adjustments required. The name of this
-is CONFIG_ARCH_DEVICE_TREE.dts.
+arch/<arch>/dts, and then make any adjustments required.
 
 If CONFIG_OF_EMBED is defined, then it will be picked up and built into
-the U-Boot image (including u-boot.bin).
+the U-Boot image (including u-boot.bin). This is suitable for debugging
+and development only and is not recommended for production devices.
 
 If CONFIG_OF_SEPARATE is defined, then it will be built and placed in
 a u-boot.dtb file alongside u-boot.bin. A common approach is then to
@@ -140,9 +131,24 @@ join the two:
 
 	cat u-boot.bin u-boot.dtb >image.bin
 
-and then flash image.bin onto your board.
+and then flash image.bin onto your board. Note that U-Boot creates
+u-boot-dtb.bin which does the above step for you also. If you are using
+CONFIG_SPL_FRAMEWORK, then u-boot.img will be built to include the device
+tree binary.
 
-You cannot use both of these options at the same time.
+If CONFIG_OF_HOSTFILE is defined, then it will be read from a file on
+startup. This is only useful for sandbox. Use the -d flag to U-Boot to
+specify the file to read.
+
+You cannot use more than one of these options at the same time.
+
+To use a device tree file that you have compiled yourself, pass
+EXT_DTB=<filename> to 'make', as in:
+
+	make EXT_DTB=boot/am335x-boneblack-pubkey.dtb
+
+Then U-Boot will copy that file to u-boot.dtb, put it in the .img file
+if used, and u-boot-dtb.bin.
 
 If you wish to put the fdt at a different address in memory, you can
 define the "fdtcontroladdr" environment variable. This is the hex
@@ -155,6 +161,14 @@ environment, for example (it will be ignored).
 To use this, put something like this in your board header file:
 
 #define CONFIG_EXTRA_ENV_SETTINGS	"fdtcontroladdr=10000\0"
+
+Build:
+
+After board configuration is done, fdt supported u-boot can be build in two ways:
+1)  build the default dts which is defined from CONFIG_DEFAULT_DEVICE_TREE
+    $ make
+2)  build the user specified dts file
+    $ make DEVICE_TREE=<dts-file-name>
 
 
 Limitations

@@ -3,53 +3,36 @@
  *
  * AM33xx clock define
  *
- * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR /PURPOSE.  See the
- * GNU General Public License for more details.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _CLOCKS_AM33XX_H_
 #define _CLOCKS_AM33XX_H_
 
-#define OSC	(V_OSCK/1000000)
+/* MAIN PLL Fdll supported frequencies */
+#define MPUPLL_M_1000	1000
+#define MPUPLL_M_800	800
+#define MPUPLL_M_720	720
+#define MPUPLL_M_600	600
+#define MPUPLL_M_550	550
+#define MPUPLL_M_300	300
 
-/* MAIN PLL Fdll = 550 MHZ, */
-#define MPUPLL_M	550
-#define MPUPLL_N	(OSC-1)
-#define MPUPLL_M2	1
+/* MAIN PLL Fdll = 550 MHz, by default */
+#ifndef CONFIG_SYS_MPUCLK
+#define CONFIG_SYS_MPUCLK	MPUPLL_M_550
+#endif
 
-/* Core PLL Fdll = 1 GHZ, */
-#define COREPLL_M	1000
-#define COREPLL_N	(OSC-1)
+#define UART_RESET		(0x1 << 1)
+#define UART_CLK_RUNNING_MASK	0x1
+#define UART_SMART_IDLE_EN	(0x1 << 0x3)
 
-#define COREPLL_M4	10	/* CORE_CLKOUTM4 = 200 MHZ */
-#define COREPLL_M5	8	/* CORE_CLKOUTM5 = 250 MHZ */
-#define COREPLL_M6	4	/* CORE_CLKOUTM6 = 500 MHZ */
+#define CM_DLL_CTRL_NO_OVERRIDE	0x0
+#define CM_DLL_READYST		0x4
 
-/*
- * USB PHY clock is 960 MHZ. Since, this comes directly from Fdll, Fdll
- * frequency needs to be set to 960 MHZ. Hence,
- * For clkout = 192 MHZ, Fdll = 960 MHZ, divider values are given below
- */
-#define PERPLL_M	960
-#define PERPLL_N	(OSC-1)
-#define PERPLL_M2	5
-
-/* DDR Freq is 266 MHZ for now */
-/* Set Fdll = 400 MHZ , Fdll = M * 2 * CLKINP/ N + 1; clkout = Fdll /(2 * M2) */
-#define DDRPLL_M	266
-#define DDRPLL_N	(OSC-1)
-#define DDRPLL_M2	1
-
-extern void pll_init(void);
-extern void enable_emif_clocks(void);
+extern void enable_dmm_clocks(void);
+extern const struct dpll_params dpll_core_opp100;
+extern struct dpll_params dpll_mpu_opp100;
 
 #endif	/* endif _CLOCKS_AM33XX_H_ */

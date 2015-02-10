@@ -4,20 +4,7 @@
  *
  * Common configuration options for all AMCC boards
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __AMCC_COMMON_H
@@ -42,9 +29,10 @@
 /*
  * I2C
  */
-#define CONFIG_HARD_I2C			/* I2C with hardware support	*/
-#define CONFIG_PPC4XX_I2C		/* use PPC4xx driver		*/
-#define CONFIG_SYS_I2C_SLAVE		0x7F
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_PPC4XX
+#define CONFIG_SYS_I2C_PPC4XX_CH0
+#define CONFIG_SYS_I2C_PPC4XX_SLAVE_0		0x7F
 
 /*
  * Ethernet/EMAC/PHY
@@ -71,6 +59,7 @@
 #define CONFIG_CMD_DIAG
 #define CONFIG_CMD_EEPROM
 #define CONFIG_CMD_ELF
+#define CONFIG_CMD_GREPENV
 #define CONFIG_CMD_I2C
 #define CONFIG_CMD_IRQ
 #define CONFIG_CMD_MII
@@ -78,13 +67,13 @@
 #define CONFIG_CMD_NFS
 #define CONFIG_CMD_PING
 #define CONFIG_CMD_REGINFO
+#define CONFIG_CMD_SETEXPR
 
 /*
  * Miscellaneous configurable options
  */
 #define CONFIG_BOOTDELAY	5	/* autoboot after 5 seconds	*/
 #define CONFIG_SYS_LONGHELP			/* undef to save memory		*/
-#define CONFIG_SYS_PROMPT		"=> "	/* Monitor Command Prompt	*/
 #if defined(CONFIG_CMD_KGDB)
 #define CONFIG_SYS_CBSIZE		1024	/* Console I/O Buffer Size	*/
 #else
@@ -100,21 +89,20 @@
 #define CONFIG_SYS_LOAD_ADDR		0x100000  /* default load address	*/
 #define CONFIG_SYS_EXTBDINFO			/* To use extended board_into (bd_t) */
 
-#define CONFIG_SYS_HZ			1000	/* decrementer freq: 1 ms ticks	*/
-
 #define CONFIG_CMDLINE_EDITING		/* add command line history	*/
 #define CONFIG_AUTO_COMPLETE		/* add autocompletion support	*/
 #define CONFIG_LOOPW			/* enable loopw command         */
 #define CONFIG_MX_CYCLIC		/* enable mdc/mwc commands      */
 #define CONFIG_ZERO_BOOTDELAY_CHECK	/* check for keypress on bootdelay==0 */
 #define CONFIG_VERSION_VARIABLE 	/* include version env variable */
-#define CONFIG_SYS_CONSOLE_INFO_QUIET		/* don't print console @ startup*/
+#define CONFIG_SYS_CONSOLE_INFO_QUIET	/* don't print console @ startup*/
 
-#define CONFIG_SYS_HUSH_PARSER			/* Use the HUSH parser		*/
+#define CONFIG_SYS_HUSH_PARSER		/* Use the HUSH parser		*/
 
 #define CONFIG_LOADS_ECHO		/* echo on for serial download	*/
-#define CONFIG_SYS_LOADS_BAUD_CHANGE		/* allow baudrate change	*/
+#define CONFIG_SYS_LOADS_BAUD_CHANGE	/* allow baudrate change	*/
 
+#define CONFIG_REGEX			/* Enable regular expression support */
 /*
  * BOOTP options
  */
@@ -137,7 +125,6 @@
  */
 #if defined(CONFIG_CMD_KGDB)
 #define CONFIG_KGDB_BAUDRATE	230400	/* speed to run kgdb serial port*/
-#define CONFIG_KGDB_SER_INDEX	2	/* which serial port to use	*/
 #endif
 
 /*
@@ -265,11 +252,5 @@
 		"era " __stringify(CONFIG_SYS_MONITOR_BASE) " FFFFFFFF;"	\
 		"cp.b ${fileaddr} " __stringify(CONFIG_SYS_MONITOR_BASE) " ${filesize}\0" \
 	"upd=run load update\0"						\
-
-#define CONFIG_AMCC_DEF_ENV_NAND_UPD					\
-	"u-boot-nand=" __stringify(CONFIG_HOSTNAME) "/u-boot-nand.bin\0"\
-	"nload=tftp 200000 ${u-boot-nand}\0"				\
-	"nupdate=nand erase 0 100000;nand write 200000 0 100000\0"	\
-	"nupd=run nload nupdate\0"
 
 #endif /* __AMCC_COMMON_H */

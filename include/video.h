@@ -11,9 +11,11 @@
 
 /* Video functions */
 
-int	video_init	(void *videobase);
-void	video_putc	(const char c);
-void	video_puts	(const char *s);
+struct stdio_dev;
+
+int	video_init(void *videobase);
+void	video_putc(struct stdio_dev *dev, const char c);
+void	video_puts(struct stdio_dev *dev, const char *s);
 
 /**
  * Display a BMP format bitmap on the screen
@@ -63,4 +65,8 @@ void video_position_cursor(unsigned col, unsigned row);
 /* Clear the display */
 void video_clear(void);
 
+#if defined(CONFIG_FORMIKE)
+int kwh043st20_f01_spi_startup(unsigned int bus, unsigned int cs,
+	unsigned int max_hz, unsigned int spi_mode);
+#endif
 #endif

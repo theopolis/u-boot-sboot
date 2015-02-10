@@ -2,32 +2,36 @@
  * (C) Copyright 2012
  * Texas Instruments, <www.ti.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #ifndef	_ASM_SPL_H_
 #define	_ASM_SPL_H_
 
+#if defined(CONFIG_OMAP) \
+	|| defined(CONFIG_EXYNOS4) || defined(CONFIG_EXYNOS5) \
+	|| defined(CONFIG_EXYNOS4210)
 /* Platform-specific defines */
 #include <asm/arch/spl.h>
 
+#else
+enum {
+	BOOT_DEVICE_RAM,
+	BOOT_DEVICE_MMC1,
+	BOOT_DEVICE_MMC2,
+	BOOT_DEVICE_MMC2_2,
+	BOOT_DEVICE_NAND,
+	BOOT_DEVICE_ONENAND,
+	BOOT_DEVICE_NOR,
+	BOOT_DEVICE_UART,
+	BOOT_DEVICE_SPI,
+	BOOT_DEVICE_SATA,
+	BOOT_DEVICE_I2C,
+	BOOT_DEVICE_NONE
+};
+#endif
+
 /* Linker symbols. */
-extern char __bss_start[], __bss_end__[];
+extern char __bss_start[], __bss_end[];
 
 extern gd_t gdata;
 

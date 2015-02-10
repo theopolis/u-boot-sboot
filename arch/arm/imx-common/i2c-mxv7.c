@@ -1,25 +1,10 @@
 /*
  * Copyright (C) 2012 Boundary Devices Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
+#include <malloc.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/errno.h>
@@ -85,15 +70,45 @@ static void * const i2c_bases[] = {
 };
 
 /* i2c_index can be from 0 - 2 */
-void setup_i2c(unsigned i2c_index, int speed, int slave_addr,
-		struct i2c_pads_info *p)
+int setup_i2c(unsigned i2c_index, int speed, int slave_addr,
+	      struct i2c_pads_info *p)
 {
+	char name[9];
+	int ret;
+
 	if (i2c_index >= ARRAY_SIZE(i2c_bases))
-		return;
+		return -EINVAL;
+
+	snprintf(name, sizeof(name), "i2c_sda%01d", i2c_index);
+	ret = gpio_request(p->sda.gp, name);
+	if (ret)
+		return ret;
+
+	snprintf(name, sizeof(name), "i2c_scl%01d", i2c_index);
+	ret = gpio_request(p->scl.gp, name);
+	if (ret)
+		goto err_req;
+
 	/* Enable i2c clock */
-	enable_i2c_clk(1, i2c_index);
+	ret = enable_i2c_clk(1, i2c_index);
+	if (ret)
+		goto err_clk;
+
 	/* Make sure bus is idle */
-	force_idle_bus(p);
+	ret = force_idle_bus(p);
+	if (ret)
+		goto err_idle;
+
 	bus_i2c_init(i2c_bases[i2c_index], speed, slave_addr,
 			force_idle_bus, p);
+
+	return 0;
+
+err_idle:
+err_clk:
+	gpio_free(p->scl.gp);
+err_req:
+	gpio_free(p->sda.gp);
+
+	return ret;
 }

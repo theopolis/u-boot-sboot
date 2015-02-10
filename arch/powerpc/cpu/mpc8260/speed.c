@@ -2,23 +2,7 @@
  * (C) Copyright 2000-2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -135,17 +119,17 @@ int get_clocks (void)
 	    (get_pvr () == PVR_8260_HIP7R1) ||
 	    (get_pvr () == PVR_8260_HIP7RA)) {
 		pllmf = (scmr & SCMR_PLLMF_MSKH7) >> SCMR_PLLMF_SHIFT;
-		gd->vco_out = clkin * (pllmf + 1);
+		gd->arch.vco_out = clkin * (pllmf + 1);
 	} else {                        /* HiP3, HiP4 */
 		pllmf = (scmr & SCMR_PLLMF_MSK) >> SCMR_PLLMF_SHIFT;
 		plldf = (scmr & SCMR_PLLDF) ? 1 : 0;
-		gd->vco_out = (clkin * 2 * (pllmf + 1)) / (plldf + 1);
+		gd->arch.vco_out = (clkin * 2 * (pllmf + 1)) / (plldf + 1);
 	}
 
-	gd->cpm_clk = gd->vco_out / 2;
+	gd->arch.cpm_clk = gd->arch.vco_out / 2;
 	gd->bus_clk = clkin;
-	gd->scc_clk = gd->vco_out / 4;
-	gd->brg_clk = gd->vco_out / (1 << (2 * (dfbrg + 1)));
+	gd->arch.scc_clk = gd->arch.vco_out / 4;
+	gd->arch.brg_clk = gd->arch.vco_out / (1 << (2 * (dfbrg + 1)));
 
 	if (cp->b2c_mult > 0) {
 		gd->cpu_clk = (clkin * cp->b2c_mult) / 2;
@@ -173,7 +157,7 @@ int get_clocks (void)
 			pci_div = pcidf + 1;
 		}
 
-		gd->pci_clk = (gd->cpm_clk * 2) / pci_div;
+		gd->pci_clk = (gd->arch.cpm_clk * 2) / pci_div;
 	}
 #endif
 
@@ -231,10 +215,10 @@ int prt_8260_clks (void)
 			plldf, pllmf, pcidf);
 
 	printf (" - vco_out %10ld, scc_clk %10ld, brg_clk %10ld\n",
-			gd->vco_out, gd->scc_clk, gd->brg_clk);
+			gd->arch.vco_out, gd->arch.scc_clk, gd->arch.brg_clk);
 
 	printf (" - cpu_clk %10ld, cpm_clk %10ld, bus_clk %10ld\n",
-			gd->cpu_clk, gd->cpm_clk, gd->bus_clk);
+			gd->cpu_clk, gd->arch.cpm_clk, gd->bus_clk);
 #ifdef CONFIG_PCI
 	printf (" - pci_clk %10ld\n", gd->pci_clk);
 #endif

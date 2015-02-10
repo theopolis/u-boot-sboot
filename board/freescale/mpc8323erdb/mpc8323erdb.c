@@ -172,12 +172,14 @@ void pci_init_board(void)
 }
 
 #if defined(CONFIG_OF_BOARD_SETUP)
-void ft_board_setup(void *blob, bd_t *bd)
+int ft_board_setup(void *blob, bd_t *bd)
 {
 	ft_cpu_setup(blob, bd);
 #ifdef CONFIG_PCI
 	ft_pci_setup(blob, bd);
 #endif
+
+	return 0;
 }
 #endif
 
@@ -195,7 +197,11 @@ int mac_read_from_eeprom(void)
 		printf("\nEEPROM @ 0x%02x read FAILED!!!\n",
 		       CONFIG_SYS_I2C_EEPROM_ADDR);
 	} else {
-		if (crc32(crc, buf, 24) == *(unsigned int *)&buf[24]) {
+		uint32_t crc_buf;
+
+		memcpy(&crc_buf, &buf[24], sizeof(uint32_t));
+
+		if (crc32(crc, buf, 24) == crc_buf) {
 			printf("Reading MAC from EEPROM\n");
 			for (i = 0; i < 4; i++) {
 				if (memcmp(&buf[i * 6], "\0\0\0\0\0\0", 6)) {

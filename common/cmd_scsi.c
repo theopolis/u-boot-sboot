@@ -2,26 +2,7 @@
  * (C) Copyright 2001
  * Denis Peter, MPL AG Switzerland
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
- *
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -29,6 +10,7 @@
  */
 #include <common.h>
 #include <command.h>
+#include <inttypes.h>
 #include <asm/processor.h>
 #include <scsi.h>
 #include <image.h>
@@ -82,8 +64,9 @@ void scsi_ident_cpy (unsigned char *dest, unsigned char *src, unsigned int len);
 
 static int scsi_read_capacity(ccb *pccb, lbaint_t *capacity,
 			      unsigned long *blksz);
-static ulong scsi_read(int device, ulong blknr, lbaint_t blkcnt, void *buffer);
-static ulong scsi_write(int device, ulong blknr,
+static ulong scsi_read(int device, lbaint_t blknr, lbaint_t blkcnt,
+		       void *buffer);
+static ulong scsi_write(int device, lbaint_t blknr,
 			lbaint_t blkcnt, const void *buffer);
 
 
@@ -106,11 +89,13 @@ void scsi_scan(int mode)
 		scsi_dev_desc[i].lun=0xff;
 		scsi_dev_desc[i].lba=0;
 		scsi_dev_desc[i].blksz=0;
+		scsi_dev_desc[i].log2blksz =
+			LOG2_INVALID(typeof(scsi_dev_desc[i].log2blksz));
 		scsi_dev_desc[i].type=DEV_TYPE_UNKNOWN;
 		scsi_dev_desc[i].vendor[0]=0;
 		scsi_dev_desc[i].product[0]=0;
 		scsi_dev_desc[i].revision[0]=0;
-		scsi_dev_desc[i].removable=FALSE;
+		scsi_dev_desc[i].removable = false;
 		scsi_dev_desc[i].if_type=IF_TYPE_SCSI;
 		scsi_dev_desc[i].dev=i;
 		scsi_dev_desc[i].part_type=PART_TYPE_UNKNOWN;
@@ -125,7 +110,7 @@ void scsi_scan(int mode)
 			pccb->pdata=(unsigned char *)&tempbuff;
 			pccb->datalen=512;
 			scsi_setup_inquiry(pccb);
-			if(scsi_exec(pccb)!=TRUE) {
+			if (scsi_exec(pccb) != true) {
 				if(pccb->contr_stat==SCSI_SEL_TIME_OUT) {
 					debug ("Selection timeout ID %d\n",pccb->target);
 					continue; /* selection timeout => assuming no device present */
@@ -139,7 +124,7 @@ void scsi_scan(int mode)
 				continue; /* skip unknown devices */
 			}
 			if((modi&0x80)==0x80) /* drive is removable */
-				scsi_dev_desc[scsi_max_devs].removable=TRUE;
+				scsi_dev_desc[scsi_max_devs].removable=true;
 			/* get info for this device */
 			scsi_ident_cpy((unsigned char *)&scsi_dev_desc[scsi_max_devs].vendor[0],
 				       &tempbuff[8], 8);
@@ -152,8 +137,8 @@ void scsi_scan(int mode)
 
 			pccb->datalen=0;
 			scsi_setup_test_unit_ready(pccb);
-			if(scsi_exec(pccb)!=TRUE) {
-				if(scsi_dev_desc[scsi_max_devs].removable==TRUE) {
+			if (scsi_exec(pccb) != true) {
+				if (scsi_dev_desc[scsi_max_devs].removable == true) {
 					scsi_dev_desc[scsi_max_devs].type=perq;
 					goto removable;
 				}
@@ -166,6 +151,8 @@ void scsi_scan(int mode)
 			}
 			scsi_dev_desc[scsi_max_devs].lba=capacity;
 			scsi_dev_desc[scsi_max_devs].blksz=blksz;
+			scsi_dev_desc[scsi_max_devs].log2blksz =
+				LOG2(scsi_dev_desc[scsi_max_devs].blksz);
 			scsi_dev_desc[scsi_max_devs].type=perq;
 			init_part(&scsi_dev_desc[scsi_max_devs]);
 removable:
@@ -182,7 +169,9 @@ removable:
 		scsi_curr_dev = -1;
 
 	printf("Found %d device(s).\n", scsi_max_devs);
+#ifndef CONFIG_SPL_BUILD
 	setenv_ulong("scsidevs", scsi_max_devs);
+#endif
 }
 
 int scsi_get_disk_count(void)
@@ -368,7 +357,8 @@ int do_scsi (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 #define SCSI_MAX_READ_BLK 0xFFFF /* almost the maximum amount of the scsi_ext command.. */
 
-static ulong scsi_read(int device, ulong blknr, lbaint_t blkcnt, void *buffer)
+static ulong scsi_read(int device, lbaint_t blknr, lbaint_t blkcnt,
+		       void *buffer)
 {
 	lbaint_t start, blks;
 	uintptr_t buf_addr;
@@ -402,9 +392,9 @@ static ulong scsi_read(int device, ulong blknr, lbaint_t blkcnt, void *buffer)
 			blks=0;
 		}
 		debug("scsi_read_ext: startblk " LBAF
-		      ", blccnt %x buffer %lx\n",
+		      ", blccnt %x buffer %" PRIXPTR "\n",
 		      start, smallblks, buf_addr);
-		if(scsi_exec(pccb)!=TRUE) {
+		if (scsi_exec(pccb) != true) {
 			scsi_print_error(pccb);
 			blkcnt-=blks;
 			break;
@@ -412,7 +402,7 @@ static ulong scsi_read(int device, ulong blknr, lbaint_t blkcnt, void *buffer)
 		buf_addr+=pccb->datalen;
 	} while(blks!=0);
 	debug("scsi_read_ext: end startblk " LBAF
-	      ", blccnt %x buffer %lx\n", start, smallblks, buf_addr);
+	      ", blccnt %x buffer %" PRIXPTR "\n", start, smallblks, buf_addr);
 	return(blkcnt);
 }
 
@@ -423,7 +413,7 @@ static ulong scsi_read(int device, ulong blknr, lbaint_t blkcnt, void *buffer)
 /* Almost the maximum amount of the scsi_ext command.. */
 #define SCSI_MAX_WRITE_BLK 0xFFFF
 
-static ulong scsi_write(int device, ulong blknr,
+static ulong scsi_write(int device, lbaint_t blknr,
 			lbaint_t blkcnt, const void *buffer)
 {
 	lbaint_t start, blks;
@@ -456,16 +446,16 @@ static ulong scsi_write(int device, ulong blknr,
 			start += blks;
 			blks = 0;
 		}
-		debug("%s: startblk " LBAF ", blccnt %x buffer %lx\n",
+		debug("%s: startblk " LBAF ", blccnt %x buffer %" PRIXPTR "\n",
 		      __func__, start, smallblks, buf_addr);
-		if (scsi_exec(pccb) != TRUE) {
+		if (scsi_exec(pccb) != true) {
 			scsi_print_error(pccb);
 			blkcnt -= blks;
 			break;
 		}
 		buf_addr += pccb->datalen;
 	} while (blks != 0);
-	debug("%s: end startblk " LBAF ", blccnt %x buffer %lx\n",
+	debug("%s: end startblk " LBAF ", blccnt %x buffer %" PRIXPTR "\n",
 	      __func__, start, smallblks, buf_addr);
 	return blkcnt;
 }
@@ -521,7 +511,7 @@ int scsi_read_capacity(ccb *pccb, lbaint_t *capacity, unsigned long *blksz)
 	pccb->msgout[0] = SCSI_IDENTIFY; /* NOT USED */
 
 	pccb->datalen = 8;
-	if (scsi_exec(pccb) != TRUE)
+	if (scsi_exec(pccb) != true)
 		return 1;
 
 	*capacity = ((lbaint_t)pccb->pdata[0] << 24) |
@@ -547,7 +537,7 @@ int scsi_read_capacity(ccb *pccb, lbaint_t *capacity, unsigned long *blksz)
 	pccb->msgout[0] = SCSI_IDENTIFY; /* NOT USED */
 
 	pccb->datalen = 16;
-	if (scsi_exec(pccb) != TRUE)
+	if (scsi_exec(pccb) != true)
 		return 1;
 
 	*capacity = ((uint64_t)pccb->pdata[0] << 56) |

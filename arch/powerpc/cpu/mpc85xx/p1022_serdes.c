@@ -2,10 +2,7 @@
  * Copyright 2010 Freescale Semiconductor, Inc.
  * Author: Timur Tabi <timur@freescale.com>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
@@ -93,7 +90,7 @@ void fsl_serdes_init(void)
 
 	debug("PORDEVSR[IO_SEL_SRDS] = %x\n", srds_cfg);
 
-	if (srds_cfg > ARRAY_SIZE(serdes1_cfg_tbl)) {
+	if (srds_cfg >= ARRAY_SIZE(serdes1_cfg_tbl)) {
 		printf("Invalid PORDEVSR[IO_SEL_SRDS] = %d\n", srds_cfg);
 		return;
 	}
@@ -102,7 +99,7 @@ void fsl_serdes_init(void)
 		serdes1_prtcl_map |= (1 << lane_prtcl);
 	}
 
-	if (srds_cfg > ARRAY_SIZE(serdes2_cfg_tbl)) {
+	if (srds_cfg >= ARRAY_SIZE(serdes2_cfg_tbl)) {
 		printf("Invalid PORDEVSR[IO_SEL_SRDS] = %d\n", srds_cfg);
 		return;
 	}

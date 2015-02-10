@@ -15,20 +15,7 @@
  * Marek Szyprowski <m.szyprowski@samsung.com>
  * Lukasz Majewski <l.majewski@samsumg.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #undef DEBUG
 #include <common.h>
@@ -44,7 +31,6 @@
 #include <asm/io.h>
 
 #include <asm/mach-types.h>
-#include <asm/arch/gpio.h>
 
 #include "regs-otg.h"
 #include <usb/lin_gadget_compat.h>
@@ -118,7 +104,7 @@ static void stop_activity(struct s3c_udc *dev,
 			  struct usb_gadget_driver *driver);
 static int udc_enable(struct s3c_udc *dev);
 static void udc_set_address(struct s3c_udc *dev, unsigned char address);
-static void reconfig_usbd(void);
+static void reconfig_usbd(struct s3c_udc *dev);
 static void set_max_pktsize(struct s3c_udc *dev, enum usb_device_speed speed);
 static void nuke(struct s3c_ep *ep, int status);
 static int s3c_udc_set_halt(struct usb_ep *_ep, int value);
@@ -159,58 +145,14 @@ static struct usb_ep_ops s3c_ep_ops = {
 
 void __iomem		*regs_otg;
 struct s3c_usbotg_reg *reg;
-struct s3c_usbotg_phy *phy;
-static unsigned int usb_phy_ctrl;
 
-void otg_phy_init(struct s3c_udc *dev)
+bool dfu_usb_get_reset(void)
 {
-	dev->pdata->phy_control(1);
-
-	/*USB PHY0 Enable */
-	printf("USB PHY0 Enable\n");
-
-	/* Enable PHY */
-	writel(readl(usb_phy_ctrl) | USB_PHY_CTRL_EN0, usb_phy_ctrl);
-
-	if (dev->pdata->usb_flags == PHY0_SLEEP) /* C210 Universal */
-		writel((readl(&phy->phypwr)
-			&~(PHY_0_SLEEP | OTG_DISABLE_0 | ANALOG_PWRDOWN)
-			&~FORCE_SUSPEND_0), &phy->phypwr);
-	else /* C110 GONI */
-		writel((readl(&phy->phypwr) &~(OTG_DISABLE_0 | ANALOG_PWRDOWN)
-			&~FORCE_SUSPEND_0), &phy->phypwr);
-
-	writel((readl(&phy->phyclk) &~(ID_PULLUP0 | COMMON_ON_N0)) |
-	       CLK_SEL_24MHZ, &phy->phyclk); /* PLL 24Mhz */
-
-	writel((readl(&phy->rstcon) &~(LINK_SW_RST | PHYLNK_SW_RST))
-	       | PHY_SW_RST0, &phy->rstcon);
-	udelay(10);
-	writel(readl(&phy->rstcon)
-	       &~(PHY_SW_RST0 | LINK_SW_RST | PHYLNK_SW_RST), &phy->rstcon);
-	udelay(10);
+	return !!(readl(&reg->gintsts) & INT_RESET);
 }
 
-void otg_phy_off(struct s3c_udc *dev)
-{
-	/* reset controller just in case */
-	writel(PHY_SW_RST0, &phy->rstcon);
-	udelay(20);
-	writel(readl(&phy->phypwr) &~PHY_SW_RST0, &phy->rstcon);
-	udelay(20);
-
-	writel(readl(&phy->phypwr) | OTG_DISABLE_0 | ANALOG_PWRDOWN
-	       | FORCE_SUSPEND_0, &phy->phypwr);
-
-	writel(readl(usb_phy_ctrl) &~USB_PHY_CTRL_EN0, usb_phy_ctrl);
-
-	writel((readl(&phy->phyclk) & ~(ID_PULLUP0 | COMMON_ON_N0)),
-	      &phy->phyclk);
-
-	udelay(10000);
-
-	dev->pdata->phy_control(0);
-}
+__weak void otg_phy_init(struct s3c_udc *dev) {}
+__weak void otg_phy_off(struct s3c_udc *dev) {}
 
 /***********************************************************/
 
@@ -273,7 +215,7 @@ static int udc_enable(struct s3c_udc *dev)
 	debug_cond(DEBUG_SETUP != 0, "%s: %p\n", __func__, dev);
 
 	otg_phy_init(dev);
-	reconfig_usbd();
+	reconfig_usbd(dev);
 
 	debug_cond(DEBUG_SETUP != 0,
 		   "S3C USB 2.0 OTG Controller Core Initialized : 0x%x\n",
@@ -291,7 +233,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 {
 	struct s3c_udc *dev = the_controller;
 	int retval = 0;
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	debug_cond(DEBUG_SETUP != 0, "%s: %s\n", __func__, "no name");
 
@@ -339,7 +281,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 {
 	struct s3c_udc *dev = the_controller;
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	if (!dev)
 		return -ENODEV;
@@ -454,15 +396,17 @@ static void stop_activity(struct s3c_udc *dev,
 	udc_reinit(dev);
 }
 
-static void reconfig_usbd(void)
+static void reconfig_usbd(struct s3c_udc *dev)
 {
 	/* 2. Soft-reset OTG Core and then unreset again. */
 	int i;
 	unsigned int uTemp = writel(CORE_SOFT_RESET, &reg->grstctl);
+	uint32_t dflt_gusbcfg;
 
 	debug("Reseting OTG controller\n");
 
-	writel(0<<15		/* PHY Low Power Clock sel*/
+	dflt_gusbcfg =
+		0<<15		/* PHY Low Power Clock sel*/
 		|1<<14		/* Non-Periodic TxFIFO Rewind Enable*/
 		|0x5<<10	/* Turnaround time*/
 		|0<<9 | 0<<8	/* [0:HNP disable,1:HNP enable][ 0:SRP disable*/
@@ -471,8 +415,12 @@ static void reconfig_usbd(void)
 		|0<<6		/* 0: high speed utmi+, 1: full speed serial*/
 		|0<<4		/* 0: utmi+, 1:ulpi*/
 		|1<<3		/* phy i/f  0:8bit, 1:16bit*/
-		|0x7<<0,	/* HS/FS Timeout**/
-		&reg->gusbcfg);
+		|0x7<<0;	/* HS/FS Timeout**/
+
+	if (dev->pdata->usb_gusbcfg)
+		dflt_gusbcfg = dev->pdata->usb_gusbcfg;
+
+	writel(dflt_gusbcfg, &reg->gusbcfg);
 
 	/* 3. Put the OTG device core in the disconnected state.*/
 	uTemp = readl(&reg->dctl);
@@ -583,7 +531,7 @@ static int s3c_ep_enable(struct usb_ep *_ep,
 {
 	struct s3c_ep *ep;
 	struct s3c_udc *dev;
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	debug("%s: %p\n", __func__, _ep);
 
@@ -647,7 +595,7 @@ static int s3c_ep_enable(struct usb_ep *_ep,
 static int s3c_ep_disable(struct usb_ep *_ep)
 {
 	struct s3c_ep *ep;
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	debug("%s: %p\n", __func__, _ep);
 
@@ -705,7 +653,7 @@ static int s3c_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 {
 	struct s3c_ep *ep;
 	struct s3c_request *req;
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	debug("%s: %p\n", __func__, _ep);
 
@@ -851,15 +799,13 @@ static struct s3c_udc memory = {
 int s3c_udc_probe(struct s3c_plat_otg_data *pdata)
 {
 	struct s3c_udc *dev = &memory;
-	int retval = 0, i;
+	int retval = 0;
 
 	debug("%s: %p\n", __func__, pdata);
 
 	dev->pdata = pdata;
 
-	phy = (struct s3c_usbotg_phy *)pdata->regs_phy;
 	reg = (struct s3c_usbotg_reg *)pdata->regs_otg;
-	usb_phy_ctrl = pdata->usb_phy_ctrl;
 
 	/* regs_otg = (void *)pdata->regs_otg; */
 
@@ -872,16 +818,15 @@ int s3c_udc_probe(struct s3c_plat_otg_data *pdata)
 
 	the_controller = dev;
 
-	for (i = 0; i < S3C_MAX_ENDPOINTS+1; i++) {
-		dev->dma_buf[i] = memalign(CONFIG_SYS_CACHELINE_SIZE,
-					   DMA_BUFFER_SIZE);
-		dev->dma_addr[i] = (dma_addr_t) dev->dma_buf[i];
-		invalidate_dcache_range((unsigned long) dev->dma_buf[i],
-					(unsigned long) (dev->dma_buf[i]
-							 + DMA_BUFFER_SIZE));
+	usb_ctrl = memalign(CONFIG_SYS_CACHELINE_SIZE,
+			    ROUND(sizeof(struct usb_ctrlrequest),
+				  CONFIG_SYS_CACHELINE_SIZE));
+	if (!usb_ctrl) {
+		error("No memory available for UDC!\n");
+		return -ENOMEM;
 	}
-	usb_ctrl = dev->dma_buf[0];
-	usb_ctrl_dma_addr = dev->dma_addr[0];
+
+	usb_ctrl_dma_addr = (dma_addr_t) usb_ctrl;
 
 	udc_reinit(dev);
 

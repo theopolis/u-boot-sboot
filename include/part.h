@@ -2,28 +2,13 @@
  * (C) Copyright 2000-2004
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #ifndef _PART_H
 #define _PART_H
 
 #include <ide.h>
+#include <common.h>
 
 typedef struct block_dev_desc {
 	int		if_type;	/* type of the interface */
@@ -38,22 +23,31 @@ typedef struct block_dev_desc {
 #endif
 	lbaint_t	lba;		/* number of blocks */
 	unsigned long	blksz;		/* block size */
+	int		log2blksz;	/* for convenience: log2(blksz) */
 	char		vendor [40+1];	/* IDE model, SCSI Vendor */
 	char		product[20+1];	/* IDE Serial no, SCSI product */
 	char		revision[8+1];	/* firmware revision */
 	unsigned long	(*block_read)(int dev,
-				      unsigned long start,
+				      lbaint_t start,
 				      lbaint_t blkcnt,
 				      void *buffer);
 	unsigned long	(*block_write)(int dev,
-				       unsigned long start,
+				       lbaint_t start,
 				       lbaint_t blkcnt,
 				       const void *buffer);
 	unsigned long   (*block_erase)(int dev,
-				       unsigned long start,
+				       lbaint_t start,
 				       lbaint_t blkcnt);
 	void		*priv;		/* driver private struct pointer */
 }block_dev_desc_t;
+
+#define BLOCK_CNT(size, block_dev_desc) (PAD_COUNT(size, block_dev_desc->blksz))
+#define PAD_TO_BLOCKSIZE(size, block_dev_desc) \
+	(PAD_SIZE(size, block_dev_desc->blksz))
+#define LOG2(x) (((x & 0xaaaaaaaa) ? 1 : 0) + ((x & 0xcccccccc) ? 2 : 0) + \
+		 ((x & 0xf0f0f0f0) ? 4 : 0) + ((x & 0xff00ff00) ? 8 : 0) + \
+		 ((x & 0xffff0000) ? 16 : 0))
+#define LOG2_INVALID(type) ((type)((sizeof(type)<<3)-1))
 
 /* Interface types: */
 #define IF_TYPE_UNKNOWN		0
@@ -65,6 +59,8 @@ typedef struct block_dev_desc {
 #define IF_TYPE_MMC		6
 #define IF_TYPE_SD		7
 #define IF_TYPE_SATA		8
+#define IF_TYPE_HOST		9
+#define IF_TYPE_MAX		10	/* Max number of IF_TYPE_* supported */
 
 /* Part types */
 #define PART_TYPE_UNKNOWN	0x00
@@ -88,8 +84,8 @@ typedef struct block_dev_desc {
 #define DEV_TYPE_OPDISK		0x07	/* optical disk */
 
 typedef struct disk_partition {
-	ulong	start;		/* # of first block in partition	*/
-	ulong	size;		/* number of blocks in partition	*/
+	lbaint_t	start;	/* # of first block in partition	*/
+	lbaint_t	size;	/* number of blocks in partition	*/
 	ulong	blksz;		/* block size in bytes			*/
 	uchar	name[32];	/* partition name			*/
 	uchar	type[32];	/* string type description		*/
@@ -107,8 +103,11 @@ block_dev_desc_t* sata_get_dev(int dev);
 block_dev_desc_t* scsi_get_dev(int dev);
 block_dev_desc_t* usb_stor_get_dev(int dev);
 block_dev_desc_t* mmc_get_dev(int dev);
+int mmc_select_hwpart(int dev_num, int hwpart);
 block_dev_desc_t* systemace_get_dev(int dev);
 block_dev_desc_t* mg_disk_get_dev(int dev);
+block_dev_desc_t *host_get_dev(int dev);
+int host_get_dev_err(int dev, block_dev_desc_t **blk_devp);
 
 /* disk/part.c */
 int get_partition_info (block_dev_desc_t * dev_desc, int part, disk_partition_t *info);
@@ -128,8 +127,10 @@ static inline block_dev_desc_t* sata_get_dev(int dev) { return NULL; }
 static inline block_dev_desc_t* scsi_get_dev(int dev) { return NULL; }
 static inline block_dev_desc_t* usb_stor_get_dev(int dev) { return NULL; }
 static inline block_dev_desc_t* mmc_get_dev(int dev) { return NULL; }
+static inline int mmc_select_hwpart(int dev_num, int hwpart) { return -1; }
 static inline block_dev_desc_t* systemace_get_dev(int dev) { return NULL; }
 static inline block_dev_desc_t* mg_disk_get_dev(int dev) { return NULL; }
+static inline block_dev_desc_t *host_get_dev(int dev) { return NULL; }
 
 static inline int get_partition_info (block_dev_desc_t * dev_desc, int part,
 	disk_partition_t *info) { return -1; }
@@ -179,6 +180,17 @@ int   test_part_amiga (block_dev_desc_t *dev_desc);
 #include <part_efi.h>
 /* disk/part_efi.c */
 int get_partition_info_efi (block_dev_desc_t * dev_desc, int part, disk_partition_t *info);
+/**
+ * get_partition_info_efi_by_name() - Find the specified GPT partition table entry
+ *
+ * @param dev_desc - block device descriptor
+ * @param gpt_name - the specified table entry name
+ * @param info - returns the disk partition info
+ *
+ * @return - '0' on match, '-1' on no match, otherwise error
+ */
+int get_partition_info_efi_by_name(block_dev_desc_t *dev_desc,
+	const char *name, disk_partition_t *info);
 void print_part_efi (block_dev_desc_t *dev_desc);
 int   test_part_efi (block_dev_desc_t *dev_desc);
 
@@ -232,6 +244,26 @@ int gpt_fill_header(block_dev_desc_t *dev_desc, gpt_header *gpt_h,
  */
 int gpt_restore(block_dev_desc_t *dev_desc, char *str_disk_guid,
 		disk_partition_t *partitions, const int parts_count);
+
+/**
+ * is_valid_gpt_buf() - Ensure that the Primary GPT information is valid
+ *
+ * @param dev_desc - block device descriptor
+ * @param buf - buffer which contains the MBR and Primary GPT info
+ *
+ * @return - '0' on success, otherwise error
+ */
+int is_valid_gpt_buf(block_dev_desc_t *dev_desc, void *buf);
+
+/**
+ * write_mbr_and_gpt_partitions() - write MBR, Primary GPT and Backup GPT
+ *
+ * @param dev_desc - block device descriptor
+ * @param buf - buffer which contains the MBR and Primary GPT info
+ *
+ * @return - '0' on success, otherwise error
+ */
+int write_mbr_and_gpt_partitions(block_dev_desc_t *dev_desc, void *buf);
 #endif
 
 #endif /* _PART_H */

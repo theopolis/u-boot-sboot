@@ -1,15 +1,12 @@
 /*
  * Matrix-centric header file for the AT91SAM9X5 family
  *
- *  Copyright (C) 2012 Atmel Corporation.
+ *  Copyright (C) 2012-2013 Atmel Corporation.
  *
  * Memory Controllers (MATRIX, EBI) - System peripherals registers.
- * Based on AT91SAM9X5 preliminary datasheet.
+ * Based on AT91SAM9X5 & AT91SAM9N12 preliminary datasheet.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __AT91SAM9X5_MATRIX_H__
@@ -17,14 +14,25 @@
 
 #ifndef __ASSEMBLY__
 
+/* AT91SAM9N12 Matrix definition is a subset of AT91SAM9X5. */
 struct at91_matrix {
 	u32	mcfg[16];
 	u32	scfg[16];
 	u32	pras[16][2];
 	u32	mrcr;           /* 0x100 Master Remap Control */
-	u32	filler[7];
+	u32	filler[5];
+#ifdef CONFIG_AT91SAM9X5
+	u32	filler1[2];
+#endif
+	/* EBI Chip Select Assignment Register
+	 * 0x118: AT91SAM9N12
+	 * 0x120: AT91SAM9X5
+	 */
 	u32	ebicsa;
 	u32	filler4[47];
+#ifdef CONFIG_AT91SAM9N12
+	u32	filler5[2];
+#endif
 	u32	wpmr;
 	u32	wpsr;
 };

@@ -11,24 +11,7 @@
  * Copyright (C) 2006
  * Tolunay Orkun <listmember@orkun.us>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* The DEBUG define must be before common to enable debugging */
@@ -38,6 +21,7 @@
 #include <asm/processor.h>
 #include <asm/io.h>
 #include <asm/byteorder.h>
+#include <asm/unaligned.h>
 #include <environment.h>
 #include <mtd/cfi_flash.h>
 #include <watchdog.h>
@@ -79,6 +63,12 @@ flash_info_t flash_info[CFI_MAX_FLASH_BANKS];	/* FLASH chips info */
 #define CONFIG_SYS_FLASH_CFI_WIDTH	FLASH_CFI_8BIT
 #endif
 
+#ifdef CONFIG_CFI_FLASH_USE_WEAK_ACCESSORS
+#define __maybe_weak __weak
+#else
+#define __maybe_weak static
+#endif
+
 /*
  * 0xffff is an undefined value for the configuration register. When
  * this value is returned, the configuration register shall not be
@@ -97,14 +87,12 @@ static u16 cfi_flash_config_reg(int i)
 int cfi_flash_num_flash_banks = CONFIG_SYS_MAX_FLASH_BANKS_DETECT;
 #endif
 
-static phys_addr_t __cfi_flash_bank_addr(int i)
+__weak phys_addr_t cfi_flash_bank_addr(int i)
 {
 	return ((phys_addr_t [])CONFIG_SYS_FLASH_BANKS_LIST)[i];
 }
-phys_addr_t cfi_flash_bank_addr(int i)
-	__attribute__((weak, alias("__cfi_flash_bank_addr")));
 
-static unsigned long __cfi_flash_bank_size(int i)
+__weak unsigned long cfi_flash_bank_size(int i)
 {
 #ifdef CONFIG_SYS_FLASH_BANKS_SIZES
 	return ((unsigned long [])CONFIG_SYS_FLASH_BANKS_SIZES)[i];
@@ -112,70 +100,48 @@ static unsigned long __cfi_flash_bank_size(int i)
 	return 0;
 #endif
 }
-unsigned long cfi_flash_bank_size(int i)
-	__attribute__((weak, alias("__cfi_flash_bank_size")));
 
-static void __flash_write8(u8 value, void *addr)
+__maybe_weak void flash_write8(u8 value, void *addr)
 {
 	__raw_writeb(value, addr);
 }
 
-static void __flash_write16(u16 value, void *addr)
+__maybe_weak void flash_write16(u16 value, void *addr)
 {
 	__raw_writew(value, addr);
 }
 
-static void __flash_write32(u32 value, void *addr)
+__maybe_weak void flash_write32(u32 value, void *addr)
 {
 	__raw_writel(value, addr);
 }
 
-static void __flash_write64(u64 value, void *addr)
+__maybe_weak void flash_write64(u64 value, void *addr)
 {
 	/* No architectures currently implement __raw_writeq() */
 	*(volatile u64 *)addr = value;
 }
 
-static u8 __flash_read8(void *addr)
+__maybe_weak u8 flash_read8(void *addr)
 {
 	return __raw_readb(addr);
 }
 
-static u16 __flash_read16(void *addr)
+__maybe_weak u16 flash_read16(void *addr)
 {
 	return __raw_readw(addr);
 }
 
-static u32 __flash_read32(void *addr)
+__maybe_weak u32 flash_read32(void *addr)
 {
 	return __raw_readl(addr);
 }
 
-static u64 __flash_read64(void *addr)
+__maybe_weak u64 flash_read64(void *addr)
 {
 	/* No architectures currently implement __raw_readq() */
 	return *(volatile u64 *)addr;
 }
-
-#ifdef CONFIG_CFI_FLASH_USE_WEAK_ACCESSORS
-void flash_write8(u8 value, void *addr)__attribute__((weak, alias("__flash_write8")));
-void flash_write16(u16 value, void *addr)__attribute__((weak, alias("__flash_write16")));
-void flash_write32(u32 value, void *addr)__attribute__((weak, alias("__flash_write32")));
-void flash_write64(u64 value, void *addr)__attribute__((weak, alias("__flash_write64")));
-u8 flash_read8(void *addr)__attribute__((weak, alias("__flash_read8")));
-u16 flash_read16(void *addr)__attribute__((weak, alias("__flash_read16")));
-u32 flash_read32(void *addr)__attribute__((weak, alias("__flash_read32")));
-u64 flash_read64(void *addr)__attribute__((weak, alias("__flash_read64")));
-#else
-#define flash_write8	__flash_write8
-#define flash_write16	__flash_write16
-#define flash_write32	__flash_write32
-#define flash_write64	__flash_write64
-#define flash_read8	__flash_read8
-#define flash_read16	__flash_read16
-#define flash_read32	__flash_read32
-#define flash_read64	__flash_read64
-#endif
 
 /*-----------------------------------------------------------------------
  */
@@ -183,16 +149,16 @@ u64 flash_read64(void *addr)__attribute__((weak, alias("__flash_read64")));
 flash_info_t *flash_get_info(ulong base)
 {
 	int i;
-	flash_info_t *info = NULL;
+	flash_info_t *info;
 
 	for (i = 0; i < CONFIG_SYS_MAX_FLASH_BANKS; i++) {
-		info = & flash_info[i];
+		info = &flash_info[i];
 		if (info->size && info->start[0] <= base &&
 		    base <= info->start[0] + info->size - 1)
-			break;
+			return info;
 	}
 
-	return info;
+	return NULL;
 }
 #endif
 
@@ -609,7 +575,7 @@ static int flash_full_status_check (flash_info_t * info, flash_sect_t sector,
 	case CFI_CMDSET_INTEL_PROG_REGIONS:
 	case CFI_CMDSET_INTEL_EXTENDED:
 	case CFI_CMDSET_INTEL_STANDARD:
-		if ((retcode != ERR_OK)
+		if ((retcode == ERR_OK)
 		    && !flash_isequal (info, sector, 0, FLASH_STATUS_DONE)) {
 			retcode = ERR_INVAL;
 			printf ("Flash %s error at address %lx\n", prompt,
@@ -1640,9 +1606,10 @@ static void cfi_reverse_geometry(struct cfi_qry *qry)
 	u32 tmp;
 
 	for (i = 0, j = qry->num_erase_regions - 1; i < j; i++, j--) {
-		tmp = qry->erase_region_info[i];
-		qry->erase_region_info[i] = qry->erase_region_info[j];
-		qry->erase_region_info[j] = tmp;
+		tmp = get_unaligned(&(qry->erase_region_info[i]));
+		put_unaligned(get_unaligned(&(qry->erase_region_info[j])),
+			      &(qry->erase_region_info[i]));
+		put_unaligned(tmp, &(qry->erase_region_info[j]));
 	}
 }
 
@@ -1795,7 +1762,7 @@ static int flash_detect_legacy(phys_addr_t base, int banknum)
 			};
 			int i;
 
-			for (i = 0; i < sizeof(modes) / sizeof(modes[0]); i++) {
+			for (i = 0; i < ARRAY_SIZE(modes); i++) {
 				info->vendor = modes[i];
 				info->start[0] =
 					(ulong)map_physmem(base,
@@ -1818,7 +1785,7 @@ static int flash_detect_legacy(phys_addr_t base, int banknum)
 					break;
 				else
 					unmap_physmem((void *)info->start[0],
-						      MAP_NOCACHE);
+						      info->portwidth);
 			}
 		}
 
@@ -1881,8 +1848,7 @@ static int __flash_detect_cfi (flash_info_t * info, struct cfi_qry *qry)
 	/* Issue FLASH reset command */
 	flash_cmd_reset(info);
 
-	for (cfi_offset=0;
-	     cfi_offset < sizeof(flash_offset_cfi) / sizeof(uint);
+	for (cfi_offset = 0; cfi_offset < ARRAY_SIZE(flash_offset_cfi);
 	     cfi_offset++) {
 		flash_write_cmd (info, 0, flash_offset_cfi[cfi_offset],
 				 FLASH_CMD_CFI);
@@ -2024,6 +1990,26 @@ static void flash_fixup_sst(flash_info_t *info, struct cfi_qry *qry)
 	}
 }
 
+static void flash_fixup_num(flash_info_t *info, struct cfi_qry *qry)
+{
+	/*
+	 * The M29EW devices seem to report the CFI information wrong
+	 * when it's in 8 bit mode.
+	 * There's an app note from Numonyx on this issue.
+	 * So adjust the buffer size for M29EW while operating in 8-bit mode
+	 */
+	if (((qry->max_buf_write_size) > 0x8) &&
+			(info->device_id == 0x7E) &&
+			(info->device_id2 == 0x2201 ||
+			info->device_id2 == 0x2301 ||
+			info->device_id2 == 0x2801 ||
+			info->device_id2 == 0x4801)) {
+		debug("Adjusted buffer size on Numonyx flash"
+			" M29EW family in 8 bit mode\n");
+		qry->max_buf_write_size = 0x8;
+	}
+}
+
 /*
  * The following code cannot be run from FLASH!
  *
@@ -2053,8 +2039,8 @@ ulong flash_get_size (phys_addr_t base, int banknum)
 	info->start[0] = (ulong)map_physmem(base, info->portwidth, MAP_NOCACHE);
 
 	if (flash_detect_cfi (info, &qry)) {
-		info->vendor = le16_to_cpu(qry.p_id);
-		info->ext_addr = le16_to_cpu(qry.p_adr);
+		info->vendor = le16_to_cpu(get_unaligned(&(qry.p_id)));
+		info->ext_addr = le16_to_cpu(get_unaligned(&(qry.p_adr)));
 		num_erase_regions = qry.num_erase_regions;
 
 		if (info->ext_addr) {
@@ -2105,6 +2091,9 @@ ulong flash_get_size (phys_addr_t base, int banknum)
 		case 0x00bf: /* SST */
 			flash_fixup_sst(info, &qry);
 			break;
+		case 0x0089: /* Numonyx */
+			flash_fixup_num(info, &qry);
+			break;
 		}
 
 		debug ("manufacturer is %d\n", info->vendor);
@@ -2140,7 +2129,8 @@ ulong flash_get_size (phys_addr_t base, int banknum)
 				break;
 			}
 
-			tmp = le32_to_cpu(qry.erase_region_info[i]);
+			tmp = le32_to_cpu(get_unaligned(
+						&(qry.erase_region_info[i])));
 			debug("erase region %u: 0x%08lx\n", i, tmp);
 
 			erase_region_count = (tmp & 0xffff) + 1;
@@ -2310,7 +2300,7 @@ void flash_protect_default(void)
 #endif
 
 #if defined(CONFIG_SYS_FLASH_AUTOPROTECT_LIST)
-	for (i = 0; i < (sizeof(apl) / sizeof(struct apl_s)); i++) {
+	for (i = 0; i < ARRAY_SIZE(apl); i++) {
 		debug("autoprotecting from %08lx to %08lx\n",
 		      apl[i].start, apl[i].start + apl[i].size - 1);
 		flash_protect(FLAG_PROTECT_SET,
@@ -2352,7 +2342,7 @@ unsigned long flash_init (void)
 #endif /* CONFIG_SYS_FLASH_QUIET_TEST */
 		}
 #ifdef CONFIG_SYS_FLASH_PROTECTION
-		else if ((s != NULL) && (strcmp(s, "yes") == 0)) {
+		else if (strcmp(s, "yes") == 0) {
 			/*
 			 * Only the U-Boot image and it's environment
 			 * is protected, all other sectors are

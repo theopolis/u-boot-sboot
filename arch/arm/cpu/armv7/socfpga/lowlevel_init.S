@@ -1,42 +1,11 @@
 /*
  *  Copyright (C) 2012 Altera Corporation <www.altera.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
 #include <version.h>
-
-/* Save the parameter pass in by previous boot loader */
-.global save_boot_params
-save_boot_params:
-	/* save the parameter here */
-
-	/*
-	 * Setup stack for exception, which is located
-	 * at the end of on-chip RAM. We don't expect exception prior to
-	 * relocation and if that happens, we won't worry -- it will overide
-	 * global data region as the code will goto reset. After relocation,
-	 * this region won't be used by other part of program.
-	 * Hence it is safe.
-	 */
-	ldr	r0, =(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_RAM_SIZE)
-	ldr	r1, =IRQ_STACK_START_IN
-	str	r0, [r1]
-
-	bx	lr
-
 
 /* Set up the platform, once the cpu has been initialized */
 .globl lowlevel_init

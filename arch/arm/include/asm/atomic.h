@@ -16,8 +16,6 @@
 #ifndef __ASM_ARM_ATOMIC_H
 #define __ASM_ARM_ATOMIC_H
 
-#include <linux/config.h>
-
 #ifdef CONFIG_SMP
 #error SMP not supported
 #endif
@@ -27,7 +25,7 @@ typedef struct { volatile int counter; } atomic_t;
 #define ATOMIC_INIT(i)	{ (i) }
 
 #ifdef __KERNEL__
-#include <asm/proc/system.h>
+#include <asm/proc-armv/system.h>
 
 #define atomic_read(v)	((v)->counter)
 #define atomic_set(v,i)	(((v)->counter) = (i))

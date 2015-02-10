@@ -2,15 +2,7 @@
  * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
  * Copyright (C) 2010 Freescale Semiconductor, Inc.
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
- * for more details.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -21,8 +13,6 @@
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/clock.h>
-#include <asm/arch/mx5x_pins.h>
-#include <asm/arch/iomux.h>
 
 #include "ehci.h"
 
@@ -86,77 +76,6 @@
 
 /* USB_CTRL_1 */
 #define MXC_USB_CTRL_UH1_EXT_CLK_EN	(1 << 25)
-
-/* USB pin configuration */
-#define USB_PAD_CONFIG	(PAD_CTL_PKE_ENABLE | PAD_CTL_SRE_FAST | \
-			PAD_CTL_DRV_HIGH | PAD_CTL_100K_PU | \
-			PAD_CTL_HYS_ENABLE | PAD_CTL_PUE_PULL)
-
-#ifdef CONFIG_MX51
-/*
- * Configure the MX51 USB H1 IOMUX
- */
-void setup_iomux_usb_h1(void)
-{
-	mxc_request_iomux(MX51_PIN_USBH1_STP, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_STP, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_CLK, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_CLK, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_DIR, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_DIR, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_NXT, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_NXT, USB_PAD_CONFIG);
-
-	mxc_request_iomux(MX51_PIN_USBH1_DATA0, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_DATA0, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_DATA1, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_DATA1, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_DATA2, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_DATA2, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_DATA3, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_DATA3, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_DATA4, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_DATA4, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_DATA5, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_DATA5, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_DATA6, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_DATA6, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_USBH1_DATA7, IOMUX_CONFIG_ALT0);
-	mxc_iomux_set_pad(MX51_PIN_USBH1_DATA7, USB_PAD_CONFIG);
-}
-
-/*
- * Configure the MX51 USB H2 IOMUX
- */
-void setup_iomux_usb_h2(void)
-{
-	mxc_request_iomux(MX51_PIN_EIM_A24, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_A24, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_A25, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_A25, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_A26, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_A26, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_A27, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_A27, USB_PAD_CONFIG);
-
-	mxc_request_iomux(MX51_PIN_EIM_D16, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_D16, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_D17, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_D17, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_D18, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_D18, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_D19, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_D19, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_D20, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_D20, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_D21, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_D21, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_D22, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_D22, USB_PAD_CONFIG);
-	mxc_request_iomux(MX51_PIN_EIM_D23, IOMUX_CONFIG_ALT2);
-	mxc_iomux_set_pad(MX51_PIN_EIM_D23, USB_PAD_CONFIG);
-}
-#endif
 
 int mxc_set_usbcontrol(int port, unsigned int flags)
 {
@@ -299,24 +218,16 @@ void __weak board_ehci_hcd_postinit(struct usb_ehci *ehci, int port)
 {
 }
 
-int ehci_hcd_init(int index, struct ehci_hccr **hccr, struct ehci_hcor **hcor)
+int ehci_hcd_init(int index, enum usb_init_type init,
+		struct ehci_hccr **hccr, struct ehci_hcor **hcor)
 {
 	struct usb_ehci *ehci;
-#ifdef CONFIG_MX53
-	struct clkctl *sc_regs = (struct clkctl *)CCM_BASE_ADDR;
-	u32 reg;
-
-	reg = __raw_readl(&sc_regs->cscmr1) & ~(1 << 26);
-	/* derive USB PHY clock multiplexer from PLL3 */
-	reg |= 1 << 26;
-	__raw_writel(reg, &sc_regs->cscmr1);
-#endif
 
 	set_usboh3_clk();
-	enable_usboh3_clk(1);
+	enable_usboh3_clk(true);
 	set_usb_phy_clk();
-	enable_usb_phy1_clk(1);
-	enable_usb_phy2_clk(1);
+	enable_usb_phy1_clk(true);
+	enable_usb_phy2_clk(true);
 	mdelay(1);
 
 	/* Do board specific initialization */

@@ -4,23 +4,7 @@
  * Keith Outwater, keith_outwater@mvis.com`
  * Steven Scholz, steven.scholz@imc-berlin.de
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -84,15 +68,6 @@
 #define RTC_SR_BIT_AF			0x01 /* Bit 0 = Alarm Flag */
 #define RTC_SR_BIT_OSF			0x80 /* Bit 7 - Osc Stop Flag */
 
-typedef unsigned char boolean_t;
-
-#ifndef TRUE
-#define TRUE ((boolean_t)(0==0))
-#endif
-#ifndef FALSE
-#define FALSE (!TRUE)
-#endif
-
 const char RtcTodAddr[] = {
 	RTC_TOD_CNT_BYTE0_ADDR,
 	RTC_TOD_CNT_BYTE1_ADDR,
@@ -101,7 +76,7 @@ const char RtcTodAddr[] = {
 };
 
 static uchar rtc_read (uchar reg);
-static void rtc_write (uchar reg, uchar val, boolean_t set);
+static void rtc_write(uchar reg, uchar val, bool set);
 static void rtc_write_raw (uchar reg, uchar val);
 
 /*
@@ -185,7 +160,7 @@ int rtc_set (struct rtc_time *tmp){
 	}
 
 	/* Start clock */
-	rtc_write(RTC_CTL_ADDR, RTC_CTL_BIT_EN_OSC, FALSE);
+	rtc_write(RTC_CTL_ADDR, RTC_CTL_BIT_EN_OSC, false);
 
 	return 0;
 }
@@ -202,18 +177,18 @@ void rtc_reset (void){
 	struct rtc_time tmp;
 
 	/* clear status flags */
-	rtc_write (RTC_SR_ADDR, (RTC_SR_BIT_AF|RTC_SR_BIT_OSF), FALSE); /* clearing OSF and AF */
+	rtc_write(RTC_SR_ADDR, (RTC_SR_BIT_AF|RTC_SR_BIT_OSF), false); /* clearing OSF and AF */
 
 	/* Initialise DS1374 oriented to MPC8349E-ADS */
 	rtc_write (RTC_CTL_ADDR, (RTC_CTL_BIT_EN_OSC
 				 |RTC_CTL_BIT_WACE
-				 |RTC_CTL_BIT_AIE), FALSE);/* start osc, disable WACE, clear AIE
+				 |RTC_CTL_BIT_AIE), false);/* start osc, disable WACE, clear AIE
 							      - set to 0 */
 	rtc_write (RTC_CTL_ADDR, (RTC_CTL_BIT_WD_ALM
 				|RTC_CTL_BIT_WDSTR
 				|RTC_CTL_BIT_RS1
 				|RTC_CTL_BIT_RS2
-				|RTC_CTL_BIT_BBSQW), TRUE);/* disable WD/ALM, WDSTR set to INT-pin,
+				|RTC_CTL_BIT_BBSQW), true);/* disable WD/ALM, WDSTR set to INT-pin,
 							      set BBSQW and SQW to 32k
 							      - set to 1 */
 	tmp.tm_year = 1970;
@@ -229,9 +204,9 @@ void rtc_reset (void){
 		tmp.tm_year, tmp.tm_mon, tmp.tm_mday,
 		tmp.tm_hour, tmp.tm_min, tmp.tm_sec);
 
-	rtc_write(RTC_WD_ALM_CNT_BYTE2_ADDR,0xAC, TRUE);
-	rtc_write(RTC_WD_ALM_CNT_BYTE1_ADDR,0xDE, TRUE);
-	rtc_write(RTC_WD_ALM_CNT_BYTE2_ADDR,0xAD, TRUE);
+	rtc_write(RTC_WD_ALM_CNT_BYTE2_ADDR, 0xAC, true);
+	rtc_write(RTC_WD_ALM_CNT_BYTE1_ADDR, 0xDE, true);
+	rtc_write(RTC_WD_ALM_CNT_BYTE2_ADDR, 0xAD, true);
 }
 
 /*
@@ -242,9 +217,9 @@ static uchar rtc_read (uchar reg)
 	return (i2c_reg_read (CONFIG_SYS_I2C_RTC_ADDR, reg));
 }
 
-static void rtc_write (uchar reg, uchar val, boolean_t set)
+static void rtc_write(uchar reg, uchar val, bool set)
 {
-	if (set == TRUE) {
+	if (set == true) {
 		val |= i2c_reg_read (CONFIG_SYS_I2C_RTC_ADDR, reg);
 		i2c_reg_write (CONFIG_SYS_I2C_RTC_ADDR, reg, val);
 	} else {

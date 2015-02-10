@@ -2,23 +2,7 @@
  * (C) Copyright 2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _ENVIRONMENT_H_
@@ -75,6 +59,12 @@
 # endif
 #endif	/* CONFIG_ENV_IS_IN_FLASH */
 
+#if defined(CONFIG_ENV_IS_IN_MMC)
+# ifdef CONFIG_ENV_OFFSET_REDUND
+#  define CONFIG_SYS_REDUNDAND_ENVIRONMENT
+# endif
+#endif
+
 #if defined(CONFIG_ENV_IS_IN_NAND)
 # if defined(CONFIG_ENV_OFFSET_OOB)
 #  ifdef CONFIG_ENV_OFFSET_REDUND
@@ -95,6 +85,24 @@ extern unsigned long nand_env_oob_offset;
 #  error "Need to define CONFIG_ENV_SIZE when using CONFIG_ENV_IS_IN_NAND"
 # endif
 #endif /* CONFIG_ENV_IS_IN_NAND */
+
+#if defined(CONFIG_ENV_IS_IN_UBI)
+# ifndef CONFIG_ENV_UBI_PART
+#  error "Need to define CONFIG_ENV_UBI_PART when using CONFIG_ENV_IS_IN_UBI"
+# endif
+# ifndef CONFIG_ENV_UBI_VOLUME
+#  error "Need to define CONFIG_ENV_UBI_VOLUME when using CONFIG_ENV_IS_IN_UBI"
+# endif
+# if defined(CONFIG_ENV_UBI_VOLUME_REDUND)
+#  define CONFIG_SYS_REDUNDAND_ENVIRONMENT
+# endif
+# ifndef CONFIG_ENV_SIZE
+#  error "Need to define CONFIG_ENV_SIZE when using CONFIG_ENV_IS_IN_UBI"
+# endif
+# ifndef CONFIG_CMD_UBI
+#  error "Need to define CONFIG_CMD_UBI when using CONFIG_ENV_IS_IN_UBI"
+# endif
+#endif /* CONFIG_ENV_IS_IN_UBI */
 
 /* Embedded env is only supported for some flash types */
 #ifdef CONFIG_ENV_IS_EMBEDDED
@@ -138,7 +146,12 @@ extern unsigned long nand_env_oob_offset;
 extern char *env_name_spec;
 #endif
 
+#ifdef CONFIG_ENV_AES
+/* Make sure the payload is multiple of AES block size */
+#define ENV_SIZE ((CONFIG_ENV_SIZE - ENV_HEADER_SIZE) & ~(16 - 1))
+#else
 #define ENV_SIZE (CONFIG_ENV_SIZE - ENV_HEADER_SIZE)
+#endif
 
 typedef struct environment_s {
 	uint32_t	crc;		/* CRC32 over data bytes	*/
@@ -146,7 +159,12 @@ typedef struct environment_s {
 	unsigned char	flags;		/* active/obsolete flags	*/
 #endif
 	unsigned char	data[ENV_SIZE]; /* Environment data		*/
-} env_t;
+} env_t
+#ifdef CONFIG_ENV_AES
+/* Make sure the env is aligned to block size. */
+__attribute__((aligned(16)))
+#endif
+;
 
 #ifdef ENV_IS_EMBEDDED
 extern env_t environment;
@@ -160,6 +178,15 @@ extern unsigned char env_get_char_spec(int);
 
 #if defined(CONFIG_NEEDS_MANUAL_RELOC)
 extern void env_reloc(void);
+#endif
+
+#ifdef CONFIG_ENV_IS_IN_MMC
+#include <mmc.h>
+
+extern int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr);
+# ifdef CONFIG_SYS_MMC_ENV_PART
+extern uint mmc_get_env_part(struct mmc *mmc);
+# endif
 #endif
 
 #ifndef DO_DEPS_ONLY
@@ -192,6 +219,9 @@ int set_default_vars(int nvars, char * const vars[]);
 
 /* Import from binary representation into hash table */
 int env_import(const char *buf, int check);
+
+/* Export from hash table into binary representation */
+int env_export(env_t *env_out);
 
 #endif /* DO_DEPS_ONLY */
 

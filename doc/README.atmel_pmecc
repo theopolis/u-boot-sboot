@@ -19,17 +19,6 @@ To use PMECC in this driver, the user needs to set:
 	   It can be 2, 4, 8, 12 or 24.
 	2. The PMECC sector size: CONFIG_PMECC_SECTOR_SIZE.
 	   It only can be 512 or 1024.
-	3. The PMECC index lookup table's offsets in ROM code: CONFIG_PMECC_INDEX_TABLE_OFFSET.
-	   In the chip datasheet section "Boot Stragegies", you can find
-	   two Galois Field Table in the ROM code. One table is for 512-bytes
-	   sector. Another is for 1024-byte sector. Each Galois Field includes
-	   two sub-table: indext table & alpha table.
-	   In the beginning of each Galois Field Table is the index table,
-	   Alpha table is in the following.
-	   So the index table's offset is same as the Galois Field Table.
-
-	   Please set CONFIG_PMECC_INDEX_TABLE_OFFSET correctly according the
-	   Galois Field Table's offset base on the sector size you used.
 
 Take AT91SAM9X5EK as an example, the board definition file likes:
 
@@ -38,7 +27,24 @@ Take AT91SAM9X5EK as an example, the board definition file likes:
 #define CONFIG_ATMEL_NAND_HW_PMECC	1
 #define CONFIG_PMECC_CAP		2
 #define CONFIG_PMECC_SECTOR_SIZE	512
-#define CONFIG_PMECC_INDEX_TABLE_OFFSET	0x8000
 
-NOTE: If you use 1024 as the sector size, then need set 0x10000 as the
- CONFIG_PMECC_INDEX_TABLE_OFFSET
+How to enable PMECC header for direct programmable boot.bin
+-----------------------------------------------------------
+2014-05-19 Andreas Bießmann <andreas.devel@googlemail.com>
+
+The usual way to program SPL into NAND flash is to use the SAM-BA Atmel tool.
+This however is often not usable when doing field updates. To be able to
+program a SPL binary into NAND flash we need to add the PMECC header to the
+binary before. Chapter '12.4.4.1 NAND Flash Boot: NAND Flash Detection' in
+sama5d3 SoC spec (as of 03. April 2014) defines how this PMECC header has to
+look like. In order to do so we have a new image type added to mkimage to
+generate this PMECC header and integrated this into the build process of SPL.
+
+To enable the generation of atmel PMECC header for SPL one need to define
+CONFIG_SPL_GENERATE_ATMEL_PMECC_HEADER. The required parameters are taken from
+board configuration and compiled into the host tools atmel_pmecc_params. This
+tool will be called in build process to parametrize mkimage for atmelimage
+type. The mkimage tool has intentionally _not_ compiled in those parameters.
+
+The mkimage image type atmelimage also set the 6'th interrupt vector to the
+correct value. This feature can also be used to setup a boot.bin for MMC boot.

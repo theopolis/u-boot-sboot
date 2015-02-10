@@ -2,10 +2,7 @@
  * Copyright 2011 Freescale Semiconductor
  * Author: Shengzhou Liu <Shengzhou.Liu@freescale.com>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * This file provides support for the QIXIS of some Freescale reference boards.
  */
@@ -78,7 +75,13 @@ struct qixis {
 	u8 trig_stat;
 	u8 res12[3];
 	u8 trig_ctr[4];
-	u8 res13[48];
+	u8 res13[16];
+	u8 clk_freq[6];	/* Clock Measurement Registers */
+	u8 res_c6[8];
+	u8 clk_base[2];	/* Clock Frequency Base Reg */
+	u8 res_d0[8];
+	u8 cms[2];	/* Core Management Space Address Register, 0xD8 */
+	u8 res_c0[6];
 	u8 aux2[4];	/* Auxiliary Registers,0xE0 */
 	u8 res14[10];
 	u8 aux_ad;
@@ -88,8 +91,28 @@ struct qixis {
 
 u8 qixis_read(unsigned int reg);
 void qixis_write(unsigned int reg, u8 value);
+u16 qixis_read_minor(void);
+char *qixis_read_time(char *result);
+char *qixis_read_tag(char *buf);
+const char *byte_to_binary_mask(u8 val, u8 mask, char *buf);
+#ifdef CONFIG_SYS_I2C_FPGA_ADDR
+u8 qixis_read_i2c(unsigned int reg);
+void qixis_write_i2c(unsigned int reg, u8 value);
+#endif
 
+#if defined(CONFIG_QIXIS_I2C_ACCESS) && defined(CONFIG_SYS_I2C_FPGA_ADDR)
+#define QIXIS_READ(reg) qixis_read_i2c(offsetof(struct qixis, reg))
+#define QIXIS_WRITE(reg, value) \
+	qixis_write_i2c(offsetof(struct qixis, reg), value)
+#else
 #define QIXIS_READ(reg) qixis_read(offsetof(struct qixis, reg))
 #define QIXIS_WRITE(reg, value) qixis_write(offsetof(struct qixis, reg), value)
+#endif
+
+#ifdef CONFIG_SYS_I2C_FPGA_ADDR
+#define QIXIS_READ_I2C(reg) qixis_read_i2c(offsetof(struct qixis, reg))
+#define QIXIS_WRITE_I2C(reg, value) \
+			qixis_write_i2c(offsetof(struct qixis, reg), value)
+#endif
 
 #endif

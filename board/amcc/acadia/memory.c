@@ -2,23 +2,7 @@
  * (C) Copyright 2007
  * Stefan Roese, DENX Software Engineering, sr@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* define DEBUG for debugging output (obviously ;-)) */
@@ -33,7 +17,6 @@
 
 extern void board_pll_init_f(void);
 
-#if !defined(CONFIG_NAND_U_BOOT) || defined(CONFIG_NAND_SPL)
 static void cram_bcr_write(u32 wr_val)
 {
 	wr_val <<= 2;
@@ -57,20 +40,9 @@ static void cram_bcr_write(u32 wr_val)
 
 	return;
 }
-#endif
 
 phys_size_t initdram(int board_type)
 {
-#if defined(CONFIG_NAND_SPL)
-	u32 reg;
-
-	/* don't reinit PLL when booting via I2C bootstrap option */
-	mfsdr(SDR0_PINSTP, reg);
-	if (reg != 0xf0000000)
-		board_pll_init_f();
-#endif
-
-#if !defined(CONFIG_NAND_U_BOOT) || defined(CONFIG_NAND_SPL)
 	int i;
 	u32 val;
 
@@ -104,7 +76,6 @@ phys_size_t initdram(int board_type)
 	/* Wait a short while, since for NAND booting this is too fast */
 	for (i=0; i<200000; i++)
 		;
-#endif
 
 	return (CONFIG_SYS_MBYTES_RAM << 20);
 }

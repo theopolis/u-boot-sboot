@@ -8,23 +8,7 @@
  * Based on SSP driver
  * Written-by: Lei Wen <leiwen@marvell.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 
@@ -120,12 +104,10 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 {
 	struct armd_spi_slave *pss;
 
-	pss = malloc(sizeof(*pss));
+	pss = spi_alloc_slave(struct armd_spi_slave, bus, cs);
 	if (!pss)
 		return NULL;
 
-	pss->slave.bus = bus;
-	pss->slave.cs = cs;
 	pss->spi_reg = (struct ssp_reg *)SSP_REG_BASE(CONFIG_SYS_SSP_PORT);
 
 	pss->cr0 = SSCR0_MOTO | SSCR0_DATASIZE(DEFAULT_WORD_LEN) | SSCR0_SSE;
@@ -184,15 +166,8 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen, const void *dout,
 		goto done;
 	}
 
-	if (dout)
-		pss->tx = dout;
-	else
-		pss->tx = NULL;
-
-	if (din)
-		pss->rx = din;
-	else
-		pss->rx = NULL;
+	pss->tx = dout;
+	pss->rx = din;
 
 	if (flags & SPI_XFER_BEGIN) {
 		spi_cs_activate(slave);

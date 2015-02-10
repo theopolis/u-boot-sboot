@@ -1,23 +1,7 @@
 /*
  * Copyright - Galileo technology.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -383,7 +367,7 @@ unsigned int memoryGetDeviceWidth (DEVICE device)
 * OUTPUT:
 *       None.
 * RETURN:
-*       False for invalid size, true otherwise.
+*       false for invalid size, true otherwise.
 *
 * CAUTION: PCI_functions must be implemented later To_do !!!!!!!!!!!!!!!!!
 *
@@ -509,7 +493,7 @@ bool memoryMapBank (MEMORY_BANK bank, unsigned int bankBase,
 *       None.
 *
 * RETURN:
-*       False for invalid size, true otherwise.
+*       false for invalid size, true otherwise.
 *
 * CAUTION: PCI_functions must be implemented later To_do !!!!!!!!!!!!!!!!!
 *
@@ -624,7 +608,7 @@ bool memoryMapDeviceSpace (DEVICE device, unsigned int deviceBase,
 *       None.
 *
 * RETURN:
-*       False for invalid size, true otherwise.
+*       false for invalid size, true otherwise.
 *
 *******************************************************************************/
 bool memorySetPciWindow (PCI_MEM_WINDOW pciWindow, unsigned int pciWindowBase,
@@ -885,7 +869,7 @@ void gtMemorySetInternalSramBaseAddr (unsigned int sramBaseAddress)
 *       None.
 *
 * RETURN:
-*       False for invalid size, true otherwise.
+*       false for invalid size, true otherwise.
 *
 *******************************************************************************/
 bool memorySetProtectRegion (MEMORY_PROTECT_WINDOW window,
@@ -1380,7 +1364,7 @@ void MemoryEnableWindow (MEMORY_WINDOW window)
 * OUTPUT:
 *       None.
 * RETURN:
-*       True for a closed window, false otherwise .
+*       true for a closed window, false otherwise .
 *******************************************************************************/
 MEMORY_WINDOW_STATUS MemoryGetMemWindowStatus (MEMORY_WINDOW window)
 {

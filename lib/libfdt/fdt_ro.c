@@ -1,52 +1,7 @@
 /*
  * libfdt - Flat Device Tree manipulation
  * Copyright (C) 2006 David Gibson, IBM Corporation.
- *
- * libfdt is dual licensed: you can use it either under the terms of
- * the GPL, or the BSD license, at your option.
- *
- *  a) This library is free software; you can redistribute it and/or
- *     modify it under the terms of the GNU General Public License as
- *     published by the Free Software Foundation; either version 2 of the
- *     License, or (at your option) any later version.
- *
- *     This library is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU General Public License for more details.
- *
- *     You should have received a copy of the GNU General Public
- *     License along with this library; if not, write to the Free
- *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
- *     MA 02110-1301 USA
- *
- * Alternatively,
- *
- *  b) Redistribution and use in source and binary forms, with or
- *     without modification, are permitted provided that the following
- *     conditions are met:
- *
- *     1. Redistributions of source code must retain the above
- *        copyright notice, this list of conditions and the following
- *        disclaimer.
- *     2. Redistributions in binary form must reproduce the above
- *        copyright notice, this list of conditions and the following
- *        disclaimer in the documentation and/or other materials
- *        provided with the distribution.
- *
- *     THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
- *     CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
- *     INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- *     MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- *     DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- *     CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- *     SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *     NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- *     LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- *     HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- *     CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- *     OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier:	GPL-2.0+ BSD-2-Clause
  */
 #include "libfdt_env.h"
 
@@ -89,7 +44,7 @@ static int _fdt_string_eq(const void *fdt, int stroffset,
 {
 	const char *p = fdt_string(fdt, stroffset);
 
-	return (strlen(p) == len) && (memcmp(p, s, len) == 0);
+	return (strnlen(p, len + 1) == len) && (memcmp(p, s, len) == 0);
 }
 
 int fdt_get_mem_rsv(const void *fdt, int n, uint64_t *address, uint64_t *size)
@@ -326,7 +281,7 @@ const void *fdt_getprop(const void *fdt, int nodeoffset,
 
 uint32_t fdt_get_phandle(const void *fdt, int nodeoffset)
 {
-	const uint32_t *php;
+	const fdt32_t *php;
 	int len;
 
 	/* FIXME: This is a bit sub-optimal, since we potentially scan
@@ -519,8 +474,7 @@ int fdt_node_offset_by_phandle(const void *fdt, uint32_t phandle)
 	return offset; /* error from fdt_next_node() */
 }
 
-static int _fdt_stringlist_contains(const char *strlist, int listlen,
-				    const char *str)
+int fdt_stringlist_contains(const char *strlist, int listlen, const char *str)
 {
 	int len = strlen(str);
 	const char *p;
@@ -537,6 +491,82 @@ static int _fdt_stringlist_contains(const char *strlist, int listlen,
 	return 0;
 }
 
+int fdt_count_strings(const void *fdt, int node, const char *property)
+{
+	int length, i, count = 0;
+	const char *list;
+
+	list = fdt_getprop(fdt, node, property, &length);
+	if (!list)
+		return -length;
+
+	for (i = 0; i < length; i++) {
+		int len = strlen(list);
+
+		list += len + 1;
+		i += len;
+		count++;
+	}
+
+	return count;
+}
+
+int fdt_find_string(const void *fdt, int node, const char *property,
+		    const char *string)
+{
+	const char *list, *end;
+	int len, index = 0;
+
+	list = fdt_getprop(fdt, node, property, &len);
+	if (!list)
+		return len;
+
+	end = list + len;
+	len = strlen(string);
+
+	while (list < end) {
+		int l = strlen(list);
+
+		if (l == len && memcmp(list, string, len) == 0)
+			return index;
+
+		list += l + 1;
+		index++;
+	}
+
+	return -FDT_ERR_NOTFOUND;
+}
+
+int fdt_get_string_index(const void *fdt, int node, const char *property,
+			 int index, const char **output)
+{
+	const char *list;
+	int length, i;
+
+	list = fdt_getprop(fdt, node, property, &length);
+
+	for (i = 0; i < length; i++) {
+		int len = strlen(list);
+
+		if (index == 0) {
+			*output = list;
+			return 0;
+		}
+
+		list += len + 1;
+		i += len;
+		index--;
+	}
+
+	return FDT_ERR_NOTFOUND;
+}
+
+int fdt_get_string(const void *fdt, int node, const char *property,
+		   const char **output)
+{
+	return fdt_get_string_index(fdt, node, property, 0, output);
+}
+
 int fdt_node_check_compatible(const void *fdt, int nodeoffset,
 			      const char *compatible)
 {
@@ -546,7 +576,7 @@ int fdt_node_check_compatible(const void *fdt, int nodeoffset,
 	prop = fdt_getprop(fdt, nodeoffset, "compatible", &len);
 	if (!prop)
 		return len;
-	if (_fdt_stringlist_contains(prop, len, compatible))
+	if (fdt_stringlist_contains(prop, len, compatible))
 		return 0;
 	else
 		return 1;

@@ -7,7 +7,7 @@
  * Copyright (c) 2005-2008 Analog Devices Inc.
  * Copyright (C) 2010 Thomas Chou <thomas@wytron.com.tw>
  *
- * Licensed under the GPL-2 or later.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -90,13 +90,10 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 	if (!spi_cs_is_valid(bus, cs) || gpio_request(cs, "tiny_spi"))
 		return NULL;
 
-	tiny_spi = malloc(sizeof(*tiny_spi));
+	tiny_spi = spi_alloc_slave(struct tiny_spi_slave, bus, cs);
 	if (!tiny_spi)
 		return NULL;
-	memset(tiny_spi, 0, sizeof(*tiny_spi));
 
-	tiny_spi->slave.bus = bus;
-	tiny_spi->slave.cs = cs;
 	tiny_spi->host = &tiny_spi_host_list[bus];
 	tiny_spi->mode = mode & (SPI_CPOL | SPI_CPHA);
 	tiny_spi->flg = mode & SPI_CS_HIGH ? 1 : 0;

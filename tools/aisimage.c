@@ -2,29 +2,10 @@
  * (C) Copyright 2011
  * Stefano Babic, DENX Software Engineering, sbabic@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
-/* Required to obtain the getline prototype from stdio.h */
-#define _GNU_SOURCE
-
-#include "mkimage.h"
+#include "imagetool.h"
 #include "aisimage.h"
 #include <image.h>
 
@@ -32,7 +13,6 @@
 #define WORD_ALIGN0	4
 #define WORD_ALIGN(len) (((len)+WORD_ALIGN0-1) & ~(WORD_ALIGN0-1))
 #define MAX_CMD_BUFFER	4096
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 static uint32_t ais_img_size;
 
@@ -196,7 +176,7 @@ static uint32_t *ais_insert_cmd_header(uint32_t cmd, uint32_t nargs,
 
 }
 
-static uint32_t *ais_alloc_buffer(struct mkimage_params *params)
+static uint32_t *ais_alloc_buffer(struct image_tool_params *params)
 {
 	int dfd;
 	struct stat sbuf;
@@ -236,7 +216,7 @@ static uint32_t *ais_alloc_buffer(struct mkimage_params *params)
 	return ptr;
 }
 
-static uint32_t *ais_copy_image(struct mkimage_params *params,
+static uint32_t *ais_copy_image(struct image_tool_params *params,
 	uint32_t *aisptr)
 
 {
@@ -272,7 +252,7 @@ static uint32_t *ais_copy_image(struct mkimage_params *params,
 
 }
 
-static int aisimage_generate(struct mkimage_params *params,
+static int aisimage_generate(struct image_tool_params *params,
 	struct image_type_params *tparams)
 {
 	FILE *fd = NULL;
@@ -390,7 +370,7 @@ static int aisimage_check_image_types(uint8_t type)
 }
 
 static int aisimage_verify_header(unsigned char *ptr, int image_size,
-			struct mkimage_params *params)
+			struct image_tool_params *params)
 {
 	struct ais_header *ais_hdr = (struct ais_header *)ptr;
 
@@ -404,11 +384,11 @@ static int aisimage_verify_header(unsigned char *ptr, int image_size,
 }
 
 static void aisimage_set_header(void *ptr, struct stat *sbuf, int ifd,
-				struct mkimage_params *params)
+				struct image_tool_params *params)
 {
 }
 
-int aisimage_check_params(struct mkimage_params *params)
+int aisimage_check_params(struct image_tool_params *params)
 {
 	if (!params)
 		return CFG_INVALID;
@@ -433,19 +413,17 @@ int aisimage_check_params(struct mkimage_params *params)
 /*
  * aisimage parameters
  */
-static struct image_type_params aisimage_params = {
-	.name		= "TI Davinci AIS Boot Image support",
-	.header_size	= 0,
-	.hdr		= NULL,
-	.check_image_type = aisimage_check_image_types,
-	.verify_header	= aisimage_verify_header,
-	.print_header	= aisimage_print_header,
-	.set_header	= aisimage_set_header,
-	.check_params	= aisimage_check_params,
-	.vrec_header	= aisimage_generate,
-};
-
-void init_ais_image_type(void)
-{
-	mkimage_register(&aisimage_params);
-}
+U_BOOT_IMAGE_TYPE(
+	aisimage,
+	"TI Davinci AIS Boot Image support",
+	0,
+	NULL,
+	aisimage_check_params,
+	aisimage_verify_header,
+	aisimage_print_header,
+	aisimage_set_header,
+	NULL,
+	aisimage_check_image_types,
+	NULL,
+	aisimage_generate
+);

@@ -4,31 +4,15 @@
  * (C) Copyright 2010
  * Petr Stetiar <ynezz@true.cz>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * Contains stolen code from ddcprobe project which is:
  * Copyright (C) Nalin Dahyabhai <bigfun@pobox.com>
- *
  */
 
 #include <common.h>
 #include <edid.h>
+#include <errno.h>
 #include <linux/ctype.h>
 #include <linux/string.h>
 
@@ -44,6 +28,17 @@ int edid_check_info(struct edid1_info *edid_info)
 		return -1;
 
 	return 0;
+}
+
+int edid_check_checksum(u8 *edid_block)
+{
+	u8 checksum = 0;
+	int i;
+
+	for (i = 0; i < 128; i++)
+		checksum += edid_block[i];
+
+	return (checksum == 0) ? 0 : -EINVAL;
 }
 
 int edid_get_ranges(struct edid1_info *edid, unsigned int *hmin,

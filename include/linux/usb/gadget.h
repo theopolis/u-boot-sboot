@@ -18,6 +18,8 @@
 #ifndef __LINUX_USB_GADGET_H
 #define __LINUX_USB_GADGET_H
 
+#include <errno.h>
+#include <linux/compat.h>
 #include <linux/list.h>
 
 struct usb_ep;
@@ -409,11 +411,6 @@ struct usb_gadget_ops {
 				unsigned code, unsigned long param);
 };
 
-struct device {
-	void		*driver_data;	/* data private to the driver */
-	void            *device_data;   /* data private to the device */
-};
-
 /**
  * struct usb_gadget - represents a usb slave device
  * @ops: Function pointers used to access hardware-specific operations.
@@ -421,11 +418,11 @@ struct device {
  *	driver setup() requests
  * @ep_list: List of other endpoints supported by the device.
  * @speed: Speed of current connection to USB host.
- * @is_dualspeed: True if the controller supports both high and full speed
+ * @is_dualspeed: true if the controller supports both high and full speed
  *	operation.  If it does, the gadget driver must also support both.
- * @is_otg: True if the USB device port uses a Mini-AB jack, so that the
+ * @is_otg: true if the USB device port uses a Mini-AB jack, so that the
  *	gadget driver must provide a USB OTG descriptor.
- * @is_a_peripheral: False unless is_otg, the "A" end of a USB cable
+ * @is_a_peripheral: false unless is_otg, the "A" end of a USB cable
  *	is in the Mini-AB jack, and HNP has been used to switch roles
  *	so that the "A" device currently acts as A-Peripheral, not A-Host.
  * @a_hnp_support: OTG device feature flag, indicating that the A-Host

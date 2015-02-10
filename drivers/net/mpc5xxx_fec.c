@@ -407,13 +407,8 @@ static int mpc5xxx_fec_init_phy(struct eth_device *dev, bd_t * bis)
 	 */
 	if (fec->xcv_type == SEVENWIRE) {
 		/*  10MBit with 7-wire operation */
-#if defined(CONFIG_TOTAL5200)
-		/* 7-wire and USB2 on Ethernet */
-		*(vu_long *)MPC5XXX_GPS_PORT_CONFIG |= 0x00030000;
-#else	/* !CONFIG_TOTAL5200 */
 		/* 7-wire only */
 		*(vu_long *)MPC5XXX_GPS_PORT_CONFIG |= 0x00020000;
-#endif	/* CONFIG_TOTAL5200 */
 	} else {
 		/* 100MBit with MD operation */
 		*(vu_long *)MPC5XXX_GPS_PORT_CONFIG |= 0x00050000;
@@ -440,8 +435,9 @@ static int mpc5xxx_fec_init_phy(struct eth_device *dev, bd_t * bis)
 		/*
 		 * Set MII_SPEED = (1/(mii_speed * 2)) * System Clock
 		 * and do not drop the Preamble.
+		 * No MII for 7-wire mode
 		 */
-		fec->eth->mii_speed = (((gd->ipb_clk >> 20) / 5) << 1);	/* No MII for 7-wire mode */
+		fec->eth->mii_speed = (((gd->arch.ipb_clk >> 20) / 5) << 1);
 	}
 
 	if (fec->xcv_type != SEVENWIRE) {
@@ -475,11 +471,6 @@ static int mpc5xxx_fec_init_phy(struct eth_device *dev, bd_t * bis)
 		miiphy_write(dev->name, phyAddr, 0x0, 0x8000);
 		udelay(1000);
 
-#if defined(CONFIG_UC101) || defined(CONFIG_MUCMC52)
-		/* Set the LED configuration Register for the UC101
-		   and MUCMC52 Board */
-		miiphy_write(dev->name, phyAddr, 0x14, 0x4122);
-#endif
 		if (fec->xcv_type == MII10) {
 			/*
 			 * Force 10Base-T, FDX operation
@@ -644,8 +635,9 @@ static void mpc5xxx_fec_halt(struct eth_device *dev)
 		/*
 		 * Set MII_SPEED = (1/(mii_speed * 2)) * System Clock
 		 * and do not drop the Preamble.
+		 * No MII for 7-wire mode
 		 */
-		fec->eth->mii_speed = (((gd->ipb_clk >> 20) / 5) << 1); /* No MII for 7-wire mode */
+		fec->eth->mii_speed = (((gd->arch.ipb_clk >> 20) / 5) << 1);
 	}
 
 #if (DEBUG & 0x3)
@@ -909,8 +901,9 @@ int mpc5xxx_fec_initialize(bd_t * bis)
 		/*
 		 * Set MII_SPEED = (1/(mii_speed * 2)) * System Clock
 		 * and do not drop the Preamble.
+		 * No MII for 7-wire mode
 		 */
-		fec->eth->mii_speed = (((gd->ipb_clk >> 20) / 5) << 1); /* No MII for 7-wire mode */
+		fec->eth->mii_speed = (((gd->arch.ipb_clk >> 20) / 5) << 1);
 	}
 
 	dev->priv = (void *)fec;

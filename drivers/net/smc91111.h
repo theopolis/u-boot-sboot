@@ -8,19 +8,7 @@
  .       Developed by Simple Network Magic Corporation (SNMC)
  . Copyright (C) 1996 by Erik Stahlman (ES)
  .
- . This program is free software; you can redistribute it and/or modify
- . it under the terms of the GNU General Public License as published by
- . the Free Software Foundation; either version 2 of the License, or
- . (at your option) any later version.
- .
- . This program is distributed in the hope that it will be useful,
- . but WITHOUT ANY WARRANTY; without even the implied warranty of
- . MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- . GNU General Public License for more details.
- .
- . You should have received a copy of the GNU General Public License
- . along with this program; if not, write to the Free Software
- . Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  * SPDX-License-Identifier:	GPL-2.0+
  .
  . This file contains register information and access macros for
  . the LAN91C111 single chip ethernet controller.  It is a modified
@@ -248,7 +236,36 @@ struct smc91111_priv{
 					  *(__b2 + __i) = SMC_inb((a),(r));  \
 					};  \
 				}while(0)
-
+#elif defined(CONFIG_MS7206SE)
+#define SWAB7206(x) ({ word __x = x; ((__x << 8)|(__x >> 8)); })
+#define SMC_inw(a, r) *((volatile word*)((a)->iobase + (r)))
+#define SMC_inb(a, r) (*((volatile byte*)((a)->iobase + ((r) ^ 0x01))))
+#define SMC_insw(a, r, b, l) \
+	do { \
+		int __i; \
+		word *__b2 = (word *)(b);		  \
+		for (__i = 0; __i < (l); __i++) { \
+			*__b2++ = SWAB7206(SMC_inw(a, r));	\
+		} \
+	} while (0)
+#define	SMC_outw(a, d, r)	(*((volatile word *)((a)->iobase+(r))) = d)
+#define	SMC_outb(a, d, r)	({	word __d = (byte)(d);  \
+				word __w = SMC_inw((a), ((r)&(~1)));	\
+				if (((r) & 1)) \
+					__w = (__w & 0x00ff) | (__d << 8); \
+				else \
+					__w = (__w & 0xff00) | (__d); \
+				SMC_outw((a), __w, ((r)&(~1)));	      \
+			})
+#define SMC_outsw(a, r, b, l) \
+	do { \
+		int __i; \
+		word *__b2 = (word *)(b);		  \
+		for (__i = 0; __i < (l); __i++) { \
+			SMC_outw(a, SWAB7206(*__b2), r);	  \
+			__b2++; \
+		} \
+	} while (0)
 #else			/* if not CONFIG_CPU_PXA25X and not CONFIG_LEON */
 
 #ifndef CONFIG_SMC_USE_IOFUNCS /* these macros don't work on some boards */
@@ -260,17 +277,26 @@ struct smc91111_priv{
 #define	SMC_inw(a,r)	(*((volatile word *)((a)->iobase+((r)<<1))))
 #elif CONFIG_BLACKFIN
 #define	SMC_inw(a,r)	({ word __v = (*((volatile word *)((a)->iobase+(r)))); SSYNC(); __v;})
+#elif CONFIG_ARM64
+#define	SMC_inw(a, r)	(*((volatile word*)((a)->iobase+((dword)(r)))))
 #else
-#define	SMC_inw(a,r)	(*((volatile word *)((a)->iobase+(r))))
+#define SMC_inw(a, r)	(*((volatile word*)((a)->iobase+(r))))
 #endif
 #define  SMC_inb(a,r)	(((r)&1) ? SMC_inw((a),(r)&~1)>>8 : SMC_inw((a),(r)&0xFF))
 
 #ifdef CONFIG_ADNPESC1
 #define	SMC_outw(a,d,r)	(*((volatile word *)((a)->iobase+((r)<<1))) = d)
 #elif CONFIG_BLACKFIN
-#define	SMC_outw(a,d,r)	{(*((volatile word *)((a)->iobase+(r))) = d); SSYNC();}
+#define	SMC_outw(a, d, r)	\
+			({	(*((volatile word*)((a)->iobase+((r)))) = d); \
+				SSYNC(); \
+			})
+#elif CONFIG_ARM64
+#define	SMC_outw(a, d, r)	\
+			(*((volatile word*)((a)->iobase+((dword)(r)))) = d)
 #else
-#define	SMC_outw(a,d,r)	(*((volatile word *)((a)->iobase+(r))) = d)
+#define	SMC_outw(a, d, r)	\
+			(*((volatile word*)((a)->iobase+(r))) = d)
 #endif
 #define	SMC_outb(a,d,r)	({	word __d = (byte)(d);  \
 				word __w = SMC_inw((a),(r)&~1);  \

@@ -3,23 +3,7 @@
  * Texas Instruments, <www.ti.com>
  * Richard Woodruff <r-woodruff2@ti.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _MEM_H_
@@ -265,6 +249,49 @@ enum {
 #define MICRON_RASWIDTH_200	14
 #define MICRON_V_MCFG_200(size)	MCFG((size), MICRON_RASWIDTH_200)
 
+/* Samsung K4X51163PG - FGC6 (165MHz optimized) 6.06ns - from 2010.90 src */
+#define SAMSUNG_TDAL_165	5
+#define SAMSUNG_TDPL_165	2
+#define SAMSUNG_TRRD_165	2
+#define SAMSUNG_TRCD_165	3
+#define SAMSUNG_TRP_165		3
+#define SAMSUNG_TRAS_165	7
+#define SAMSUNG_TRC_165		10
+#define SAMSUNG_TRFC_165	12
+
+#define SAMSUNG_V_ACTIMA_165	\
+		ACTIM_CTRLA(SAMSUNG_TRFC_165, SAMSUNG_TRC_165,		\
+				SAMSUNG_TRAS_165, SAMSUNG_TRP_165,	\
+				SAMSUNG_TRCD_165, SAMSUNG_TRRD_165,	\
+				SAMSUNG_TDPL_165, SAMSUNG_TDAL_165)
+
+#define SAMSUNG_TWTR_165	1
+#define SAMSUNG_TCKE_165	2
+#define SAMSUNG_XSR_165		20
+#define SAMSUNG_TXP_165		5
+
+#define SAMSUNG_V_ACTIMB_165	\
+		ACTIM_CTRLB(SAMSUNG_TWTR_165, SAMSUNG_TCKE_165,	\
+				SAMSUNG_TXP_165, SAMSUNG_XSR_165)
+
+#define SAMSUNG_RASWIDTH_165	14
+#define SAMSUNG_V_MCFG_165(size) \
+	V_MCFG_RASWIDTH(SAMSUNG_RASWIDTH_165) | V_MCFG_CASWIDTH_10B | \
+	V_MCFG_ADDRMUXLEGACY_FLEX | V_MCFG_RAMSIZE(size) | \
+	V_MCFG_BANKALLOCATION_RBC | V_MCFG_RAMTYPE_DDR
+
+/* TODO: find which register these were taken from */
+
+#define SAMSUNG_BL_165				0x2
+#define SAMSUNG_SIL_165				0x0
+#define SAMSUNG_CASL_165			0x3
+#define SAMSUNG_WBST_165			0x0
+#define SAMSUNG_V_MR_165			((SAMSUNG_WBST_165 << 9) | \
+		(SAMSUNG_CASL_165 << 4) | (SAMSUNG_SIL_165 << 3) | \
+		(SAMSUNG_BL_165))
+
+#define SAMSUNG_SHARING 0x00003700
+
 /* NUMONYX part of IGEP v2 (165MHz optimized) 6.06ns */
 #define NUMONYX_TDAL_165	6	/* Twr/Tck + Trp/tck		*/
 					/* 15/6 + 18/6 = 5.5 -> 6	*/
@@ -360,6 +387,7 @@ enum {
  * MAP  - Map this CS to which address(GPMC address space)- Absolute address
  *   >>24 before being used.
  */
+#define GPMC_SIZE_256M	0x0
 #define GPMC_SIZE_128M	0x8
 #define GPMC_SIZE_64M	0xC
 #define GPMC_SIZE_32M	0xE
@@ -368,14 +396,6 @@ enum {
 #define GPMC_BASEADDR_MASK	0x3F
 
 #define GPMC_CS_ENABLE		0x1
-
-#define SMNAND_GPMC_CONFIG1	0x00000800
-#define SMNAND_GPMC_CONFIG2	0x00141400
-#define SMNAND_GPMC_CONFIG3	0x00141400
-#define SMNAND_GPMC_CONFIG4	0x0F010F01
-#define SMNAND_GPMC_CONFIG5	0x010C1414
-#define SMNAND_GPMC_CONFIG6	0x1F0F0A80
-#define SMNAND_GPMC_CONFIG7	0x00000C44
 
 #define M_NAND_GPMC_CONFIG1	0x00001800
 #define M_NAND_GPMC_CONFIG2	0x00141400
@@ -435,25 +455,22 @@ enum {
 #define NET_GPMC_CONFIG6	0x00000FCF
 #define NET_GPMC_CONFIG7	0x00000f6c
 
+/* GPMC CS configuration for an SMSC LAN9221 ethernet controller */
+#define NET_LAN9221_GPMC_CONFIG1    0x00001000
+#define NET_LAN9221_GPMC_CONFIG2    0x00060700
+#define NET_LAN9221_GPMC_CONFIG3    0x00020201
+#define NET_LAN9221_GPMC_CONFIG4    0x06000700
+#define NET_LAN9221_GPMC_CONFIG5    0x0006090A
+#define NET_LAN9221_GPMC_CONFIG6    0x87030000
+#define NET_LAN9221_GPMC_CONFIG7    0x00000f6c
+
+
 /* max number of GPMC Chip Selects */
 #define GPMC_MAX_CS	8
 /* max number of GPMC regs */
 #define GPMC_MAX_REG	7
 
-#define PISMO1_NOR	1
-#define PISMO1_NAND	2
-#define PISMO2_CS0	3
-#define PISMO2_CS1	4
-#define PISMO1_ONENAND	5
 #define DBG_MPDB	6
-#define PISMO2_NAND_CS0 7
-#define PISMO2_NAND_CS1 8
-
-/* make it readable for the gpmc_init */
-#define PISMO1_NOR_BASE		FLASH_BASE
-#define PISMO1_NAND_BASE	NAND_BASE
-#define PISMO2_CS0_BASE		PISMO2_MAP1
-#define PISMO1_ONEN_BASE	ONENAND_MAP
 #define DBG_MPDB_BASE		DEBUG_BASE
 
 #ifndef __ASSEMBLY__

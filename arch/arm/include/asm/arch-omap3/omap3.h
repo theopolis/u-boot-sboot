@@ -4,23 +4,7 @@
  * Richard Woodruff <r-woodruff2@ti.com>
  * Syed Mohammed Khasim <x0khasim@ti.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _OMAP3_H_
@@ -71,6 +55,7 @@ struct control_prog_io {
 #define OMAP34XX_UART1			(OMAP34XX_L4_IO_BASE + 0x6a000)
 #define OMAP34XX_UART2			(OMAP34XX_L4_IO_BASE + 0x6c000)
 #define OMAP34XX_UART3			(OMAP34XX_L4_PER + 0x20000)
+#define OMAP34XX_UART4			(OMAP34XX_L4_PER + 0x42000)
 
 /* General Purpose Timers */
 #define OMAP34XX_GPT1			0x48318000
@@ -155,13 +140,13 @@ struct gpio {
 					 SRAM_OFFSET2)
 #define SRAM_CLK_CODE			(SRAM_VECT_CODE + 64)
 
-#define OMAP3_PUBLIC_SRAM_BASE		0x40208000 /* Works for GP & EMU */
-#define OMAP3_PUBLIC_SRAM_END		0x40210000
+#define NON_SECURE_SRAM_START		0x40208000 /* Works for GP & EMU */
+#define NON_SECURE_SRAM_END		0x40210000
 
 #define LOW_LEVEL_SRAM_STACK		0x4020FFFC
 
 /* scratch area - accessible on both EMU and GP */
-#define OMAP3_PUBLIC_SRAM_SCRATCH_AREA	OMAP3_PUBLIC_SRAM_BASE
+#define OMAP3_PUBLIC_SRAM_SCRATCH_AREA	NON_SECURE_SRAM_START
 
 #define DEBUG_LED1			149	/* gpio */
 #define DEBUG_LED2			150	/* gpio */
@@ -252,5 +237,12 @@ struct gpio {
 #define OMAP3_EMU_HAL_API_WRITE_ACR		42
 
 #define OMAP3_EMU_HAL_START_HAL_CRITICAL	4
+
+/* ABB settings */
+#define OMAP_ABB_SETTLING_TIME		30
+#define OMAP_ABB_CLOCK_CYCLES		8
+
+/* ABB tranxdone mask */
+#define OMAP_ABB_MPU_TXDONE_MASK	(0x1 << 26)
 
 #endif

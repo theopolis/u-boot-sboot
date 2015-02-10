@@ -2,23 +2,7 @@
  * (C) Copyright 2008
  * Stefan Roese, DENX Software Engineering, sr@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm-offsets.h>
@@ -64,11 +48,7 @@ tlbtab:
 	/* BOOT_CS (FLASH) must be forth. Before relocation SA_I can be off to use the
 	 * speed up boot process. It is patched after relocation to enable SA_I
 	 */
-#ifndef CONFIG_NAND_SPL
 	tlbentry( CONFIG_SYS_BOOT_BASE_ADDR, SZ_256M, CONFIG_SYS_BOOT_BASE_ADDR, 1, AC_RWX | SA_G )
-#else
-	tlbentry( CONFIG_SYS_NAND_BOOT_SPL_SRC, SZ_4K, CONFIG_SYS_NAND_BOOT_SPL_SRC, 1, AC_RWX | SA_G )
-#endif
 
 #ifdef CONFIG_SYS_INIT_RAM_DCACHE
 	/* TLB-entry for init-ram in dcache (SA_I must be turned off!) */
@@ -97,31 +77,3 @@ tlbtab:
 	tlbentry(0xE8000000, SZ_64K, 0xE8000000, 1, AC_RWX | SA_IG)
 
 	tlbtab_end
-
-#if defined(CONFIG_NAND_U_BOOT) && !defined(CONFIG_NAND_SPL)
-	/*
-	 * For NAND booting the first TLB has to be reconfigured to full size
-	 * and with caching disabled after running from RAM!
-	 */
-#define TLB00	TLB0(CONFIG_SYS_BOOT_BASE_ADDR, SZ_256M)
-#define TLB01	TLB1(CONFIG_SYS_BOOT_BASE_ADDR, 1)
-#define TLB02	TLB2(AC_RWX | SA_IG)
-
-	.globl	reconfig_tlb0
-reconfig_tlb0:
-	sync
-	isync
-	addi	r4,r0,CONFIG_SYS_TLB_FOR_BOOT_FLASH /* TLB entry # */
-	lis	r5,TLB00@h
-	ori	r5,r5,TLB00@l
-	tlbwe	r5,r4,0x0000		/* Save it out */
-	lis	r5,TLB01@h
-	ori	r5,r5,TLB01@l
-	tlbwe	r5,r4,0x0001		/* Save it out */
-	lis	r5,TLB02@h
-	ori	r5,r5,TLB02@l
-	tlbwe	r5,r4,0x0002		/* Save it out */
-	sync
-	isync
-	blr
-#endif

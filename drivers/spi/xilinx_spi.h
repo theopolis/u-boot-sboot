@@ -9,7 +9,7 @@
  * Copyright (c) 2010 Graeme Smecher <graeme.smecher@mail.mcgill.ca>
  * Copyright (c) 2012 Stephan Linz <linz@li-pro.net>
  *
- * Licensed under the GPL-2 or later.
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * [0]: http://www.xilinx.com/support/documentation
  *
@@ -118,6 +118,9 @@ struct xilinx_spi_reg {
 /* SPI Receive FIFO Occupancy Register (spirfor), [1] p14, [2] p14 */
 #define SPIRFOR_OCYVAL_POS	0
 #define SPIRFOR_OCYVAL_MASK	(0xf << SPIRFOR_OCYVAL_POS)
+
+/* SPI Software Reset Register (ssr) */
+#define SPISSR_RESET_VALUE	0x0a
 
 struct xilinx_spi_slave {
 	struct spi_slave slave;

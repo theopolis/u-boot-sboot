@@ -2,23 +2,7 @@
  * (C) Copyright 2008
  * Stefan Roese, DENX Software Engineering, sr@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _PPC4xx_SDRAM_H_
@@ -292,7 +276,7 @@
  */
 #if defined(CONFIG_440SPE) || \
     defined(CONFIG_460EX) || defined(CONFIG_460GT) || \
-    defined(CONFIG_460SX) || defined(CONFIG_APM821XX)
+    defined(CONFIG_460SX)
 #define SDRAM_RXBAS_SDBA_MASK		0xFFE00000	/* Base address	*/
 #define SDRAM_RXBAS_SDBA_ENCODE(n)	((u32)(((phys_size_t)(n) >> 2) & 0xFFE00000))
 #define SDRAM_RXBAS_SDBA_DECODE(n)	((((phys_size_t)(n)) & 0xFFE00000) << 2)
@@ -365,7 +349,7 @@
 /*
  * Memory controller registers
  */
-#if defined(CONFIG_405EX) || defined(CONFIG_APM821XX)
+#if defined(CONFIG_405EX)
 #define SDRAM_BESR	0x00	/* PLB bus error status (read/clear)         */
 #define SDRAM_BESRT	0x01	/* PLB bus error status (test/set)           */
 #define SDRAM_BEARL	0x02	/* PLB bus error address low                 */
@@ -375,9 +359,9 @@
 #define SDRAM_PLBOPT	0x08	/* PLB slave options                         */
 #define SDRAM_PUABA	0x09	/* PLB upper address base                    */
 #define SDRAM_MCSTAT	0x1F	/* memory controller status                  */
-#else /* CONFIG_405EX || CONFIG_APM821XX */
+#else /* CONFIG_405EX */
 #define SDRAM_MCSTAT	0x14	/* memory controller status                  */
-#endif /* CONFIG_405EX || CONFIG_APM821XX */
+#endif /* CONFIG_405EX */
 #define SDRAM_MCOPT1	0x20	/* memory controller options 1               */
 #define SDRAM_MCOPT2	0x21	/* memory controller options 2               */
 #define SDRAM_MODT0	0x22	/* on die termination for bank 0             */
@@ -423,12 +407,12 @@
 #define SDRAM_MEMODE	0x89	/* memory extended mode                      */
 #define SDRAM_ECCES	0x98	/* ECC error status                          */
 #define SDRAM_CID	0xA4	/* core ID                                   */
-#if !defined(CONFIG_405EX) && !defined(CONFIG_APM821XX)
+#if !defined(CONFIG_405EX)
 #define SDRAM_RID	0xA8	/* revision ID                               */
 #endif
 #define SDRAM_FCSR	0xB0	/* feedback calibration status               */
 #define SDRAM_RTSR	0xB1	/* run time status tracking                  */
-#if  defined(CONFIG_405EX) || defined(CONFIG_APM821XX)
+#if  defined(CONFIG_405EX)
 #define SDRAM_RID	0xF8	/* revision ID                               */
 #endif
 

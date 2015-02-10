@@ -2,27 +2,12 @@
  * (C) Copyright 2000-2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
 #include <common.h>
+#include <inttypes.h>
 #include <version.h>
 #include <linux/ctype.h>
 #include <asm/io.h>
@@ -37,15 +22,10 @@ int display_options (void)
 	return 0;
 }
 
-/*
- * print sizes as "xxx KiB", "xxx.y KiB", "xxx MiB", "xxx.y MiB",
- * xxx GiB, xxx.y GiB, etc as needed; allow for optional trailing string
- * (like "\n")
- */
-void print_size(unsigned long long size, const char *s)
+void print_size(uint64_t size, const char *s)
 {
 	unsigned long m = 0, n;
-	unsigned long long f;
+	uint64_t f;
 	static const char names[] = {'E', 'P', 'T', 'G', 'M', 'K'};
 	unsigned long d = 10 * ARRAY_SIZE(names);
 	char c = 0;
@@ -59,7 +39,7 @@ void print_size(unsigned long long size, const char *s)
 	}
 
 	if (!c) {
-		printf("%llu Bytes%s", size, s);
+		printf("%" PRIu64 " Bytes%s", size, s);
 		return;
 	}
 
@@ -98,15 +78,24 @@ void print_size(unsigned long long size, const char *s)
  */
 #define MAX_LINE_LENGTH_BYTES (64)
 #define DEFAULT_LINE_LENGTH_BYTES (16)
-int print_buffer (ulong addr, void* data, uint width, uint count, uint linelen)
+int print_buffer(ulong addr, const void *data, uint width, uint count,
+		 uint linelen)
 {
 	/* linebuf as a union causes proper alignment */
 	union linebuf {
+#ifdef CONFIG_SYS_SUPPORT_64BIT_DATA
+		uint64_t uq[MAX_LINE_LENGTH_BYTES/sizeof(uint64_t) + 1];
+#endif
 		uint32_t ui[MAX_LINE_LENGTH_BYTES/sizeof(uint32_t) + 1];
 		uint16_t us[MAX_LINE_LENGTH_BYTES/sizeof(uint16_t) + 1];
 		uint8_t  uc[MAX_LINE_LENGTH_BYTES/sizeof(uint8_t) + 1];
 	} lb;
 	int i;
+#ifdef CONFIG_SYS_SUPPORT_64BIT_DATA
+	uint64_t x;
+#else
+	uint32_t x;
+#endif
 
 	if (linelen*width > MAX_LINE_LENGTH_BYTES)
 		linelen = MAX_LINE_LENGTH_BYTES / width;
@@ -114,27 +103,42 @@ int print_buffer (ulong addr, void* data, uint width, uint count, uint linelen)
 		linelen = DEFAULT_LINE_LENGTH_BYTES / width;
 
 	while (count) {
+		uint thislinelen = linelen;
 		printf("%08lx:", addr);
 
 		/* check for overflow condition */
-		if (count < linelen)
-			linelen = count;
+		if (count < thislinelen)
+			thislinelen = count;
 
 		/* Copy from memory into linebuf and print hex values */
-		for (i = 0; i < linelen; i++) {
-			uint32_t x;
+		for (i = 0; i < thislinelen; i++) {
 			if (width == 4)
 				x = lb.ui[i] = *(volatile uint32_t *)data;
+#ifdef CONFIG_SYS_SUPPORT_64BIT_DATA
+			else if (width == 8)
+				x = lb.uq[i] = *(volatile uint64_t *)data;
+#endif
 			else if (width == 2)
 				x = lb.us[i] = *(volatile uint16_t *)data;
 			else
 				x = lb.uc[i] = *(volatile uint8_t *)data;
+#ifdef CONFIG_SYS_SUPPORT_64BIT_DATA
+			printf(" %0*" PRIx64, width * 2, x);
+#else
 			printf(" %0*x", width * 2, x);
+#endif
 			data += width;
 		}
 
+		while (thislinelen < linelen) {
+			/* fill line with whitespace for nice ASCII print */
+			for (i=0; i<width*2+1; i++)
+				puts(" ");
+			linelen--;
+		}
+
 		/* Print data in ASCII characters */
-		for (i = 0; i < linelen * width; i++) {
+		for (i = 0; i < thislinelen * width; i++) {
 			if (!isprint(lb.uc[i]) || lb.uc[i] >= 0x80)
 				lb.uc[i] = '.';
 		}
@@ -142,8 +146,8 @@ int print_buffer (ulong addr, void* data, uint width, uint count, uint linelen)
 		printf("    %s\n", lb.uc);
 
 		/* update references */
-		addr += linelen * width;
-		count -= linelen;
+		addr += thislinelen * width;
+		count -= thislinelen;
 
 		if (ctrlc())
 			return -1;

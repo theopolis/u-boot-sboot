@@ -2,23 +2,7 @@
  * Copyright 2004, 2007-2012 Freescale Semiconductor, Inc.
  * Copyright (C) 2003  Motorola,Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* U-Boot Startup Code for Motorola 85xx PowerPC based Embedded Boards
@@ -33,8 +17,6 @@
 #include <mpc85xx.h>
 #include <version.h>
 
-#define _LINUX_CONFIG_H 1	/* avoid reading Linux autoconf.h file	*/
-
 #include <ppc_asm.tmpl>
 #include <ppc_defs.h>
 
@@ -44,12 +26,15 @@
 #undef	MSR_KERNEL
 #define MSR_KERNEL ( MSR_ME )	/* Machine Check */
 
+#define LAW_EN		0x80000000
+
 #if defined(CONFIG_NAND_SPL) || \
 	(defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_INIT_MINIMAL))
 #define MINIMAL_SPL
 #endif
 
-#if !defined(CONFIG_SPL) && !defined(CONFIG_SYS_RAMBOOT) && !defined(CONFIG_SECURE_BOOT)
+#if !defined(CONFIG_SPL) && !defined(CONFIG_SYS_RAMBOOT) && \
+	!defined(CONFIG_SECURE_BOOT) && !defined(CONFIG_SRIO_PCIE_BOOT_SLAVE)
 #define NOR_BOOT
 #endif
 
@@ -70,7 +55,7 @@
 #endif
 
 	GOT_ENTRY(__init_end)
-	GOT_ENTRY(__bss_end__)
+	GOT_ENTRY(__bss_end)
 	GOT_ENTRY(__bss_start)
 	END_GOT
 
@@ -95,6 +80,13 @@ _start_e500:
 	li	r1,MSR_DE
 	mtmsr 	r1
 
+	/*
+	 * If we got an ePAPR device tree pointer passed in as r3, we need that
+	 * later in cpu_init_early_f(). Save it to a safe register before we
+	 * clobber it so that we can fetch it from there later.
+	 */
+	mr	r24, r3
+
 #ifdef CONFIG_SYS_FSL_ERRATUM_A004510
 	mfspr	r3,SPRN_SVR
 	rlwinm	r3,r3,0,0xff
@@ -116,15 +108,24 @@ _start_e500:
 	/* Erratum says set bits 55:60 to 001001 */
 	msync
 	isync
-	mfspr	r3,976
+	mfspr	r3,SPRN_HDBCR0
 	li	r4,0x48
 	rlwimi	r3,r4,0,0x1f8
-	mtspr	976,r3
+	mtspr	SPRN_HDBCR0,r3
 	isync
 2:
 #endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A005125
+	msync
+	isync
+	mfspr	r3, SPRN_HDBCR0
+	oris	r3, r3, 0x0080
+	mtspr	SPRN_HDBCR0, r3
+#endif
 
-#if defined(CONFIG_SECURE_BOOT) && defined(CONFIG_E500MC)
+
+#if defined(CONFIG_SECURE_BOOT) && defined(CONFIG_E500MC) && \
+	!defined(CONFIG_E6500)
 	/* ISBC uses L2 as stack.
 	 * Disable L2 cache here so that u-boot can enable it later
 	 * as part of it's normal flow
@@ -173,52 +174,6 @@ l2_disabled:
 	mfspr	r1,DBSR
 	mtspr	DBSR,r1		/* Clear all valid bits */
 
-	/*
-	 *	Enable L1 Caches early
-	 *
-	 */
-
-#ifdef CONFIG_SYS_CACHE_STASHING
-	/* set stash id to (coreID) * 2 + 32 + L1 CT (0) */
-	li	r2,(32 + 0)
-	mtspr	L1CSR2,r2
-#endif
-
-	/* Enable/invalidate the I-Cache */
-	lis	r2,(L1CSR1_ICFI|L1CSR1_ICLFR)@h
-	ori	r2,r2,(L1CSR1_ICFI|L1CSR1_ICLFR)@l
-	mtspr	SPRN_L1CSR1,r2
-1:
-	mfspr	r3,SPRN_L1CSR1
-	and.	r1,r3,r2
-	bne	1b
-
-	lis	r3,(L1CSR1_CPE|L1CSR1_ICE)@h
-	ori	r3,r3,(L1CSR1_CPE|L1CSR1_ICE)@l
-	mtspr	SPRN_L1CSR1,r3
-	isync
-2:
-	mfspr	r3,SPRN_L1CSR1
-	andi.	r1,r3,L1CSR1_ICE@l
-	beq	2b
-
-	/* Enable/invalidate the D-Cache */
-	lis	r2,(L1CSR0_DCFI|L1CSR0_DCLFR)@h
-	ori	r2,r2,(L1CSR0_DCFI|L1CSR0_DCLFR)@l
-	mtspr	SPRN_L1CSR0,r2
-1:
-	mfspr	r3,SPRN_L1CSR0
-	and.	r1,r3,r2
-	bne	1b
-
-	lis	r3,(L1CSR0_CPE|L1CSR0_DCE)@h
-	ori	r3,r3,(L1CSR0_CPE|L1CSR0_DCE)@l
-	mtspr	SPRN_L1CSR0,r3
-	isync
-2:
-	mfspr	r3,SPRN_L1CSR0
-	andi.	r1,r3,L1CSR0_DCE@l
-	beq	2b
 
 	.macro	create_tlb1_entry esel ts tsize epn wimg rpn perm phy_high scratch
 	lis	\scratch, FSL_BOOKE_MAS0(1, \esel, 0)@h
@@ -359,7 +314,7 @@ l2_disabled:
 #endif
 	mtspr	HID0,r0
 
-#ifndef CONFIG_E500MC
+#if !defined(CONFIG_E500MC) && !defined(CONFIG_QEMU_E500)
 	li	r0,(HID1_ASTME|HID1_ABE)@l	/* Addr streaming & broadcast */
 	mfspr	r3,PVR
 	andi.	r3,r3, 0xff
@@ -372,9 +327,9 @@ l2_disabled:
 #endif
 
 #ifdef CONFIG_SYS_FSL_ERRATUM_CPU_A003999
-	mfspr	r3,977
+	mfspr	r3,SPRN_HDBCR1
 	oris	r3,r3,0x0100
-	mtspr	977,r3
+	mtspr	SPRN_HDBCR1,r3
 #endif
 
 	/* Enable Branch Prediction */
@@ -449,7 +404,7 @@ nexti:	mflr	r1		/* R1 = our PC */
 
 	/* Set the size of the TLB to 4KB */
 	mfspr	r3, MAS1
-	li	r2, 0xF00
+	li	r2, 0xF80
 	andc	r3, r3, r2	/* Clear the TSIZE bits */
 	ori	r3, r3, MAS1_TSIZE(BOOKE_PAGESZ_4K)@l
 	oris	r3, r3, MAS1_IPROT@h
@@ -515,7 +470,8 @@ nexti:	mflr	r1		/* R1 = our PC */
 2:	cmpw	r3, r4
 	blt	1b
 
-#if defined(CONFIG_SYS_PPC_E500_DEBUG_TLB) && !defined(MINIMAL_SPL)
+#if defined(CONFIG_SYS_PPC_E500_DEBUG_TLB) && !defined(MINIMAL_SPL) && \
+	!defined(CONFIG_SECURE_BOOT)
 /*
  * TLB entry for debuggging in AS1
  * Create temporary TLB entry in AS0 to handle debug exception
@@ -536,12 +492,6 @@ nexti:	mflr	r1		/* R1 = our PC */
 		0xffc00000, MAS3_SX|MAS3_SW|MAS3_SR, \
 		0, r6
 
-#elif !defined(CONFIG_SYS_RAMBOOT) && defined(CONFIG_SECURE_BOOT)
-	create_tlb1_entry CONFIG_SYS_PPC_E500_DEBUG_TLB, \
-		0, BOOKE_PAGESZ_1M, \
-		CONFIG_SYS_MONITOR_BASE, MAS2_I|MAS2_G, \
-		CONFIG_SYS_PBI_FLASH_WINDOW, MAS3_SX|MAS3_SW|MAS3_SR, \
-		0, r6
 #else
 /*
  * TLB entry is created for IVPR + IVOR15 to map on valid OP code address
@@ -629,7 +579,6 @@ infinite_debug_loop:
 #ifdef CONFIG_FSL_CORENET
 
 #define CCSR_LAWBARH0	(CONFIG_SYS_CCSRBAR + 0x1000)
-#define LAW_EN		0x80000000
 #define LAW_SIZE_4K	0xb
 #define CCSRBAR_LAWAR	(LAW_EN | (0x1e << 20) | LAW_SIZE_4K)
 #define CCSRAR_C	0x80000000	/* Commit */
@@ -752,7 +701,7 @@ delete_temp_tlbs:
 
 #endif /* #if (CONFIG_SYS_CCSRBAR_DEFAULT != CONFIG_SYS_CCSRBAR_PHYS) */
 
-#ifdef CONFIG_SYS_FSL_QORIQ_CHASSIS2
+#if defined(CONFIG_SYS_FSL_QORIQ_CHASSIS2) && defined(CONFIG_E6500)
 create_ccsr_l2_tlb:
 	/*
 	 * Create a TLB for the MMR location of CCSR
@@ -780,13 +729,60 @@ enable_l2_cluster_l2:
 	isync
 	and.	r1, r0, r4
 	bne	1b
-	lis	r4, L2CSR0_L2E@h
+	lis	r4, (L2CSR0_L2E|L2CSR0_L2PE)@h
+	ori	r4, r4, (L2CSR0_L2REP_MODE)@l
 	sync
-	stw	r4, 0(r3)	/* eanble L2 */
+	stw	r4, 0(r3)	/* enable L2 */
 delete_ccsr_l2_tlb:
 	delete_tlb0_entry 0, CONFIG_SYS_CCSRBAR + 0xC20000, MAS2_I|MAS2_G, r3
 #endif
 
+	/*
+	 * Enable the L1. On e6500, this has to be done
+	 * after the L2 is up.
+	 */
+
+#ifdef CONFIG_SYS_CACHE_STASHING
+	/* set stash id to (coreID) * 2 + 32 + L1 CT (0) */
+	li	r2,(32 + 0)
+	mtspr	L1CSR2,r2
+#endif
+
+	/* Enable/invalidate the I-Cache */
+	lis	r2,(L1CSR1_ICFI|L1CSR1_ICLFR)@h
+	ori	r2,r2,(L1CSR1_ICFI|L1CSR1_ICLFR)@l
+	mtspr	SPRN_L1CSR1,r2
+1:
+	mfspr	r3,SPRN_L1CSR1
+	and.	r1,r3,r2
+	bne	1b
+
+	lis	r3,(L1CSR1_CPE|L1CSR1_ICE)@h
+	ori	r3,r3,(L1CSR1_CPE|L1CSR1_ICE)@l
+	mtspr	SPRN_L1CSR1,r3
+	isync
+2:
+	mfspr	r3,SPRN_L1CSR1
+	andi.	r1,r3,L1CSR1_ICE@l
+	beq	2b
+
+	/* Enable/invalidate the D-Cache */
+	lis	r2,(L1CSR0_DCFI|L1CSR0_DCLFR)@h
+	ori	r2,r2,(L1CSR0_DCFI|L1CSR0_DCLFR)@l
+	mtspr	SPRN_L1CSR0,r2
+1:
+	mfspr	r3,SPRN_L1CSR0
+	and.	r1,r3,r2
+	bne	1b
+
+	lis	r3,(L1CSR0_CPE|L1CSR0_DCE)@h
+	ori	r3,r3,(L1CSR0_CPE|L1CSR0_DCE)@l
+	mtspr	SPRN_L1CSR0,r3
+	isync
+2:
+	mfspr	r3,SPRN_L1CSR0
+	andi.	r1,r3,L1CSR0_DCE@l
+	beq	2b
 #ifdef CONFIG_SYS_FSL_ERRATUM_A004510
 #define DCSR_LAWBARH0	(CONFIG_SYS_CCSRBAR + 0x1000)
 #define LAW_SIZE_1M	0x13
@@ -892,7 +888,11 @@ delete_ccsr_l2_tlb:
 	erratum_set_dcsr 0xb0008 0x00900000
 	erratum_set_dcsr 0xb0e40 0xe00a0000
 	erratum_set_ccsr 0x18600 CONFIG_SYS_FSL_CORENET_SNOOPVEC_COREONLY
+#ifdef  CONFIG_RAMBOOT_PBL
+	erratum_set_ccsr 0x10f00 0x495e5000
+#else
 	erratum_set_ccsr 0x10f00 0x415e5000
+#endif
 	erratum_set_ccsr 0x11f00 0x415e5000
 
 	/* Make temp mapping uncacheable again, if it was initially */
@@ -1146,6 +1146,10 @@ _start_cont:
 	mr	r1,r3		/* Transfer to SP(r1) */
 
 	GET_GOT
+
+	/* Pass our potential ePAPR device tree pointer to cpu_init_early_f */
+	mr	r3, r24
+
 	bl	cpu_init_early_f
 
 	/* switch back to AS = 0 */
@@ -1154,7 +1158,7 @@ _start_cont:
 	mtmsr	r3
 	isync
 
-	bl	cpu_init_f
+	bl	cpu_init_f	/* return boot_flag for calling board_init_f */
 	bl	board_init_f
 	isync
 
@@ -1648,6 +1652,7 @@ relocate_code:
 	mr	r10,r5		/* Save copy of Destination Address	*/
 
 	GET_GOT
+#ifndef CONFIG_SPL_SKIP_RELOCATE
 	mr	r3,r5				/* Destination Address	*/
 	lis	r4,CONFIG_SYS_MONITOR_BASE@h		/* Source      Address	*/
 	ori	r4,r4,CONFIG_SYS_MONITOR_BASE@l
@@ -1738,6 +1743,7 @@ relocate_code:
 
 	mtlr	r0
 	blr				/* NEVER RETURNS! */
+#endif
 	.globl	in_ram
 in_ram:
 
@@ -1784,7 +1790,7 @@ clear_bss:
 	 * Now clear BSS segment
 	 */
 	lwz	r3,GOT(__bss_start)
-	lwz	r4,GOT(__bss_end__)
+	lwz	r4,GOT(__bss_end)
 
 	cmplw	0,r3,r4
 	beq	6f
@@ -1794,7 +1800,7 @@ clear_bss:
 	stw	r0,0(r3)
 	addi	r3,r3,4
 	cmplw	0,r3,r4
-	bne	5b
+	blt	5b
 6:
 
 	mr	r3,r9		/* Init Data pointer		*/
@@ -1905,6 +1911,7 @@ unlock_ram_in_cache:
 	slwi	r4,r4,(10 - 1 - L1_CACHE_SHIFT)
 	mtctr	r4
 1:	dcbi	r0,r3
+	dcblc	r0,r3
 	addi	r3,r3,CONFIG_SYS_CACHELINE_SIZE
 	bdnz	1b
 	sync
@@ -1967,11 +1974,5 @@ flush_dcache:
 	mtspr	SPRN_HID0,r8
 	isync
 
-	blr
-
-.globl setup_ivors
-setup_ivors:
-
-#include "fixed_ivor.S"
 	blr
 #endif /* !MINIMAL_SPL */

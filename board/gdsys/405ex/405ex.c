@@ -11,18 +11,24 @@
 #define REFLECTION_TESTPATTERN 0xdede
 #define REFLECTION_TESTPATTERN_INV (~REFLECTION_TESTPATTERN & 0xffff)
 
+#ifdef CONFIG_SYS_FPGA_NO_RFL_HI
+#define REFLECTION_TESTREG reflection_low
+#else
+#define REFLECTION_TESTREG reflection_high
+#endif
+
 DECLARE_GLOBAL_DATA_PTR;
 
 int get_fpga_state(unsigned dev)
 {
-	return gd->fpga_state[dev];
+	return gd->arch.fpga_state[dev];
 }
 
 void print_fpga_state(unsigned dev)
 {
-	if (gd->fpga_state[dev] & FPGA_STATE_DONE_FAILED)
+	if (gd->arch.fpga_state[dev] & FPGA_STATE_DONE_FAILED)
 		puts("       Waiting for FPGA-DONE timed out.\n");
-	if (gd->fpga_state[dev] & FPGA_STATE_REFLECTION_FAILED)
+	if (gd->arch.fpga_state[dev] & FPGA_STATE_REFLECTION_FAILED)
 		puts("       FPGA reflection test failed.\n");
 }
 
@@ -192,7 +198,7 @@ int board_early_init_r(void)
 	unsigned ctr;
 
 	for (k = 0; k < CONFIG_SYS_FPGA_COUNT; ++k)
-		gd->fpga_state[k] = 0;
+		gd->arch.fpga_state[k] = 0;
 
 	/*
 	 * reset FPGA
@@ -208,7 +214,8 @@ int board_early_init_r(void)
 		while (!gd405ex_get_fpga_done(k)) {
 			udelay(100000);
 			if (ctr++ > 5) {
-				gd->fpga_state[k] |= FPGA_STATE_DONE_FAILED;
+				gd->arch.fpga_state[k] |=
+					FPGA_STATE_DONE_FAILED;
 				break;
 			}
 		}
@@ -219,28 +226,22 @@ int board_early_init_r(void)
 	gd405ex_set_fpga_reset(0);
 
 	for (k = 0; k < CONFIG_SYS_FPGA_COUNT; ++k) {
-		struct ihs_fpga *fpga =
-			(struct ihs_fpga *)CONFIG_SYS_FPGA_BASE(k);
-#ifdef CONFIG_SYS_FPGA_NO_RFL_HI
-		u16 *reflection_target = &fpga->reflection_low;
-#else
-		u16 *reflection_target = &fpga->reflection_high;
-#endif
 		/*
 		 * wait for fpga out of reset
 		 */
 		ctr = 0;
 		while (1) {
-			out_le16(&fpga->reflection_low,
-				REFLECTION_TESTPATTERN);
+			u16 val;
 
-			if (in_le16(reflection_target) ==
-				REFLECTION_TESTPATTERN_INV)
+			FPGA_SET_REG(k, reflection_low, REFLECTION_TESTPATTERN);
+
+			FPGA_GET_REG(k, REFLECTION_TESTREG, &val);
+			if (val == REFLECTION_TESTPATTERN_INV)
 				break;
 
 			udelay(100000);
 			if (ctr++ > 5) {
-				gd->fpga_state[k] |=
+				gd->arch.fpga_state[k] |=
 					FPGA_STATE_REFLECTION_FAILED;
 				break;
 			}

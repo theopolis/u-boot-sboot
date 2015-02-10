@@ -75,6 +75,7 @@
 #define CONFIG_ROOTPATH		"/romfs/brettl2"
 /* Uncomment next line to use fixed MAC address */
 /* #define CONFIG_ETHADDR	02:80:ad:20:31:e8 */
+#define CONFIG_LIB_RAND
 #endif
 
 
@@ -96,7 +97,7 @@
 #define CONFIG_ENV_IS_IN_FLASH 1
 #define CONFIG_ENV_OFFSET	0x4000
 #define CONFIG_ENV_SIZE		0x2000
-#define CONFIG_ENV_SECT_SIZE	0x10000
+#define CONFIG_ENV_SECT_SIZE	0x12000
 
 #if (CONFIG_BFIN_BOOT_MODE == BFIN_BOOT_BYPASS)
 #define ENV_IS_EMBEDDED
@@ -111,8 +112,8 @@
  * it linked after the configuration sector.
  */
 # define LDS_BOARD_TEXT \
-	arch/blackfin/lib/libblackfin.o (.text*); \
-	arch/blackfin/cpu/libblackfin.o (.text*); \
+	arch/blackfin/lib/built-in.o (.text*); \
+	arch/blackfin/cpu/built-in.o (.text*); \
 	. = DEFINED(env_offset) ? env_offset : .; \
 	common/env_embedded.o (.text*);
 #endif
@@ -121,8 +122,8 @@
 /*
  * I2C Settings
  */
-#define CONFIG_BFIN_TWI_I2C	1
-#define CONFIG_HARD_I2C		1
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_ADI
 
 
 /*
@@ -136,7 +137,6 @@
 #define CONFIG_MTD_DEVICE
 #define CONFIG_MTD_PARTITIONS
 #define CONFIG_SYS_HUSH_PARSER
-
 
 /*
  * Pull in common ADI header for remaining command/environment setup

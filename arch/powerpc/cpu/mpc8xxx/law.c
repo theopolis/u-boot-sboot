@@ -4,23 +4,7 @@
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -69,7 +53,7 @@ static inline void set_law_base_addr(int idx, phys_addr_t addr)
 
 void set_law(u8 idx, phys_addr_t addr, enum law_size sz, enum law_trgt_if id)
 {
-	gd->used_laws |= (1 << idx);
+	gd->arch.used_laws |= (1 << idx);
 
 	out_be32(LAWAR_ADDR(idx), 0);
 	set_law_base_addr(idx, addr);
@@ -81,7 +65,7 @@ void set_law(u8 idx, phys_addr_t addr, enum law_size sz, enum law_trgt_if id)
 
 void disable_law(u8 idx)
 {
-	gd->used_laws &= ~(1 << idx);
+	gd->arch.used_laws &= ~(1 << idx);
 
 	out_be32(LAWAR_ADDR(idx), 0);
 	set_law_base_addr(idx, 0);
@@ -92,7 +76,8 @@ void disable_law(u8 idx)
 	return;
 }
 
-#if !defined(CONFIG_NAND_SPL) && !defined(CONFIG_SPL_BUILD)
+#if !defined(CONFIG_NAND_SPL) && \
+	(!defined(CONFIG_SPL_BUILD) || !defined(CONFIG_SPL_INIT_MINIMAL))
 static int get_law_entry(u8 i, struct law_entry *e)
 {
 	u32 lawar;
@@ -112,7 +97,7 @@ static int get_law_entry(u8 i, struct law_entry *e)
 
 int set_next_law(phys_addr_t addr, enum law_size sz, enum law_trgt_if id)
 {
-	u32 idx = ffz(gd->used_laws);
+	u32 idx = ffz(gd->arch.used_laws);
 
 	if (idx >= FSL_HW_NUM_LAWS)
 		return -1;
@@ -122,17 +107,18 @@ int set_next_law(phys_addr_t addr, enum law_size sz, enum law_trgt_if id)
 	return idx;
 }
 
-#if !defined(CONFIG_NAND_SPL) && !defined(CONFIG_SPL_BUILD)
+#if !defined(CONFIG_NAND_SPL) && \
+	(!defined(CONFIG_SPL_BUILD) || !defined(CONFIG_SPL_INIT_MINIMAL))
 int set_last_law(phys_addr_t addr, enum law_size sz, enum law_trgt_if id)
 {
 	u32 idx;
 
 	/* we have no LAWs free */
-	if (gd->used_laws == -1)
+	if (gd->arch.used_laws == -1)
 		return -1;
 
 	/* grab the last free law */
-	idx = __ilog2(~(gd->used_laws));
+	idx = __ilog2(~(gd->arch.used_laws));
 
 	if (idx >= FSL_HW_NUM_LAWS)
 		return -1;
@@ -235,16 +221,59 @@ int set_ddr_laws(u64 start, u64 sz, enum law_trgt_if id)
 }
 #endif /* not SPL */
 
+void disable_non_ddr_laws(void)
+{
+	int i;
+	int id;
+	for (i = 0; i < FSL_HW_NUM_LAWS; i++) {
+		u32 lawar = in_be32(LAWAR_ADDR(i));
+
+		if (lawar & LAW_EN) {
+			id = (lawar & ~LAW_EN) >> 20;
+			switch (id) {
+			case LAW_TRGT_IF_DDR_1:
+			case LAW_TRGT_IF_DDR_2:
+			case LAW_TRGT_IF_DDR_3:
+			case LAW_TRGT_IF_DDR_4:
+			case LAW_TRGT_IF_DDR_INTRLV:
+			case LAW_TRGT_IF_DDR_INTLV_34:
+			case LAW_TRGT_IF_DDR_INTLV_123:
+			case LAW_TRGT_IF_DDR_INTLV_1234:
+						continue;
+			default:
+						disable_law(i);
+			}
+		}
+	}
+}
+
 void init_laws(void)
 {
 	int i;
 
 #if FSL_HW_NUM_LAWS < 32
-	gd->used_laws = ~((1 << FSL_HW_NUM_LAWS) - 1);
+	gd->arch.used_laws = ~((1 << FSL_HW_NUM_LAWS) - 1);
 #elif FSL_HW_NUM_LAWS == 32
-	gd->used_laws = 0;
+	gd->arch.used_laws = 0;
 #else
 #error FSL_HW_NUM_LAWS can not be greater than 32 w/o code changes
+#endif
+
+#if defined(CONFIG_SECURE_BOOT) && defined(CONFIG_E500) && \
+						!defined(CONFIG_E500MC)
+	/* ISBC (Boot ROM) creates a LAW 0 entry for non PBL platforms,
+	 * which is not disabled before transferring the control to uboot.
+	 * Disable the LAW 0 entry here.
+	 */
+	disable_law(0);
+#endif
+
+#if !defined(CONFIG_SECURE_BOOT)
+	/*
+	 * if any non DDR LAWs has been created earlier, remove them before
+	 * LAW table is parsed.
+	*/
+	disable_non_ddr_laws();
 #endif
 
 	/*
@@ -255,17 +284,8 @@ void init_laws(void)
 		u32 lawar = in_be32(LAWAR_ADDR(i));
 
 		if (lawar & LAW_EN)
-			gd->used_laws |= (1 << i);
+			gd->arch.used_laws |= (1 << i);
 	}
-
-#if (defined(CONFIG_NAND_U_BOOT) && !defined(CONFIG_NAND_SPL)) || \
-	(defined(CONFIG_SPL) && !defined(CONFIG_SPL_BUILD))
-	/*
-	 * in SPL boot we've already parsed the law_table and setup those LAWs
-	 * so don't do it again.
-	 */
-	return;
-#endif
 
 	for (i = 0; i < num_law_entries; i++) {
 		if (law_table[i].index == -1)

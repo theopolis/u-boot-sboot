@@ -1,35 +1,23 @@
 /*
  * Copyright (c) 2011-2012 The Chromium OS Authors.
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <os.h>
+#include <cli.h>
+#include <malloc.h>
 #include <asm/getopt.h>
+#include <asm/io.h>
 #include <asm/sections.h>
 #include <asm/state.h>
 
-#include <os.h>
+DECLARE_GLOBAL_DATA_PTR;
 
 int sandbox_early_getopt_check(void)
 {
 	struct sandbox_state *state = state_get_current();
-	struct sb_cmdline_option **sb_opt = __u_boot_sandbox_option_start;
+	struct sandbox_cmdline_option **sb_opt = __u_boot_sandbox_option_start;
 	size_t num_options = __u_boot_sandbox_option_count();
 	size_t i;
 	int max_arg_len, max_noarg_len;
@@ -52,11 +40,11 @@ int sandbox_early_getopt_check(void)
 
 	max_arg_len = 0;
 	for (i = 0; i < num_options; ++i)
-		max_arg_len = max(strlen(sb_opt[i]->flag), max_arg_len);
+		max_arg_len = max((int)strlen(sb_opt[i]->flag), max_arg_len);
 	max_noarg_len = max_arg_len + 7;
 
 	for (i = 0; i < num_options; ++i) {
-		struct sb_cmdline_option *opt = sb_opt[i];
+		struct sandbox_cmdline_option *opt = sb_opt[i];
 
 		/* first output the short flag if it has one */
 		if (opt->flag_short >= 0x100)
@@ -66,9 +54,9 @@ int sandbox_early_getopt_check(void)
 
 		/* then the long flag */
 		if (opt->has_arg)
-			printf("--%-*s", max_noarg_len, opt->flag);
-		else
 			printf("--%-*s <arg> ", max_arg_len, opt->flag);
+		else
+			printf("--%-*s", max_noarg_len, opt->flag);
 
 		/* finally the help text */
 		printf("  %s\n", opt->help);
@@ -77,12 +65,12 @@ int sandbox_early_getopt_check(void)
 	os_exit(0);
 }
 
-static int sb_cmdline_cb_help(struct sandbox_state *state, const char *arg)
+static int sandbox_cmdline_cb_help(struct sandbox_state *state, const char *arg)
 {
 	/* just flag to sandbox_early_getopt_check to show usage */
 	return 1;
 }
-SB_CMDLINE_OPT_SHORT(help, 'h', 0, "Display help");
+SANDBOX_CMDLINE_OPT_SHORT(help, 'h', 0, "Display help");
 
 int sandbox_main_loop_init(void)
 {
@@ -90,36 +78,205 @@ int sandbox_main_loop_init(void)
 
 	/* Execute command if required */
 	if (state->cmd) {
-		run_command(state->cmd, 0);
-		os_exit(state->exit_type);
+		cli_init();
+
+		run_command_list(state->cmd, -1, 0);
+		if (!state->interactive)
+			os_exit(state->exit_type);
 	}
 
 	return 0;
 }
 
-static int sb_cmdline_cb_command(struct sandbox_state *state, const char *arg)
+static int sandbox_cmdline_cb_command(struct sandbox_state *state,
+				      const char *arg)
 {
 	state->cmd = arg;
 	return 0;
 }
-SB_CMDLINE_OPT_SHORT(command, 'c', 1, "Execute U-Boot command");
+SANDBOX_CMDLINE_OPT_SHORT(command, 'c', 1, "Execute U-Boot command");
+
+static int sandbox_cmdline_cb_fdt(struct sandbox_state *state, const char *arg)
+{
+	state->fdt_fname = arg;
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(fdt, 'd', 1, "Specify U-Boot's control FDT");
+
+static int sandbox_cmdline_cb_default_fdt(struct sandbox_state *state,
+					  const char *arg)
+{
+	const char *fmt = "%s.dtb";
+	char *fname;
+	int len;
+
+	len = strlen(state->argv[0]) + strlen(fmt) + 1;
+	fname = os_malloc(len);
+	if (!fname)
+		return -ENOMEM;
+	snprintf(fname, len, fmt, state->argv[0]);
+	state->fdt_fname = fname;
+
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(default_fdt, 'D', 0,
+		"Use the default u-boot.dtb control FDT in U-Boot directory");
+
+static int sandbox_cmdline_cb_interactive(struct sandbox_state *state,
+					  const char *arg)
+{
+	state->interactive = true;
+	return 0;
+}
+
+SANDBOX_CMDLINE_OPT_SHORT(interactive, 'i', 0, "Enter interactive mode");
+
+static int sandbox_cmdline_cb_jump(struct sandbox_state *state,
+				   const char *arg)
+{
+	/* Remember to delete this U-Boot image later */
+	state->jumped_fname = arg;
+
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(jump, 'j', 1, "Jumped from previous U-Boot");
+
+static int sandbox_cmdline_cb_memory(struct sandbox_state *state,
+				     const char *arg)
+{
+	int err;
+
+	/* For now assume we always want to write it */
+	state->write_ram_buf = true;
+	state->ram_buf_fname = arg;
+
+	err = os_read_ram_buf(arg);
+	if (err) {
+		printf("Failed to read RAM buffer\n");
+		return err;
+	}
+
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(memory, 'm', 1,
+			  "Read/write ram_buf memory contents from file");
+
+static int sandbox_cmdline_cb_rm_memory(struct sandbox_state *state,
+					const char *arg)
+{
+	state->ram_buf_rm = true;
+
+	return 0;
+}
+SANDBOX_CMDLINE_OPT(rm_memory, 0, "Remove memory file after reading");
+
+static int sandbox_cmdline_cb_state(struct sandbox_state *state,
+				    const char *arg)
+{
+	state->state_fname = arg;
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(state, 's', 1, "Specify the sandbox state FDT");
+
+static int sandbox_cmdline_cb_read(struct sandbox_state *state,
+				   const char *arg)
+{
+	state->read_state = true;
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(read, 'r', 0, "Read the state FDT on startup");
+
+static int sandbox_cmdline_cb_write(struct sandbox_state *state,
+				    const char *arg)
+{
+	state->write_state = true;
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(write, 'w', 0, "Write state FDT on exit");
+
+static int sandbox_cmdline_cb_ignore_missing(struct sandbox_state *state,
+					     const char *arg)
+{
+	state->ignore_missing_state_on_read = true;
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(ignore_missing, 'n', 0,
+			  "Ignore missing state on read");
+
+static int sandbox_cmdline_cb_show_lcd(struct sandbox_state *state,
+				       const char *arg)
+{
+	state->show_lcd = true;
+	return 0;
+}
+SANDBOX_CMDLINE_OPT_SHORT(show_lcd, 'l', 0,
+			  "Show the sandbox LCD display");
+
+static const char *term_args[STATE_TERM_COUNT] = {
+	"raw-with-sigs",
+	"raw",
+	"cooked",
+};
+
+static int sandbox_cmdline_cb_terminal(struct sandbox_state *state,
+				       const char *arg)
+{
+	int i;
+
+	for (i = 0; i < STATE_TERM_COUNT; i++) {
+		if (!strcmp(arg, term_args[i])) {
+			state->term_raw = i;
+			return 0;
+		}
+	}
+
+	printf("Unknown terminal setting '%s' (", arg);
+	for (i = 0; i < STATE_TERM_COUNT; i++)
+		printf("%s%s", i ? ", " : "", term_args[i]);
+	puts(")\n");
+
+	return 1;
+}
+SANDBOX_CMDLINE_OPT_SHORT(terminal, 't', 1,
+			  "Set terminal to raw/cooked mode");
 
 int main(int argc, char *argv[])
 {
 	struct sandbox_state *state;
-	int err;
+	gd_t data;
+	int ret;
 
-	err = state_init();
-	if (err)
-		return err;
+	ret = state_init();
+	if (ret)
+		goto err;
 
 	state = state_get_current();
 	if (os_parse_args(state, argc, argv))
 		return 1;
 
-	/*
-	 * Do pre- and post-relocation init, then start up U-Boot. This will
-	 * never return.
-	 */
+	ret = sandbox_read_state(state, state->state_fname);
+	if (ret)
+		goto err;
+
+	/* Remove old memory file if required */
+	if (state->ram_buf_rm && state->ram_buf_fname)
+		os_unlink(state->ram_buf_fname);
+
+	memset(&data, '\0', sizeof(data));
+	gd = &data;
+#ifdef CONFIG_SYS_MALLOC_F_LEN
+	gd->malloc_base = CONFIG_MALLOC_F_ADDR;
+#endif
+
+	/* Do pre- and post-relocation init */
 	board_init_f(0);
+
+	board_init_r(gd->new_gd, 0);
+
+	/* NOTREACHED - board_init_r() does not return */
+	return 0;
+
+err:
+	printf("Error %d\n", ret);
+	return 1;
 }

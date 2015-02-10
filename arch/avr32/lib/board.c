@@ -1,23 +1,7 @@
 /*
  * Copyright (C) 2004-2006 Atmel Corporation
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <command.h>
@@ -81,8 +65,8 @@ static void dma_alloc_init(void)
 	printf("DMA: Using memory from 0x%08lx to 0x%08lx\n",
 	       dma_alloc_start, dma_alloc_end);
 
-	dcache_invalidate_range(cached(dma_alloc_start),
-				dma_alloc_end - dma_alloc_start);
+	invalidate_dcache_range((unsigned long)cached(dma_alloc_start),
+				dma_alloc_end);
 }
 
 void *dma_alloc_coherent(size_t len, unsigned long *handle)
@@ -116,13 +100,8 @@ static int display_banner (void)
 	printf ("\n\n%s\n\n", version_string);
 	printf ("U-Boot code: %08lx -> %08lx  data: %08lx -> %08lx\n",
 		(unsigned long)_text, (unsigned long)_etext,
-		(unsigned long)_data, (unsigned long)__bss_end__);
+		(unsigned long)_data, (unsigned long)(&__bss_end));
 	return 0;
-}
-
-void hang(void)
-{
-	for (;;) ;
 }
 
 static int display_dram_config (void)
@@ -188,7 +167,7 @@ void board_init_f(ulong board_type)
 	 *  - stack
 	 */
 	addr = CONFIG_SYS_SDRAM_BASE + sdram_size;
-	monitor_len = __bss_end__ - _text;
+	monitor_len = (char *)(&__bss_end) - _text;
 
 	/*
 	 * Reserve memory for u-boot code, data and bss.
@@ -211,11 +190,11 @@ void board_init_f(ulong board_type)
 #ifdef CONFIG_FB_ADDR
 	printf("LCD: Frame buffer allocated at preset 0x%08x\n",
 	       CONFIG_FB_ADDR);
-	gd->fb_base = (void *)CONFIG_FB_ADDR;
+	gd->fb_base = CONFIG_FB_ADDR;
 #else
 	addr = lcd_setmem(addr);
 	printf("LCD: Frame buffer allocated at 0x%08lx\n", addr);
-	gd->fb_base = (void *)addr;
+	gd->fb_base = addr;
 #endif /* CONFIG_FB_ADDR */
 #endif /* CONFIG_LCD */
 
@@ -231,7 +210,7 @@ void board_init_f(ulong board_type)
 
 	/* And finally, a new, bigger stack. */
 	new_sp = (unsigned long *)addr;
-	gd->stack_end = addr;
+	gd->arch.stack_end = addr;
 	*(--new_sp) = 0;
 	*(--new_sp) = 0;
 
@@ -241,7 +220,6 @@ void board_init_f(ulong board_type)
 	 */
 	bd->bi_dram[0].start = CONFIG_SYS_SDRAM_BASE;
 	bd->bi_dram[0].size = sdram_size;
-	bd->bi_baudrate = gd->baudrate;
 
 	memcpy(new_gd, gd, sizeof(gd_t));
 
@@ -286,7 +264,6 @@ void board_init_r(gd_t *new_gd, ulong dest_addr)
 	/* The malloc area is right below the monitor image in RAM */
 	mem_malloc_init(CONFIG_SYS_MONITOR_BASE + gd->reloc_off -
 			CONFIG_SYS_MALLOC_LEN, CONFIG_SYS_MALLOC_LEN);
-	malloc_bin_reloc();
 	dma_alloc_init();
 
 	enable_interrupts();

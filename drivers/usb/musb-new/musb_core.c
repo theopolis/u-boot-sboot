@@ -89,7 +89,6 @@
  * Most of the conditional compilation will (someday) vanish.
  */
 
-#define __UBOOT__
 #ifndef __UBOOT__
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -1309,9 +1308,7 @@ static int __devinit ep_config_from_table(struct musb *musb)
 		break;
 	}
 
-	printk(KERN_DEBUG "%s: setup fifo_mode %d\n",
-			musb_driver_name, fifo_mode);
-
+	pr_debug("%s: setup fifo_mode %d\n", musb_driver_name, fifo_mode);
 
 done:
 	offset = fifo_setup(musb, hw_ep, &ep0_cfg, 0);
@@ -1339,10 +1336,9 @@ done:
 		musb->nr_endpoints = max(epn, musb->nr_endpoints);
 	}
 
-	printk(KERN_DEBUG "%s: %d/%d max ep, %d/%d memory\n",
-			musb_driver_name,
-			n + 1, musb->config->num_eps * 2 - 1,
-			offset, (1 << (musb->config->ram_bits + 2)));
+	pr_debug("%s: %d/%d max ep, %d/%d memory\n", musb_driver_name, n + 1,
+		 musb->config->num_eps * 2 - 1, offset,
+		 (1 << (musb->config->ram_bits + 2)));
 
 	if (!musb->bulk_ep) {
 		pr_debug("%s: missing bulk\n", musb_driver_name);
@@ -1421,6 +1417,7 @@ static int __devinit musb_core_init(u16 musb_type, struct musb *musb)
 		strcat(aInfo, ", dyn FIFOs");
 		musb->dyn_fifo = true;
 	}
+#ifndef CONFIG_MUSB_DISABLE_BULK_COMBINE_SPLIT
 	if (reg & MUSB_CONFIGDATA_MPRXE) {
 		strcat(aInfo, ", bulk combine");
 		musb->bulk_combine = true;
@@ -1429,6 +1426,10 @@ static int __devinit musb_core_init(u16 musb_type, struct musb *musb)
 		strcat(aInfo, ", bulk split");
 		musb->bulk_split = true;
 	}
+#else
+	musb->bulk_combine = false;
+	musb->bulk_split = false;
+#endif
 	if (reg & MUSB_CONFIGDATA_HBRXE) {
 		strcat(aInfo, ", HB-ISO Rx");
 		musb->hb_iso_rx = true;
@@ -1440,8 +1441,7 @@ static int __devinit musb_core_init(u16 musb_type, struct musb *musb)
 	if (reg & MUSB_CONFIGDATA_SOFTCONE)
 		strcat(aInfo, ", SoftConn");
 
-	printk(KERN_DEBUG "%s: ConfigData=0x%02x (%s)\n",
-			musb_driver_name, reg, aInfo);
+	pr_debug("%s:ConfigData=0x%02x (%s)\n", musb_driver_name, reg, aInfo);
 
 	aDate[0] = 0;
 	if (MUSB_CONTROLLER_MHDRC == musb_type) {
@@ -1462,8 +1462,8 @@ static int __devinit musb_core_init(u16 musb_type, struct musb *musb)
 	snprintf(aRevision, 32, "%d.%d%s", MUSB_HWVERS_MAJOR(musb->hwvers),
 		MUSB_HWVERS_MINOR(musb->hwvers),
 		(musb->hwvers & MUSB_HWVERS_RC) ? "RC" : "");
-	printk(KERN_DEBUG "%s: %sHDRC RTL version %s %s\n",
-			musb_driver_name, type, aRevision, aDate);
+	pr_debug("%s: %sHDRC RTL version %s %s\n", musb_driver_name, type,
+		 aRevision, aDate);
 
 	/* configure ep0 */
 	musb_configure_ep0(musb);
@@ -2115,7 +2115,7 @@ musb_init_controller(struct musb_hdrc_platform_data *plat, struct device *dev,
 
 	pm_runtime_put(musb->controller);
 
-	dev_info(dev, "USB %s mode controller at %p using %s, IRQ %d\n",
+	pr_debug("USB %s mode controller at %p using %s, IRQ %d\n",
 			({char *s;
 			 switch (musb->board_mode) {
 			 case MUSB_HOST:		s = "Host"; break;

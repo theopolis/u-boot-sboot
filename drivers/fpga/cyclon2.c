@@ -3,24 +3,7 @@
  * Heiko Schocher, hs@denx.de
  * Based on ACE1XK.c
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>		/* core U-Boot definitions */
@@ -144,9 +127,9 @@ static int CYC2_ps_load(Altera_desc *desc, const void *buf, size_t bsize)
 		}
 
 		/* Establish the initial state */
-		(*fn->config) (FALSE, TRUE, cookie);	/* De-assert nCONFIG */
+		(*fn->config) (false, true, cookie);	/* De-assert nCONFIG */
 		udelay(100);
-		(*fn->config) (TRUE, TRUE, cookie);	/* Assert nCONFIG */
+		(*fn->config) (true, true, cookie);	/* Assert nCONFIG */
 
 		udelay(2);		/* T_cfg > 2us	*/
 
@@ -164,7 +147,7 @@ static int CYC2_ps_load(Altera_desc *desc, const void *buf, size_t bsize)
 		/* Get ready for the burn */
 		CONFIG_FPGA_DELAY ();
 
-		ret = (*fn->write) (buf, bsize, TRUE, cookie);
+		ret = (*fn->write) (buf, bsize, true, cookie);
 		if (ret) {
 			puts ("** Write failed.\n");
 			(*fn->abort) (cookie);

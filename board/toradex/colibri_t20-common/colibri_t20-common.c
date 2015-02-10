@@ -1,16 +1,7 @@
 /*
  *  Copyright (C) 2012 Lucas Stach
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -27,12 +18,12 @@ void colibri_t20_common_pin_mux_usb(void)
 	/* module internal USB bus to connect ethernet chipset */
 	funcmux_select(PERIPH_ID_USB2, FUNCMUX_USB2_ULPI);
 	/* ULPI reference clock output */
-	pinmux_set_func(PINGRP_CDEV2, PMUX_FUNC_PLLP_OUT4);
-	pinmux_tristate_disable(PINGRP_CDEV2);
+	pinmux_set_func(PMUX_PINGRP_CDEV2, PMUX_FUNC_PLLP_OUT4);
+	pinmux_tristate_disable(PMUX_PINGRP_CDEV2);
 	/* PHY reset GPIO */
-	pinmux_tristate_disable(PINGRP_UAC);
+	pinmux_tristate_disable(PMUX_PINGRP_UAC);
 	/* VBus GPIO */
-	pinmux_tristate_disable(PINGRP_DTE);
+	pinmux_tristate_disable(PMUX_PINGRP_DTE);
 }
 #endif
 

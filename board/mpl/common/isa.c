@@ -2,24 +2,7 @@
  * (C) Copyright 2001
  * Denis Peter, MPL AG Switzerland
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * TODO: clean-up
  */
@@ -39,13 +22,6 @@
 #define	PRINTF(fmt,args...)	printf (fmt ,##args)
 #else
 #define PRINTF(fmt,args...)
-#endif
-
-#ifndef	TRUE
-#define TRUE            1
-#endif
-#ifndef FALSE
-#define FALSE           0
 #endif
 
 #if defined(CONFIG_PIP405)
@@ -116,9 +92,9 @@ unsigned char open_cfg_super_IO(int address)
 	out8(CONFIG_SYS_ISA_IO_BASE_ADDRESS | address,0x55); /* open config */
 	out8(CONFIG_SYS_ISA_IO_BASE_ADDRESS | address,0x20); /* set address to DEV ID */
 	if(in8(CONFIG_SYS_ISA_IO_BASE_ADDRESS | address | 0x1)==0x40) /* ok Device ID is correct */
-		return TRUE;
+		return true;
 	else
-		return FALSE;
+		return false;
 }
 
 void close_cfg_super_IO(int address)
@@ -179,7 +155,7 @@ void isa_sio_loadtable(void)
 
 void isa_sio_setup(void)
 {
-	if(open_cfg_super_IO(SIO_CFG_PORT)==TRUE)
+	if (open_cfg_super_IO(SIO_CFG_PORT) == true)
 	{
 		isa_sio_loadtable();
 		close_cfg_super_IO(0x3F0);

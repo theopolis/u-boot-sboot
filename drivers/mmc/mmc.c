@@ -4,56 +4,52 @@
  *
  * Based vaguely on the Linux code
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
 #include <common.h>
 #include <command.h>
+#include <errno.h>
 #include <mmc.h>
 #include <part.h>
 #include <malloc.h>
 #include <linux/list.h>
 #include <div64.h>
-
-/* Set block count limit because of 16 bit register limit on some hardware*/
-#ifndef CONFIG_SYS_MMC_MAX_BLK_COUNT
-#define CONFIG_SYS_MMC_MAX_BLK_COUNT 65535
-#endif
+#include "mmc_private.h"
 
 static struct list_head mmc_devices;
 static int cur_dev_num = -1;
 
-int __board_mmc_getcd(struct mmc *mmc) {
+__weak int board_mmc_getwp(struct mmc *mmc)
+{
 	return -1;
 }
 
-int board_mmc_getcd(struct mmc *mmc)__attribute__((weak,
-	alias("__board_mmc_getcd")));
-
-static int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
-			struct mmc_data *data)
+int mmc_getwp(struct mmc *mmc)
 {
-	struct mmc_data backup;
-	int ret;
+	int wp;
 
-	memset(&backup, 0, sizeof(backup));
+	wp = board_mmc_getwp(mmc);
+
+	if (wp < 0) {
+		if (mmc->cfg->ops->getwp)
+			wp = mmc->cfg->ops->getwp(mmc);
+		else
+			wp = 0;
+	}
+
+	return wp;
+}
+
+__weak int board_mmc_getcd(struct mmc *mmc)
+{
+	return -1;
+}
+
+int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
+{
+	int ret;
 
 #ifdef CONFIG_MMC_TRACE
 	int i;
@@ -61,7 +57,7 @@ static int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 
 	printf("CMD_SEND:%d\n", cmd->cmdidx);
 	printf("\t\tARG\t\t\t 0x%08X\n", cmd->cmdarg);
-	ret = mmc->send_cmd(mmc, cmd, data);
+	ret = mmc->cfg->ops->send_cmd(mmc, cmd, data);
 	switch (cmd->resp_type) {
 		case MMC_RSP_NONE:
 			printf("\t\tMMC_RSP_NONE\n");
@@ -104,12 +100,12 @@ static int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 			break;
 	}
 #else
-	ret = mmc->send_cmd(mmc, cmd, data);
+	ret = mmc->cfg->ops->send_cmd(mmc, cmd, data);
 #endif
 	return ret;
 }
 
-static int mmc_send_status(struct mmc *mmc, int timeout)
+int mmc_send_status(struct mmc *mmc, int timeout)
 {
 	struct mmc_cmd cmd;
 	int err, retries = 5;
@@ -130,8 +126,10 @@ static int mmc_send_status(struct mmc *mmc, int timeout)
 			     MMC_STATE_PRG)
 				break;
 			else if (cmd.response[0] & MMC_STATUS_MASK) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 				printf("Status Error: 0x%08X\n",
 					cmd.response[0]);
+#endif
 				return COMM_ERR;
 			}
 		} else if (--retries < 0)
@@ -146,16 +144,23 @@ static int mmc_send_status(struct mmc *mmc, int timeout)
 	printf("CURR STATE:%d\n", status);
 #endif
 	if (timeout <= 0) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 		printf("Timeout waiting card ready\n");
+#endif
 		return TIMEOUT;
 	}
+	if (cmd.response[0] & MMC_STATUS_SWITCH_ERROR)
+		return SWITCH_ERR;
 
 	return 0;
 }
 
-static int mmc_set_blocklen(struct mmc *mmc, int len)
+int mmc_set_blocklen(struct mmc *mmc, int len)
 {
 	struct mmc_cmd cmd;
+
+	if (mmc->ddr_mode)
+		return 0;
 
 	cmd.cmdidx = MMC_CMD_SET_BLOCKLEN;
 	cmd.resp_type = MMC_RSP_R1;
@@ -176,177 +181,14 @@ struct mmc *find_mmc_device(int dev_num)
 			return m;
 	}
 
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 	printf("MMC Device %d not found\n", dev_num);
+#endif
 
 	return NULL;
 }
 
-static ulong mmc_erase_t(struct mmc *mmc, ulong start, lbaint_t blkcnt)
-{
-	struct mmc_cmd cmd;
-	ulong end;
-	int err, start_cmd, end_cmd;
-
-	if (mmc->high_capacity)
-		end = start + blkcnt - 1;
-	else {
-		end = (start + blkcnt - 1) * mmc->write_bl_len;
-		start *= mmc->write_bl_len;
-	}
-
-	if (IS_SD(mmc)) {
-		start_cmd = SD_CMD_ERASE_WR_BLK_START;
-		end_cmd = SD_CMD_ERASE_WR_BLK_END;
-	} else {
-		start_cmd = MMC_CMD_ERASE_GROUP_START;
-		end_cmd = MMC_CMD_ERASE_GROUP_END;
-	}
-
-	cmd.cmdidx = start_cmd;
-	cmd.cmdarg = start;
-	cmd.resp_type = MMC_RSP_R1;
-
-	err = mmc_send_cmd(mmc, &cmd, NULL);
-	if (err)
-		goto err_out;
-
-	cmd.cmdidx = end_cmd;
-	cmd.cmdarg = end;
-
-	err = mmc_send_cmd(mmc, &cmd, NULL);
-	if (err)
-		goto err_out;
-
-	cmd.cmdidx = MMC_CMD_ERASE;
-	cmd.cmdarg = SECURE_ERASE;
-	cmd.resp_type = MMC_RSP_R1b;
-
-	err = mmc_send_cmd(mmc, &cmd, NULL);
-	if (err)
-		goto err_out;
-
-	return 0;
-
-err_out:
-	puts("mmc erase failed\n");
-	return err;
-}
-
-static unsigned long
-mmc_berase(int dev_num, unsigned long start, lbaint_t blkcnt)
-{
-	int err = 0;
-	struct mmc *mmc = find_mmc_device(dev_num);
-	lbaint_t blk = 0, blk_r = 0;
-	int timeout = 1000;
-
-	if (!mmc)
-		return -1;
-
-	if ((start % mmc->erase_grp_size) || (blkcnt % mmc->erase_grp_size))
-		printf("\n\nCaution! Your devices Erase group is 0x%x\n"
-			"The erase range would be change to 0x%lx~0x%lx\n\n",
-		       mmc->erase_grp_size, start & ~(mmc->erase_grp_size - 1),
-		       ((start + blkcnt + mmc->erase_grp_size)
-		       & ~(mmc->erase_grp_size - 1)) - 1);
-
-	while (blk < blkcnt) {
-		blk_r = ((blkcnt - blk) > mmc->erase_grp_size) ?
-			mmc->erase_grp_size : (blkcnt - blk);
-		err = mmc_erase_t(mmc, start + blk, blk_r);
-		if (err)
-			break;
-
-		blk += blk_r;
-
-		/* Waiting for the ready status */
-		if (mmc_send_status(mmc, timeout))
-			return 0;
-	}
-
-	return blk;
-}
-
-static ulong
-mmc_write_blocks(struct mmc *mmc, ulong start, lbaint_t blkcnt, const void*src)
-{
-	struct mmc_cmd cmd;
-	struct mmc_data data;
-	int timeout = 1000;
-
-	if ((start + blkcnt) > mmc->block_dev.lba) {
-		printf("MMC: block number 0x%lx exceeds max(0x%lx)\n",
-			start + blkcnt, mmc->block_dev.lba);
-		return 0;
-	}
-
-	if (blkcnt > 1)
-		cmd.cmdidx = MMC_CMD_WRITE_MULTIPLE_BLOCK;
-	else
-		cmd.cmdidx = MMC_CMD_WRITE_SINGLE_BLOCK;
-
-	if (mmc->high_capacity)
-		cmd.cmdarg = start;
-	else
-		cmd.cmdarg = start * mmc->write_bl_len;
-
-	cmd.resp_type = MMC_RSP_R1;
-
-	data.src = src;
-	data.blocks = blkcnt;
-	data.blocksize = mmc->write_bl_len;
-	data.flags = MMC_DATA_WRITE;
-
-	if (mmc_send_cmd(mmc, &cmd, &data)) {
-		printf("mmc write failed\n");
-		return 0;
-	}
-
-	/* SPI multiblock writes terminate using a special
-	 * token, not a STOP_TRANSMISSION request.
-	 */
-	if (!mmc_host_is_spi(mmc) && blkcnt > 1) {
-		cmd.cmdidx = MMC_CMD_STOP_TRANSMISSION;
-		cmd.cmdarg = 0;
-		cmd.resp_type = MMC_RSP_R1b;
-		if (mmc_send_cmd(mmc, &cmd, NULL)) {
-			printf("mmc fail to send stop cmd\n");
-			return 0;
-		}
-	}
-
-	/* Waiting for the ready status */
-	if (mmc_send_status(mmc, timeout))
-		return 0;
-
-	return blkcnt;
-}
-
-static ulong
-mmc_bwrite(int dev_num, ulong start, lbaint_t blkcnt, const void*src)
-{
-	lbaint_t cur, blocks_todo = blkcnt;
-
-	struct mmc *mmc = find_mmc_device(dev_num);
-	if (!mmc)
-		return 0;
-
-	if (mmc_set_blocklen(mmc, mmc->write_bl_len))
-		return 0;
-
-	do {
-		cur = (blocks_todo > mmc->b_max) ?  mmc->b_max : blocks_todo;
-		if(mmc_write_blocks(mmc, start, cur, src) != cur)
-			return 0;
-		blocks_todo -= cur;
-		start += cur;
-		src += cur * mmc->write_bl_len;
-	} while (blocks_todo > 0);
-
-	return blkcnt;
-}
-
-static int mmc_read_blocks(struct mmc *mmc, void *dst, ulong start,
+static int mmc_read_blocks(struct mmc *mmc, void *dst, lbaint_t start,
 			   lbaint_t blkcnt)
 {
 	struct mmc_cmd cmd;
@@ -377,7 +219,9 @@ static int mmc_read_blocks(struct mmc *mmc, void *dst, ulong start,
 		cmd.cmdarg = 0;
 		cmd.resp_type = MMC_RSP_R1b;
 		if (mmc_send_cmd(mmc, &cmd, NULL)) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 			printf("mmc fail to send stop cmd\n");
+#endif
 			return 0;
 		}
 	}
@@ -385,7 +229,7 @@ static int mmc_read_blocks(struct mmc *mmc, void *dst, ulong start,
 	return blkcnt;
 }
 
-static ulong mmc_bread(int dev_num, ulong start, lbaint_t blkcnt, void *dst)
+static ulong mmc_bread(int dev_num, lbaint_t start, lbaint_t blkcnt, void *dst)
 {
 	lbaint_t cur, blocks_todo = blkcnt;
 
@@ -397,8 +241,10 @@ static ulong mmc_bread(int dev_num, ulong start, lbaint_t blkcnt, void *dst)
 		return 0;
 
 	if ((start + blkcnt) > mmc->block_dev.lba) {
-		printf("MMC: block number 0x%lx exceeds max(0x%lx)\n",
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+		printf("MMC: block number 0x" LBAF " exceeds max(0x" LBAF ")\n",
 			start + blkcnt, mmc->block_dev.lba);
+#endif
 		return 0;
 	}
 
@@ -406,7 +252,8 @@ static ulong mmc_bread(int dev_num, ulong start, lbaint_t blkcnt, void *dst)
 		return 0;
 
 	do {
-		cur = (blocks_todo > mmc->b_max) ?  mmc->b_max : blocks_todo;
+		cur = (blocks_todo > mmc->cfg->b_max) ?
+			mmc->cfg->b_max : blocks_todo;
 		if(mmc_read_blocks(mmc, dst, start, cur) != cur)
 			return 0;
 		blocks_todo -= cur;
@@ -465,7 +312,7 @@ static int sd_send_op_cond(struct mmc *mmc)
 		 * specified.
 		 */
 		cmd.cmdarg = mmc_host_is_spi(mmc) ? 0 :
-			(mmc->voltages & 0xff8000);
+			(mmc->cfg->voltages & 0xff8000);
 
 		if (mmc->version == SD_VERSION_2)
 			cmd.cmdarg |= OCR_HCS;
@@ -503,48 +350,70 @@ static int sd_send_op_cond(struct mmc *mmc)
 	return 0;
 }
 
+/* We pass in the cmd since otherwise the init seems to fail */
+static int mmc_send_op_cond_iter(struct mmc *mmc, struct mmc_cmd *cmd,
+		int use_arg)
+{
+	int err;
+
+	cmd->cmdidx = MMC_CMD_SEND_OP_COND;
+	cmd->resp_type = MMC_RSP_R3;
+	cmd->cmdarg = 0;
+	if (use_arg && !mmc_host_is_spi(mmc)) {
+		cmd->cmdarg =
+			(mmc->cfg->voltages &
+			(mmc->op_cond_response & OCR_VOLTAGE_MASK)) |
+			(mmc->op_cond_response & OCR_ACCESS_MODE);
+
+		if (mmc->cfg->host_caps & MMC_MODE_HC)
+			cmd->cmdarg |= OCR_HCS;
+	}
+	err = mmc_send_cmd(mmc, cmd, NULL);
+	if (err)
+		return err;
+	mmc->op_cond_response = cmd->response[0];
+	return 0;
+}
+
 static int mmc_send_op_cond(struct mmc *mmc)
 {
-	int timeout = 10000;
 	struct mmc_cmd cmd;
-	int err;
+	int err, i;
 
 	/* Some cards seem to need this */
 	mmc_go_idle(mmc);
 
  	/* Asking to the card its capabilities */
- 	cmd.cmdidx = MMC_CMD_SEND_OP_COND;
- 	cmd.resp_type = MMC_RSP_R3;
- 	cmd.cmdarg = 0;
-
- 	err = mmc_send_cmd(mmc, &cmd, NULL);
-
- 	if (err)
- 		return err;
-
- 	udelay(1000);
-
-	do {
-		cmd.cmdidx = MMC_CMD_SEND_OP_COND;
-		cmd.resp_type = MMC_RSP_R3;
-		cmd.cmdarg = (mmc_host_is_spi(mmc) ? 0 :
-				(mmc->voltages &
-				(cmd.response[0] & OCR_VOLTAGE_MASK)) |
-				(cmd.response[0] & OCR_ACCESS_MODE));
-
-		if (mmc->host_caps & MMC_MODE_HC)
-			cmd.cmdarg |= OCR_HCS;
-
-		err = mmc_send_cmd(mmc, &cmd, NULL);
-
+	mmc->op_cond_pending = 1;
+	for (i = 0; i < 2; i++) {
+		err = mmc_send_op_cond_iter(mmc, &cmd, i != 0);
 		if (err)
 			return err;
 
-		udelay(1000);
-	} while (!(cmd.response[0] & OCR_BUSY) && timeout--);
+		/* exit if not busy (flag seems to be inverted) */
+		if (mmc->op_cond_response & OCR_BUSY)
+			return 0;
+	}
+	return IN_PROGRESS;
+}
 
-	if (timeout <= 0)
-		return UNUSABLE_ERR;
+static int mmc_complete_op_cond(struct mmc *mmc)
+{
+	struct mmc_cmd cmd;
+	int timeout = 1000;
+	uint start;
+	int err;
+
+	mmc->op_cond_pending = 0;
+	start = get_timer(0);
+	do {
+		err = mmc_send_op_cond_iter(mmc, &cmd, 1);
+		if (err)
+			return err;
+		if (get_timer(start) > timeout)
+			return UNUSABLE_ERR;
+		udelay(100);
+	} while (!(mmc->op_cond_response & OCR_BUSY));
 
 	if (mmc_host_is_spi(mmc)) { /* read OCR for spi */
 		cmd.cmdidx = MMC_CMD_SPI_READ_OCR;
@@ -561,7 +430,7 @@ static int mmc_send_op_cond(struct mmc *mmc)
 	mmc->ocr = cmd.response[0];
 
 	mmc->high_capacity = ((mmc->ocr & OCR_HCS) == OCR_HCS);
-	mmc->rca = 0;
+	mmc->rca = 1;
 
 	return 0;
 }
@@ -580,7 +449,7 @@ static int mmc_send_ext_csd(struct mmc *mmc, u8 *ext_csd)
 
 	data.dest = (char *)ext_csd;
 	data.blocks = 1;
-	data.blocksize = 512;
+	data.blocksize = MMC_MAX_BLOCK_LEN;
 	data.flags = MMC_DATA_READ;
 
 	err = mmc_send_cmd(mmc, &cmd, &data);
@@ -613,7 +482,7 @@ static int mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value)
 
 static int mmc_change_freq(struct mmc *mmc)
 {
-	ALLOC_CACHE_ALIGN_BUFFER(u8, ext_csd, 512);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, ext_csd, MMC_MAX_BLOCK_LEN);
 	char cardtype;
 	int err;
 
@@ -626,6 +495,8 @@ static int mmc_change_freq(struct mmc *mmc)
 	if (mmc->version < MMC_VERSION_4)
 		return 0;
 
+	mmc->card_caps |= MMC_MODE_4BIT | MMC_MODE_8BIT;
+
 	err = mmc_send_ext_csd(mmc, ext_csd);
 
 	if (err)
@@ -636,7 +507,7 @@ static int mmc_change_freq(struct mmc *mmc)
 	err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING, 1);
 
 	if (err)
-		return err;
+		return err == SWITCH_ERR ? 0 : err;
 
 	/* Now check to see that it worked */
 	err = mmc_send_ext_csd(mmc, ext_csd);
@@ -649,24 +520,285 @@ static int mmc_change_freq(struct mmc *mmc)
 		return 0;
 
 	/* High Speed is set, there are two types: 52MHz and 26MHz */
-	if (cardtype & MMC_HS_52MHZ)
+	if (cardtype & EXT_CSD_CARD_TYPE_52) {
+		if (cardtype & EXT_CSD_CARD_TYPE_DDR_1_8V)
+			mmc->card_caps |= MMC_MODE_DDR_52MHz;
 		mmc->card_caps |= MMC_MODE_HS_52MHz | MMC_MODE_HS;
-	else
+	} else {
 		mmc->card_caps |= MMC_MODE_HS;
+	}
 
 	return 0;
 }
 
+static int mmc_set_capacity(struct mmc *mmc, int part_num)
+{
+	switch (part_num) {
+	case 0:
+		mmc->capacity = mmc->capacity_user;
+		break;
+	case 1:
+	case 2:
+		mmc->capacity = mmc->capacity_boot;
+		break;
+	case 3:
+		mmc->capacity = mmc->capacity_rpmb;
+		break;
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+		mmc->capacity = mmc->capacity_gp[part_num - 4];
+		break;
+	default:
+		return -1;
+	}
+
+	mmc->block_dev.lba = lldiv(mmc->capacity, mmc->read_bl_len);
+
+	return 0;
+}
+
+int mmc_select_hwpart(int dev_num, int hwpart)
+{
+	struct mmc *mmc = find_mmc_device(dev_num);
+	int ret;
+
+	if (!mmc)
+		return -ENODEV;
+
+	if (mmc->part_num == hwpart)
+		return 0;
+
+	if (mmc->part_config == MMCPART_NOAVAILABLE) {
+		printf("Card doesn't support part_switch\n");
+		return -EMEDIUMTYPE;
+	}
+
+	ret = mmc_switch_part(dev_num, hwpart);
+	if (ret)
+		return ret;
+
+	mmc->part_num = hwpart;
+
+	return 0;
+}
+
+
 int mmc_switch_part(int dev_num, unsigned int part_num)
 {
 	struct mmc *mmc = find_mmc_device(dev_num);
+	int ret;
 
 	if (!mmc)
 		return -1;
 
-	return mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONF,
-			  (mmc->part_config & ~PART_ACCESS_MASK)
-			  | (part_num & PART_ACCESS_MASK));
+	ret = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONF,
+			 (mmc->part_config & ~PART_ACCESS_MASK)
+			 | (part_num & PART_ACCESS_MASK));
+
+	/*
+	 * Set the capacity if the switch succeeded or was intended
+	 * to return to representing the raw device.
+	 */
+	if ((ret == 0) || ((ret == -ENODEV) && (part_num == 0)))
+		ret = mmc_set_capacity(mmc, part_num);
+
+	return ret;
+}
+
+int mmc_hwpart_config(struct mmc *mmc,
+		      const struct mmc_hwpart_conf *conf,
+		      enum mmc_hwpart_conf_mode mode)
+{
+	u8 part_attrs = 0;
+	u32 enh_size_mult;
+	u32 enh_start_addr;
+	u32 gp_size_mult[4];
+	u32 max_enh_size_mult;
+	u32 tot_enh_size_mult = 0;
+	u8 wr_rel_set;
+	int i, pidx, err;
+	ALLOC_CACHE_ALIGN_BUFFER(u8, ext_csd, MMC_MAX_BLOCK_LEN);
+
+	if (mode < MMC_HWPART_CONF_CHECK || mode > MMC_HWPART_CONF_COMPLETE)
+		return -EINVAL;
+
+	if (IS_SD(mmc) || (mmc->version < MMC_VERSION_4_41)) {
+		printf("eMMC >= 4.4 required for enhanced user data area\n");
+		return -EMEDIUMTYPE;
+	}
+
+	if (!(mmc->part_support & PART_SUPPORT)) {
+		printf("Card does not support partitioning\n");
+		return -EMEDIUMTYPE;
+	}
+
+	if (!mmc->hc_wp_grp_size) {
+		printf("Card does not define HC WP group size\n");
+		return -EMEDIUMTYPE;
+	}
+
+	/* check partition alignment and total enhanced size */
+	if (conf->user.enh_size) {
+		if (conf->user.enh_size % mmc->hc_wp_grp_size ||
+		    conf->user.enh_start % mmc->hc_wp_grp_size) {
+			printf("User data enhanced area not HC WP group "
+			       "size aligned\n");
+			return -EINVAL;
+		}
+		part_attrs |= EXT_CSD_ENH_USR;
+		enh_size_mult = conf->user.enh_size / mmc->hc_wp_grp_size;
+		if (mmc->high_capacity) {
+			enh_start_addr = conf->user.enh_start;
+		} else {
+			enh_start_addr = (conf->user.enh_start << 9);
+		}
+	} else {
+		enh_size_mult = 0;
+		enh_start_addr = 0;
+	}
+	tot_enh_size_mult += enh_size_mult;
+
+	for (pidx = 0; pidx < 4; pidx++) {
+		if (conf->gp_part[pidx].size % mmc->hc_wp_grp_size) {
+			printf("GP%i partition not HC WP group size "
+			       "aligned\n", pidx+1);
+			return -EINVAL;
+		}
+		gp_size_mult[pidx] = conf->gp_part[pidx].size / mmc->hc_wp_grp_size;
+		if (conf->gp_part[pidx].size && conf->gp_part[pidx].enhanced) {
+			part_attrs |= EXT_CSD_ENH_GP(pidx);
+			tot_enh_size_mult += gp_size_mult[pidx];
+		}
+	}
+
+	if (part_attrs && ! (mmc->part_support & ENHNCD_SUPPORT)) {
+		printf("Card does not support enhanced attribute\n");
+		return -EMEDIUMTYPE;
+	}
+
+	err = mmc_send_ext_csd(mmc, ext_csd);
+	if (err)
+		return err;
+
+	max_enh_size_mult =
+		(ext_csd[EXT_CSD_MAX_ENH_SIZE_MULT+2] << 16) +
+		(ext_csd[EXT_CSD_MAX_ENH_SIZE_MULT+1] << 8) +
+		ext_csd[EXT_CSD_MAX_ENH_SIZE_MULT];
+	if (tot_enh_size_mult > max_enh_size_mult) {
+		printf("Total enhanced size exceeds maximum (%u > %u)\n",
+		       tot_enh_size_mult, max_enh_size_mult);
+		return -EMEDIUMTYPE;
+	}
+
+	/* The default value of EXT_CSD_WR_REL_SET is device
+	 * dependent, the values can only be changed if the
+	 * EXT_CSD_HS_CTRL_REL bit is set. The values can be
+	 * changed only once and before partitioning is completed. */
+	wr_rel_set = ext_csd[EXT_CSD_WR_REL_SET];
+	if (conf->user.wr_rel_change) {
+		if (conf->user.wr_rel_set)
+			wr_rel_set |= EXT_CSD_WR_DATA_REL_USR;
+		else
+			wr_rel_set &= ~EXT_CSD_WR_DATA_REL_USR;
+	}
+	for (pidx = 0; pidx < 4; pidx++) {
+		if (conf->gp_part[pidx].wr_rel_change) {
+			if (conf->gp_part[pidx].wr_rel_set)
+				wr_rel_set |= EXT_CSD_WR_DATA_REL_GP(pidx);
+			else
+				wr_rel_set &= ~EXT_CSD_WR_DATA_REL_GP(pidx);
+		}
+	}
+
+	if (wr_rel_set != ext_csd[EXT_CSD_WR_REL_SET] &&
+	    !(ext_csd[EXT_CSD_WR_REL_PARAM] & EXT_CSD_HS_CTRL_REL)) {
+		puts("Card does not support host controlled partition write "
+		     "reliability settings\n");
+		return -EMEDIUMTYPE;
+	}
+
+	if (ext_csd[EXT_CSD_PARTITION_SETTING] &
+	    EXT_CSD_PARTITION_SETTING_COMPLETED) {
+		printf("Card already partitioned\n");
+		return -EPERM;
+	}
+
+	if (mode == MMC_HWPART_CONF_CHECK)
+		return 0;
+
+	/* Partitioning requires high-capacity size definitions */
+	if (!(ext_csd[EXT_CSD_ERASE_GROUP_DEF] & 0x01)) {
+		err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_ERASE_GROUP_DEF, 1);
+
+		if (err)
+			return err;
+
+		ext_csd[EXT_CSD_ERASE_GROUP_DEF] = 1;
+
+		/* update erase group size to be high-capacity */
+		mmc->erase_grp_size =
+			ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE] * 1024;
+
+	}
+
+	/* all OK, write the configuration */
+	for (i = 0; i < 4; i++) {
+		err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_ENH_START_ADDR+i,
+				 (enh_start_addr >> (i*8)) & 0xFF);
+		if (err)
+			return err;
+	}
+	for (i = 0; i < 3; i++) {
+		err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_ENH_SIZE_MULT+i,
+				 (enh_size_mult >> (i*8)) & 0xFF);
+		if (err)
+			return err;
+	}
+	for (pidx = 0; pidx < 4; pidx++) {
+		for (i = 0; i < 3; i++) {
+			err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+					 EXT_CSD_GP_SIZE_MULT+pidx*3+i,
+					 (gp_size_mult[pidx] >> (i*8)) & 0xFF);
+			if (err)
+				return err;
+		}
+	}
+	err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+			 EXT_CSD_PARTITIONS_ATTRIBUTE, part_attrs);
+	if (err)
+		return err;
+
+	if (mode == MMC_HWPART_CONF_SET)
+		return 0;
+
+	/* The WR_REL_SET is a write-once register but shall be
+	 * written before setting PART_SETTING_COMPLETED. As it is
+	 * write-once we can only write it when completing the
+	 * partitioning. */
+	if (wr_rel_set != ext_csd[EXT_CSD_WR_REL_SET]) {
+		err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_WR_REL_SET, wr_rel_set);
+		if (err)
+			return err;
+	}
+
+	/* Setting PART_SETTING_COMPLETED confirms the partition
+	 * configuration but it only becomes effective after power
+	 * cycle, so we do not adjust the partition related settings
+	 * in the mmc struct. */
+
+	err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+			 EXT_CSD_PARTITION_SETTING,
+			 EXT_CSD_PARTITION_SETTING_COMPLETED);
+	if (err)
+		return err;
+
+	return 0;
 }
 
 int mmc_getcd(struct mmc *mmc)
@@ -675,8 +807,12 @@ int mmc_getcd(struct mmc *mmc)
 
 	cd = board_mmc_getcd(mmc);
 
-	if ((cd < 0) && mmc->getcd)
-		cd = mmc->getcd(mmc);
+	if (cd < 0) {
+		if (mmc->cfg->ops->getcd)
+			cd = mmc->cfg->ops->getcd(mmc);
+		else
+			cd = 1;
+	}
 
 	return cd;
 }
@@ -759,6 +895,8 @@ retry_scr:
 			break;
 		case 2:
 			mmc->version = SD_VERSION_2;
+			if ((mmc->scr[0] >> 15) & 0x1)
+				mmc->version = SD_VERSION_3;
 			break;
 		default:
 			mmc->version = SD_VERSION_1_0;
@@ -795,8 +933,8 @@ retry_scr:
 	 * This can avoid furthur problem when the card runs in different
 	 * mode between the host.
 	 */
-	if (!((mmc->host_caps & MMC_MODE_HS_52MHz) &&
-		(mmc->host_caps & MMC_MODE_HS)))
+	if (!((mmc->cfg->host_caps & MMC_MODE_HS_52MHz) &&
+		(mmc->cfg->host_caps & MMC_MODE_HS)))
 		return 0;
 
 	err = sd_switch(mmc, SD_SWITCH_SWITCH, 0, 1, (u8 *)switch_status);
@@ -843,16 +981,17 @@ static const int multipliers[] = {
 
 static void mmc_set_ios(struct mmc *mmc)
 {
-	mmc->set_ios(mmc);
+	if (mmc->cfg->ops->set_ios)
+		mmc->cfg->ops->set_ios(mmc);
 }
 
 void mmc_set_clock(struct mmc *mmc, uint clock)
 {
-	if (clock > mmc->f_max)
-		clock = mmc->f_max;
+	if (clock > mmc->cfg->f_max)
+		clock = mmc->cfg->f_max;
 
-	if (clock < mmc->f_min)
-		clock = mmc->f_min;
+	if (clock < mmc->cfg->f_min)
+		clock = mmc->cfg->f_min;
 
 	mmc->clock = clock;
 
@@ -868,13 +1007,15 @@ static void mmc_set_bus_width(struct mmc *mmc, uint width)
 
 static int mmc_startup(struct mmc *mmc)
 {
-	int err;
+	int err, i;
 	uint mult, freq;
 	u64 cmult, csize, capacity;
 	struct mmc_cmd cmd;
-	ALLOC_CACHE_ALIGN_BUFFER(u8, ext_csd, 512);
-	ALLOC_CACHE_ALIGN_BUFFER(u8, test_csd, 512);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, ext_csd, MMC_MAX_BLOCK_LEN);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, test_csd, MMC_MAX_BLOCK_LEN);
 	int timeout = 1000;
+	bool has_parts = false;
+	bool part_completed;
 
 #ifdef CONFIG_MMC_SPI_CRC_ON
 	if (mmc_host_is_spi(mmc)) { /* enable CRC check for spi */
@@ -969,6 +1110,7 @@ static int mmc_startup(struct mmc *mmc)
 
 	mmc->tran_speed = freq * mult;
 
+	mmc->dsr_imp = ((cmd.response[1] >> 12) & 0x1);
 	mmc->read_bl_len = 1 << ((cmd.response[1] >> 16) & 0xf);
 
 	if (IS_SD(mmc))
@@ -986,14 +1128,26 @@ static int mmc_startup(struct mmc *mmc)
 		cmult = (mmc->csd[2] & 0x00038000) >> 15;
 	}
 
-	mmc->capacity = (csize + 1) << (cmult + 2);
-	mmc->capacity *= mmc->read_bl_len;
+	mmc->capacity_user = (csize + 1) << (cmult + 2);
+	mmc->capacity_user *= mmc->read_bl_len;
+	mmc->capacity_boot = 0;
+	mmc->capacity_rpmb = 0;
+	for (i = 0; i < 4; i++)
+		mmc->capacity_gp[i] = 0;
 
-	if (mmc->read_bl_len > 512)
-		mmc->read_bl_len = 512;
+	if (mmc->read_bl_len > MMC_MAX_BLOCK_LEN)
+		mmc->read_bl_len = MMC_MAX_BLOCK_LEN;
 
-	if (mmc->write_bl_len > 512)
-		mmc->write_bl_len = 512;
+	if (mmc->write_bl_len > MMC_MAX_BLOCK_LEN)
+		mmc->write_bl_len = MMC_MAX_BLOCK_LEN;
+
+	if ((mmc->dsr_imp) && (0xffffffff != mmc->dsr)) {
+		cmd.cmdidx = MMC_CMD_SET_DSR;
+		cmd.cmdarg = (mmc->dsr & 0xffff) << 16;
+		cmd.resp_type = MMC_RSP_NONE;
+		if (mmc_send_cmd(mmc, &cmd, NULL))
+			printf("MMC: SET_DSR failed\n");
+	}
 
 	/* Select the card, and put it into Transfer Mode */
 	if (!mmc_host_is_spi(mmc)) { /* cmd not supported in spi */
@@ -1014,7 +1168,9 @@ static int mmc_startup(struct mmc *mmc)
 	if (!IS_SD(mmc) && (mmc->version >= MMC_VERSION_4)) {
 		/* check  ext_csd version and capacity */
 		err = mmc_send_ext_csd(mmc, ext_csd);
-		if (!err && (ext_csd[EXT_CSD_REV] >= 2)) {
+		if (err)
+			return err;
+		if (ext_csd[EXT_CSD_REV] >= 2) {
 			/*
 			 * According to the JEDEC Standard, the value of
 			 * ext_csd's capacity is valid if the value is more
@@ -1024,20 +1180,124 @@ static int mmc_startup(struct mmc *mmc)
 					| ext_csd[EXT_CSD_SEC_CNT + 1] << 8
 					| ext_csd[EXT_CSD_SEC_CNT + 2] << 16
 					| ext_csd[EXT_CSD_SEC_CNT + 3] << 24;
-			capacity *= 512;
+			capacity *= MMC_MAX_BLOCK_LEN;
 			if ((capacity >> 20) > 2 * 1024)
-				mmc->capacity = capacity;
+				mmc->capacity_user = capacity;
+		}
+
+		switch (ext_csd[EXT_CSD_REV]) {
+		case 1:
+			mmc->version = MMC_VERSION_4_1;
+			break;
+		case 2:
+			mmc->version = MMC_VERSION_4_2;
+			break;
+		case 3:
+			mmc->version = MMC_VERSION_4_3;
+			break;
+		case 5:
+			mmc->version = MMC_VERSION_4_41;
+			break;
+		case 6:
+			mmc->version = MMC_VERSION_4_5;
+			break;
+		case 7:
+			mmc->version = MMC_VERSION_5_0;
+			break;
+		}
+
+		/* The partition data may be non-zero but it is only
+		 * effective if PARTITION_SETTING_COMPLETED is set in
+		 * EXT_CSD, so ignore any data if this bit is not set,
+		 * except for enabling the high-capacity group size
+		 * definition (see below). */
+		part_completed = !!(ext_csd[EXT_CSD_PARTITION_SETTING] &
+				    EXT_CSD_PARTITION_SETTING_COMPLETED);
+
+		/* store the partition info of emmc */
+		mmc->part_support = ext_csd[EXT_CSD_PARTITIONING_SUPPORT];
+		if ((ext_csd[EXT_CSD_PARTITIONING_SUPPORT] & PART_SUPPORT) ||
+		    ext_csd[EXT_CSD_BOOT_MULT])
+			mmc->part_config = ext_csd[EXT_CSD_PART_CONF];
+		if (part_completed &&
+		    (ext_csd[EXT_CSD_PARTITIONING_SUPPORT] & ENHNCD_SUPPORT))
+			mmc->part_attr = ext_csd[EXT_CSD_PARTITIONS_ATTRIBUTE];
+
+		mmc->capacity_boot = ext_csd[EXT_CSD_BOOT_MULT] << 17;
+
+		mmc->capacity_rpmb = ext_csd[EXT_CSD_RPMB_MULT] << 17;
+
+		for (i = 0; i < 4; i++) {
+			int idx = EXT_CSD_GP_SIZE_MULT + i * 3;
+			uint mult = (ext_csd[idx + 2] << 16) +
+				(ext_csd[idx + 1] << 8) + ext_csd[idx];
+			if (mult)
+				has_parts = true;
+			if (!part_completed)
+				continue;
+			mmc->capacity_gp[i] = mult;
+			mmc->capacity_gp[i] *=
+				ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE];
+			mmc->capacity_gp[i] *= ext_csd[EXT_CSD_HC_WP_GRP_SIZE];
+			mmc->capacity_gp[i] <<= 19;
+		}
+
+		if (part_completed) {
+			mmc->enh_user_size =
+				(ext_csd[EXT_CSD_ENH_SIZE_MULT+2] << 16) +
+				(ext_csd[EXT_CSD_ENH_SIZE_MULT+1] << 8) +
+				ext_csd[EXT_CSD_ENH_SIZE_MULT];
+			mmc->enh_user_size *= ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE];
+			mmc->enh_user_size *= ext_csd[EXT_CSD_HC_WP_GRP_SIZE];
+			mmc->enh_user_size <<= 19;
+			mmc->enh_user_start =
+				(ext_csd[EXT_CSD_ENH_START_ADDR+3] << 24) +
+				(ext_csd[EXT_CSD_ENH_START_ADDR+2] << 16) +
+				(ext_csd[EXT_CSD_ENH_START_ADDR+1] << 8) +
+				ext_csd[EXT_CSD_ENH_START_ADDR];
+			if (mmc->high_capacity)
+				mmc->enh_user_start <<= 9;
 		}
 
 		/*
-		 * Check whether GROUP_DEF is set, if yes, read out
-		 * group size from ext_csd directly, or calculate
-		 * the group size from the csd value.
+		 * Host needs to enable ERASE_GRP_DEF bit if device is
+		 * partitioned. This bit will be lost every time after a reset
+		 * or power off. This will affect erase size.
 		 */
-		if (ext_csd[EXT_CSD_ERASE_GROUP_DEF])
+		if (part_completed)
+			has_parts = true;
+		if ((ext_csd[EXT_CSD_PARTITIONING_SUPPORT] & PART_SUPPORT) &&
+		    (ext_csd[EXT_CSD_PARTITIONS_ATTRIBUTE] & PART_ENH_ATTRIB))
+			has_parts = true;
+		if (has_parts) {
+			err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_ERASE_GROUP_DEF, 1);
+
+			if (err)
+				return err;
+			else
+				ext_csd[EXT_CSD_ERASE_GROUP_DEF] = 1;
+		}
+
+		if (ext_csd[EXT_CSD_ERASE_GROUP_DEF] & 0x01) {
+			/* Read out group size from ext_csd */
 			mmc->erase_grp_size =
-			      ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE] * 512 * 1024;
-		else {
+				ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE] * 1024;
+			/*
+			 * if high capacity and partition setting completed
+			 * SEC_COUNT is valid even if it is smaller than 2 GiB
+			 * JEDEC Standard JESD84-B45, 6.2.4
+			 */
+			if (mmc->high_capacity && part_completed) {
+				capacity = (ext_csd[EXT_CSD_SEC_CNT]) |
+					(ext_csd[EXT_CSD_SEC_CNT + 1] << 8) |
+					(ext_csd[EXT_CSD_SEC_CNT + 2] << 16) |
+					(ext_csd[EXT_CSD_SEC_CNT + 3] << 24);
+				capacity *= MMC_MAX_BLOCK_LEN;
+				mmc->capacity_user = capacity;
+			}
+		} else {
+			/* Calculate the group size from the csd value. */
 			int erase_gsz, erase_gmul;
 			erase_gsz = (mmc->csd[2] & 0x00007c00) >> 10;
 			erase_gmul = (mmc->csd[2] & 0x000003e0) >> 5;
@@ -1045,11 +1305,16 @@ static int mmc_startup(struct mmc *mmc)
 				* (erase_gmul + 1);
 		}
 
-		/* store the partition info of emmc */
-		if ((ext_csd[EXT_CSD_PARTITIONING_SUPPORT] & PART_SUPPORT) ||
-		    ext_csd[EXT_CSD_BOOT_MULT])
-			mmc->part_config = ext_csd[EXT_CSD_PART_CONF];
+		mmc->hc_wp_grp_size = 1024
+			* ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE]
+			* ext_csd[EXT_CSD_HC_WP_GRP_SIZE];
+
+		mmc->wr_rel_set = ext_csd[EXT_CSD_WR_REL_SET];
 	}
+
+	err = mmc_set_capacity(mmc, mmc->part_num);
+	if (err)
+		return err;
 
 	if (IS_SD(mmc))
 		err = sd_change_freq(mmc);
@@ -1060,7 +1325,7 @@ static int mmc_startup(struct mmc *mmc)
 		return err;
 
 	/* Restrict card's capabilities by what the host can do */
-	mmc->card_caps &= mmc->host_caps;
+	mmc->card_caps &= mmc->cfg->host_caps;
 
 	if (IS_SD(mmc)) {
 		if (mmc->card_caps & MMC_MODE_4BIT) {
@@ -1086,11 +1351,14 @@ static int mmc_startup(struct mmc *mmc)
 			mmc->tran_speed = 50000000;
 		else
 			mmc->tran_speed = 25000000;
-	} else {
+	} else if (mmc->version >= MMC_VERSION_4) {
+		/* Only version 4 of MMC supports wider bus widths */
 		int idx;
 
 		/* An array of possible bus widths in order of preference */
 		static unsigned ext_csd_bits[] = {
+			EXT_CSD_DDR_BUS_WIDTH_8,
+			EXT_CSD_DDR_BUS_WIDTH_4,
 			EXT_CSD_BUS_WIDTH_8,
 			EXT_CSD_BUS_WIDTH_4,
 			EXT_CSD_BUS_WIDTH_1,
@@ -1098,24 +1366,40 @@ static int mmc_startup(struct mmc *mmc)
 
 		/* An array to map CSD bus widths to host cap bits */
 		static unsigned ext_to_hostcaps[] = {
+			[EXT_CSD_DDR_BUS_WIDTH_4] =
+				MMC_MODE_DDR_52MHz | MMC_MODE_4BIT,
+			[EXT_CSD_DDR_BUS_WIDTH_8] =
+				MMC_MODE_DDR_52MHz | MMC_MODE_8BIT,
 			[EXT_CSD_BUS_WIDTH_4] = MMC_MODE_4BIT,
 			[EXT_CSD_BUS_WIDTH_8] = MMC_MODE_8BIT,
 		};
 
 		/* An array to map chosen bus width to an integer */
 		static unsigned widths[] = {
-			8, 4, 1,
+			8, 4, 8, 4, 1,
 		};
 
 		for (idx=0; idx < ARRAY_SIZE(ext_csd_bits); idx++) {
 			unsigned int extw = ext_csd_bits[idx];
+			unsigned int caps = ext_to_hostcaps[extw];
 
 			/*
-			 * Check to make sure the controller supports
-			 * this bus width, if it's more than 1
+			 * If the bus width is still not changed,
+			 * don't try to set the default again.
+			 * Otherwise, recover from switch attempts
+			 * by switching to 1-bit bus width.
 			 */
-			if (extw != EXT_CSD_BUS_WIDTH_1 &&
-					!(mmc->host_caps & ext_to_hostcaps[extw]))
+			if (extw == EXT_CSD_BUS_WIDTH_1 &&
+					mmc->bus_width == 1) {
+				err = 0;
+				break;
+			}
+
+			/*
+			 * Check to make sure the card and controller support
+			 * these capabilities
+			 */
+			if ((mmc->card_caps & caps) != caps)
 				continue;
 
 			err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,
@@ -1124,24 +1408,32 @@ static int mmc_startup(struct mmc *mmc)
 			if (err)
 				continue;
 
+			mmc->ddr_mode = (caps & MMC_MODE_DDR_52MHz) ? 1 : 0;
 			mmc_set_bus_width(mmc, widths[idx]);
 
 			err = mmc_send_ext_csd(mmc, test_csd);
-			if (!err && ext_csd[EXT_CSD_PARTITIONING_SUPPORT] \
-				    == test_csd[EXT_CSD_PARTITIONING_SUPPORT]
-				 && ext_csd[EXT_CSD_ERASE_GROUP_DEF] \
-				    == test_csd[EXT_CSD_ERASE_GROUP_DEF] \
-				 && ext_csd[EXT_CSD_REV] \
-				    == test_csd[EXT_CSD_REV]
-				 && ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE] \
-				    == test_csd[EXT_CSD_HC_ERASE_GRP_SIZE]
-				 && memcmp(&ext_csd[EXT_CSD_SEC_CNT], \
-					&test_csd[EXT_CSD_SEC_CNT], 4) == 0) {
 
-				mmc->card_caps |= ext_to_hostcaps[extw];
+			if (err)
+				continue;
+
+			/* Only compare read only fields */
+			if (ext_csd[EXT_CSD_PARTITIONING_SUPPORT]
+				== test_csd[EXT_CSD_PARTITIONING_SUPPORT] &&
+			    ext_csd[EXT_CSD_HC_WP_GRP_SIZE]
+				== test_csd[EXT_CSD_HC_WP_GRP_SIZE] &&
+			    ext_csd[EXT_CSD_REV]
+				== test_csd[EXT_CSD_REV] &&
+			    ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE]
+				== test_csd[EXT_CSD_HC_ERASE_GRP_SIZE] &&
+			    memcmp(&ext_csd[EXT_CSD_SEC_CNT],
+				   &test_csd[EXT_CSD_SEC_CNT], 4) == 0)
 				break;
-			}
+			else
+				err = SWITCH_ERR;
 		}
+
+		if (err)
+			return err;
 
 		if (mmc->card_caps & MMC_MODE_HS) {
 			if (mmc->card_caps & MMC_MODE_HS_52MHz)
@@ -1153,11 +1445,19 @@ static int mmc_startup(struct mmc *mmc)
 
 	mmc_set_clock(mmc, mmc->tran_speed);
 
+	/* Fix the block length for DDR mode */
+	if (mmc->ddr_mode) {
+		mmc->read_bl_len = MMC_MAX_BLOCK_LEN;
+		mmc->write_bl_len = MMC_MAX_BLOCK_LEN;
+	}
+
 	/* fill in device description */
 	mmc->block_dev.lun = 0;
 	mmc->block_dev.type = 0;
 	mmc->block_dev.blksz = mmc->read_bl_len;
+	mmc->block_dev.log2blksz = LOG2(mmc->block_dev.blksz);
 	mmc->block_dev.lba = lldiv(mmc->capacity, mmc->read_bl_len);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 	sprintf(mmc->block_dev.vendor, "Man %06x Snr %04x%04x",
 		mmc->cid[0] >> 24, (mmc->cid[2] & 0xffff),
 		(mmc->cid[3] >> 16) & 0xffff);
@@ -1167,6 +1467,11 @@ static int mmc_startup(struct mmc *mmc)
 		(mmc->cid[2] >> 24) & 0xff);
 	sprintf(mmc->block_dev.revision, "%d.%d", (mmc->cid[2] >> 20) & 0xf,
 		(mmc->cid[2] >> 16) & 0xf);
+#else
+	mmc->block_dev.vendor[0] = 0;
+	mmc->block_dev.product[0] = 0;
+	mmc->block_dev.revision[0] = 0;
+#endif
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBDISK_SUPPORT)
 	init_part(&mmc->block_dev);
 #endif
@@ -1181,7 +1486,7 @@ static int mmc_send_if_cond(struct mmc *mmc)
 
 	cmd.cmdidx = SD_CMD_SEND_IF_COND;
 	/* We set the bit if the host supports voltages between 2.7 and 3.6 V */
-	cmd.cmdarg = ((mmc->voltages & 0xff8000) != 0) << 8 | 0xaa;
+	cmd.cmdarg = ((mmc->cfg->voltages & 0xff8000) != 0) << 8 | 0xaa;
 	cmd.resp_type = MMC_RSP_R7;
 
 	err = mmc_send_cmd(mmc, &cmd, NULL);
@@ -1197,8 +1502,36 @@ static int mmc_send_if_cond(struct mmc *mmc)
 	return 0;
 }
 
-int mmc_register(struct mmc *mmc)
+/* not used any more */
+int __deprecated mmc_register(struct mmc *mmc)
 {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+	printf("%s is deprecated! use mmc_create() instead.\n", __func__);
+#endif
+	return -1;
+}
+
+struct mmc *mmc_create(const struct mmc_config *cfg, void *priv)
+{
+	struct mmc *mmc;
+
+	/* quick validation */
+	if (cfg == NULL || cfg->ops == NULL || cfg->ops->send_cmd == NULL ||
+			cfg->f_min == 0 || cfg->f_max == 0 || cfg->b_max == 0)
+		return NULL;
+
+	mmc = calloc(1, sizeof(*mmc));
+	if (mmc == NULL)
+		return NULL;
+
+	mmc->cfg = cfg;
+	mmc->priv = priv;
+
+	/* the following chunk was mmc_register() */
+
+	/* Setup dsr related values */
+	mmc->dsr_imp = 0;
+	mmc->dsr = 0xffffffff;
 	/* Setup the universal parts of the block interface just once */
 	mmc->block_dev.if_type = IF_TYPE_MMC;
 	mmc->block_dev.dev = cur_dev_num++;
@@ -1206,14 +1539,21 @@ int mmc_register(struct mmc *mmc)
 	mmc->block_dev.block_read = mmc_bread;
 	mmc->block_dev.block_write = mmc_bwrite;
 	mmc->block_dev.block_erase = mmc_berase;
-	if (!mmc->b_max)
-		mmc->b_max = CONFIG_SYS_MMC_MAX_BLK_COUNT;
 
-	INIT_LIST_HEAD (&mmc->link);
+	/* setup initial part type */
+	mmc->block_dev.part_type = mmc->cfg->part_type;
 
-	list_add_tail (&mmc->link, &mmc_devices);
+	INIT_LIST_HEAD(&mmc->link);
 
-	return 0;
+	list_add_tail(&mmc->link, &mmc_devices);
+
+	return mmc;
+}
+
+void mmc_destroy(struct mmc *mmc)
+{
+	/* only freeing memory for now */
+	free(mmc);
 }
 
 #ifdef CONFIG_PARTITIONS
@@ -1227,24 +1567,36 @@ block_dev_desc_t *mmc_get_dev(int dev)
 }
 #endif
 
-int mmc_init(struct mmc *mmc)
+/* board-specific MMC power initializations. */
+__weak void board_mmc_power_init(void)
+{
+}
+
+int mmc_start_init(struct mmc *mmc)
 {
 	int err;
 
-	if (mmc_getcd(mmc) == 0) {
+	/* we pretend there's no card when init is NULL */
+	if (mmc_getcd(mmc) == 0 || mmc->cfg->ops->init == NULL) {
 		mmc->has_init = 0;
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 		printf("MMC: no card present\n");
+#endif
 		return NO_CARD_ERR;
 	}
 
 	if (mmc->has_init)
 		return 0;
 
-	err = mmc->init(mmc);
+	board_mmc_power_init();
+
+	/* made sure it's not NULL earlier */
+	err = mmc->cfg->ops->init(mmc);
 
 	if (err)
 		return err;
 
+	mmc->ddr_mode = 0;
 	mmc_set_bus_width(mmc, 1);
 	mmc_set_clock(mmc, 1);
 
@@ -1267,31 +1619,75 @@ int mmc_init(struct mmc *mmc)
 	if (err == TIMEOUT) {
 		err = mmc_send_op_cond(mmc);
 
-		if (err) {
+		if (err && err != IN_PROGRESS) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 			printf("Card did not respond to voltage select!\n");
+#endif
 			return UNUSABLE_ERR;
 		}
 	}
 
-	err = mmc_startup(mmc);
+	if (err == IN_PROGRESS)
+		mmc->init_in_progress = 1;
+
+	return err;
+}
+
+static int mmc_complete_init(struct mmc *mmc)
+{
+	int err = 0;
+
+	if (mmc->op_cond_pending)
+		err = mmc_complete_op_cond(mmc);
+
+	if (!err)
+		err = mmc_startup(mmc);
 	if (err)
 		mmc->has_init = 0;
 	else
 		mmc->has_init = 1;
+	mmc->init_in_progress = 0;
 	return err;
 }
 
-/*
- * CPU and board-specific MMC initializations.  Aliased function
- * signals caller to move on
- */
-static int __def_mmc_init(bd_t *bis)
+int mmc_init(struct mmc *mmc)
+{
+	int err = IN_PROGRESS;
+	unsigned start;
+
+	if (mmc->has_init)
+		return 0;
+
+	start = get_timer(0);
+
+	if (!mmc->init_in_progress)
+		err = mmc_start_init(mmc);
+
+	if (!err || err == IN_PROGRESS)
+		err = mmc_complete_init(mmc);
+	debug("%s: %d, time %lu\n", __func__, err, get_timer(start));
+	return err;
+}
+
+int mmc_set_dsr(struct mmc *mmc, u16 val)
+{
+	mmc->dsr = val;
+	return 0;
+}
+
+/* CPU-specific MMC initializations */
+__weak int cpu_mmc_init(bd_t *bis)
 {
 	return -1;
 }
 
-int cpu_mmc_init(bd_t *bis) __attribute__((weak, alias("__def_mmc_init")));
-int board_mmc_init(bd_t *bis) __attribute__((weak, alias("__def_mmc_init")));
+/* board-specific MMC initializations. */
+__weak int board_mmc_init(bd_t *bis)
+{
+	return -1;
+}
+
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 
 void print_mmc_devices(char separator)
 {
@@ -1301,19 +1697,45 @@ void print_mmc_devices(char separator)
 	list_for_each(entry, &mmc_devices) {
 		m = list_entry(entry, struct mmc, link);
 
-		printf("%s: %d", m->name, m->block_dev.dev);
+		printf("%s: %d", m->cfg->name, m->block_dev.dev);
 
-		if (entry->next != &mmc_devices)
-			printf("%c ", separator);
+		if (entry->next != &mmc_devices) {
+			printf("%c", separator);
+			if (separator != '\n')
+				puts (" ");
+		}
 	}
 
 	printf("\n");
 }
 
+#else
+void print_mmc_devices(char separator) { }
+#endif
+
 int get_mmc_num(void)
 {
 	return cur_dev_num;
 }
+
+void mmc_set_preinit(struct mmc *mmc, int preinit)
+{
+	mmc->preinit = preinit;
+}
+
+static void do_preinit(void)
+{
+	struct mmc *m;
+	struct list_head *entry;
+
+	list_for_each(entry, &mmc_devices) {
+		m = list_entry(entry, struct mmc, link);
+
+		if (m->preinit)
+			mmc_start_init(m);
+	}
+}
+
 
 int mmc_initialize(bd_t *bis)
 {
@@ -1323,7 +1745,133 @@ int mmc_initialize(bd_t *bis)
 	if (board_mmc_init(bis) < 0)
 		cpu_mmc_init(bis);
 
+#ifndef CONFIG_SPL_BUILD
 	print_mmc_devices(',');
+#endif
 
+	do_preinit();
 	return 0;
 }
+
+#ifdef CONFIG_SUPPORT_EMMC_BOOT
+/*
+ * This function changes the size of boot partition and the size of rpmb
+ * partition present on EMMC devices.
+ *
+ * Input Parameters:
+ * struct *mmc: pointer for the mmc device strcuture
+ * bootsize: size of boot partition
+ * rpmbsize: size of rpmb partition
+ *
+ * Returns 0 on success.
+ */
+
+int mmc_boot_partition_size_change(struct mmc *mmc, unsigned long bootsize,
+				unsigned long rpmbsize)
+{
+	int err;
+	struct mmc_cmd cmd;
+
+	/* Only use this command for raw EMMC moviNAND. Enter backdoor mode */
+	cmd.cmdidx = MMC_CMD_RES_MAN;
+	cmd.resp_type = MMC_RSP_R1b;
+	cmd.cmdarg = MMC_CMD62_ARG1;
+
+	err = mmc_send_cmd(mmc, &cmd, NULL);
+	if (err) {
+		debug("mmc_boot_partition_size_change: Error1 = %d\n", err);
+		return err;
+	}
+
+	/* Boot partition changing mode */
+	cmd.cmdidx = MMC_CMD_RES_MAN;
+	cmd.resp_type = MMC_RSP_R1b;
+	cmd.cmdarg = MMC_CMD62_ARG2;
+
+	err = mmc_send_cmd(mmc, &cmd, NULL);
+	if (err) {
+		debug("mmc_boot_partition_size_change: Error2 = %d\n", err);
+		return err;
+	}
+	/* boot partition size is multiple of 128KB */
+	bootsize = (bootsize * 1024) / 128;
+
+	/* Arg: boot partition size */
+	cmd.cmdidx = MMC_CMD_RES_MAN;
+	cmd.resp_type = MMC_RSP_R1b;
+	cmd.cmdarg = bootsize;
+
+	err = mmc_send_cmd(mmc, &cmd, NULL);
+	if (err) {
+		debug("mmc_boot_partition_size_change: Error3 = %d\n", err);
+		return err;
+	}
+	/* RPMB partition size is multiple of 128KB */
+	rpmbsize = (rpmbsize * 1024) / 128;
+	/* Arg: RPMB partition size */
+	cmd.cmdidx = MMC_CMD_RES_MAN;
+	cmd.resp_type = MMC_RSP_R1b;
+	cmd.cmdarg = rpmbsize;
+
+	err = mmc_send_cmd(mmc, &cmd, NULL);
+	if (err) {
+		debug("mmc_boot_partition_size_change: Error4 = %d\n", err);
+		return err;
+	}
+	return 0;
+}
+
+/*
+ * Modify EXT_CSD[177] which is BOOT_BUS_WIDTH
+ * based on the passed in values for BOOT_BUS_WIDTH, RESET_BOOT_BUS_WIDTH
+ * and BOOT_MODE.
+ *
+ * Returns 0 on success.
+ */
+int mmc_set_boot_bus_width(struct mmc *mmc, u8 width, u8 reset, u8 mode)
+{
+	int err;
+
+	err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BOOT_BUS_WIDTH,
+			 EXT_CSD_BOOT_BUS_WIDTH_MODE(mode) |
+			 EXT_CSD_BOOT_BUS_WIDTH_RESET(reset) |
+			 EXT_CSD_BOOT_BUS_WIDTH_WIDTH(width));
+
+	if (err)
+		return err;
+	return 0;
+}
+
+/*
+ * Modify EXT_CSD[179] which is PARTITION_CONFIG (formerly BOOT_CONFIG)
+ * based on the passed in values for BOOT_ACK, BOOT_PARTITION_ENABLE and
+ * PARTITION_ACCESS.
+ *
+ * Returns 0 on success.
+ */
+int mmc_set_part_conf(struct mmc *mmc, u8 ack, u8 part_num, u8 access)
+{
+	int err;
+
+	err = mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONF,
+			 EXT_CSD_BOOT_ACK(ack) |
+			 EXT_CSD_BOOT_PART_NUM(part_num) |
+			 EXT_CSD_PARTITION_ACCESS(access));
+
+	if (err)
+		return err;
+	return 0;
+}
+
+/*
+ * Modify EXT_CSD[162] which is RST_n_FUNCTION based on the given value
+ * for enable.  Note that this is a write-once field for non-zero values.
+ *
+ * Returns 0 on success.
+ */
+int mmc_set_rst_n_function(struct mmc *mmc, u8 enable)
+{
+	return mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_RST_N_FUNCTION,
+			  enable);
+}
+#endif

@@ -1,23 +1,7 @@
 /*
  * Copyright 2011 Freescale Semiconductor, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -32,7 +16,9 @@
 #define ESDHC_BOOT_IMAGE_SIZE	0x48
 #define ESDHC_BOOT_IMAGE_ADDR	0x50
 
-int mmc_get_env_addr(struct mmc *mmc, u32 *env_addr)
+#define ESDHC_DEFAULT_ENVADDR	0x400
+
+int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr)
 {
 	u8 *tmp_buf;
 	u32 blklen, code_offset, code_len, n;
@@ -54,6 +40,33 @@ int mmc_get_env_addr(struct mmc *mmc, u32 *env_addr)
 
 	/* Get the code size from offset 0x48 */
 	code_len = *(u32 *)(tmp_buf + ESDHC_BOOT_IMAGE_SIZE);
+
+#ifdef CONFIG_ESDHC_HC_BLK_ADDR
+	/*
+	 * On soc BSC9131, BSC9132:
+	 * In High Capacity SD Cards (> 2 GBytes), the 32-bit source address and
+	 * code length of these soc specify the memory address in block address
+	 * format. Block length is fixed to 512 bytes as per the SD High
+	 * Capacity specification.
+	 */
+	u64 tmp;
+
+	if (mmc->high_capacity) {
+		tmp = (u64)code_offset * blklen;
+		tmp += code_len * blklen;
+	} else
+		tmp = code_offset + code_len;
+
+	if ((tmp + CONFIG_ENV_SIZE > mmc->capacity) ||
+			(tmp > 0xFFFFFFFFU))
+		*env_addr = ESDHC_DEFAULT_ENVADDR;
+	else
+		*env_addr = tmp;
+
+	free(tmp_buf);
+
+	return 0;
+#endif
 
 	*env_addr = code_offset + code_len;
 

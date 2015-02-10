@@ -8,23 +8,7 @@
  * Michal  SIMEK <monstr@monstr.eu>
  * Yasushi SHOJI <yashi@atmark-techno.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -40,6 +24,12 @@ int do_bootm_linux(int flag, int argc, char * const argv[],
 {
 	void	(*kernel) (unsigned int);
 	ulong	rd_data_start, rd_data_end;
+
+	/*
+	 * allow the PREP bootm subcommand, it is required for bootm to work
+	 */
+	if (flag & BOOTM_STATE_OS_PREP)
+		return 0;
 
 	if ((flag != 0) && (flag != BOOTM_STATE_OS_GO))
 		return 1;
@@ -63,8 +53,8 @@ int do_bootm_linux(int flag, int argc, char * const argv[],
 
 	show_boot_progress(15);
 
-	if (!of_flat_tree && argc > 3)
-		of_flat_tree = (char *)simple_strtoul(argv[3], NULL, 16);
+	if (!of_flat_tree && argc > 1)
+		of_flat_tree = (char *)simple_strtoul(argv[1], NULL, 16);
 #ifdef DEBUG
 	printf("## Transferring control to Linux (at address 0x%08lx) " \
 				"ramdisk 0x%08lx, FDT 0x%08lx...\n",

@@ -6,22 +6,7 @@
  * Copyright (C) 2008 Lyrtech <www.lyrtech.com>
  * Copyright (C) 2004 Texas Instruments.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -104,7 +89,7 @@ void davinci_sync_env_enetaddr(uint8_t *rom_enetaddr)
 	int ret;
 
 	ret = eth_getenv_enetaddr_by_index("eth", 0, env_enetaddr);
-	if (ret) {
+	if (!ret) {
 		/*
 		 * There is no MAC address in the environment, so we
 		 * initialize it from the value in the EEPROM.
@@ -115,7 +100,7 @@ void davinci_sync_env_enetaddr(uint8_t *rom_enetaddr)
 		ret = !eth_setenv_enetaddr("ethaddr", rom_enetaddr);
 	}
 	if (!ret)
-		printf("Failed to set mac address from EEPROM\n");
+		printf("Failed to set mac address from EEPROM: %d\n", ret);
 }
 #endif	/* CONFIG_DRIVER_TI_EMAC */
 

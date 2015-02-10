@@ -1,28 +1,17 @@
 /*
+ * Copyright (C) 2009 Sergey Kubushyn <ksi@koi8.net>
+ *
+ * Changes for multibus/multiadapter I2C support.
+ *
  * (C) Copyright 2000
  * Paolo Scaffardi, AIRVENT SAM s.p.a - RIMINI(ITALY), arsenio@tin.it
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
 #include <common.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <malloc.h>
 #include <stdio_dev.h>
@@ -30,7 +19,8 @@
 #ifdef CONFIG_LOGBUFFER
 #include <logbuff.h>
 #endif
-#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SOFT_I2C)
+
+#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SYS_I2C)
 #include <i2c.h>
 #endif
 
@@ -44,24 +34,47 @@ char *stdio_names[MAX_FILES] = { "stdin", "stdout", "stderr" };
 #define	CONFIG_SYS_DEVICE_NULLDEV	1
 #endif
 
+#ifdef	CONFIG_SYS_STDIO_DEREGISTER
+#define	CONFIG_SYS_DEVICE_NULLDEV	1
+#endif
 
 #ifdef CONFIG_SYS_DEVICE_NULLDEV
-void nulldev_putc(const char c)
+static void nulldev_putc(struct stdio_dev *dev, const char c)
 {
 	/* nulldev is empty! */
 }
 
-void nulldev_puts(const char *s)
+static void nulldev_puts(struct stdio_dev *dev, const char *s)
 {
 	/* nulldev is empty! */
 }
 
-int nulldev_input(void)
+static int nulldev_input(struct stdio_dev *dev)
 {
 	/* nulldev is empty! */
 	return 0;
 }
 #endif
+
+static void stdio_serial_putc(struct stdio_dev *dev, const char c)
+{
+	serial_putc(c);
+}
+
+static void stdio_serial_puts(struct stdio_dev *dev, const char *s)
+{
+	serial_puts(s);
+}
+
+static int stdio_serial_getc(struct stdio_dev *dev)
+{
+	return serial_getc();
+}
+
+static int stdio_serial_tstc(struct stdio_dev *dev)
+{
+	return serial_tstc();
+}
 
 /**************************************************************************
  * SYSTEM DRIVERS
@@ -76,10 +89,10 @@ static void drv_system_init (void)
 
 	strcpy (dev.name, "serial");
 	dev.flags = DEV_FLAGS_OUTPUT | DEV_FLAGS_INPUT | DEV_FLAGS_SYSTEM;
-	dev.putc = serial_putc;
-	dev.puts = serial_puts;
-	dev.getc = serial_getc;
-	dev.tstc = serial_tstc;
+	dev.putc = stdio_serial_putc;
+	dev.puts = stdio_serial_puts;
+	dev.getc = stdio_serial_getc;
+	dev.tstc = stdio_serial_tstc;
 	stdio_register (&dev);
 
 #ifdef CONFIG_SYS_DEVICE_NULLDEV
@@ -139,35 +152,42 @@ struct stdio_dev* stdio_clone(struct stdio_dev *dev)
 	return _dev;
 }
 
-int stdio_register (struct stdio_dev * dev)
+int stdio_register_dev(struct stdio_dev *dev, struct stdio_dev **devp)
 {
 	struct stdio_dev *_dev;
 
 	_dev = stdio_clone(dev);
 	if(!_dev)
-		return -1;
+		return -ENODEV;
 	list_add_tail(&(_dev->list), &(devs.list));
+	if (devp)
+		*devp = _dev;
+
 	return 0;
+}
+
+int stdio_register(struct stdio_dev *dev)
+{
+	return stdio_register_dev(dev, NULL);
 }
 
 /* deregister the device "devname".
  * returns 0 if success, -1 if device is assigned and 1 if devname not found
  */
 #ifdef	CONFIG_SYS_STDIO_DEREGISTER
-int stdio_deregister(const char *devname)
+int stdio_deregister_dev(struct stdio_dev *dev, int force)
 {
 	int l;
 	struct list_head *pos;
-	struct stdio_dev *dev;
 	char temp_names[3][16];
 
-	dev = stdio_get_by_name(devname);
-
-	if(!dev) /* device not found */
-		return -1;
 	/* get stdio devices (ListRemoveItem changes the dev list) */
 	for (l=0 ; l< MAX_FILES; l++) {
 		if (stdio_devices[l] == dev) {
+			if (force) {
+				strcpy(temp_names[l], "nulldev");
+				continue;
+			}
 			/* Device is assigned -> report error */
 			return -1;
 		}
@@ -177,6 +197,7 @@ int stdio_deregister(const char *devname)
 	}
 
 	list_del(&(dev->list));
+	free(dev);
 
 	/* reassign Device list */
 	list_for_each(pos, &(devs.list)) {
@@ -188,9 +209,21 @@ int stdio_deregister(const char *devname)
 	}
 	return 0;
 }
+
+int stdio_deregister(const char *devname, int force)
+{
+	struct stdio_dev *dev;
+
+	dev = stdio_get_by_name(devname);
+
+	if (!dev) /* device not found */
+		return -ENODEV;
+
+	return stdio_deregister_dev(dev, force);
+}
 #endif	/* CONFIG_SYS_STDIO_DEREGISTER */
 
-int stdio_init (void)
+int stdio_init_tables(void)
 {
 #if defined(CONFIG_NEEDS_MANUAL_RELOC)
 	/* already relocated for current ARM implementation */
@@ -207,11 +240,17 @@ int stdio_init (void)
 	/* Initialize the list */
 	INIT_LIST_HEAD(&(devs.list));
 
-#ifdef CONFIG_ARM_DCC_MULTI
-	drv_arm_dcc_init ();
-#endif
-#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SOFT_I2C)
+	return 0;
+}
+
+int stdio_add_devices(void)
+{
+#ifdef CONFIG_SYS_I2C
+	i2c_init_all();
+#else
+#if defined(CONFIG_HARD_I2C)
 	i2c_init (CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
+#endif
 #endif
 #ifdef CONFIG_LCD
 	drv_lcd_init ();
@@ -239,5 +278,14 @@ int stdio_init (void)
 #ifdef CONFIG_CBMEM_CONSOLE
 	cbmemc_init();
 #endif
-	return (0);
+
+	return 0;
+}
+
+int stdio_init(void)
+{
+	stdio_init_tables();
+	stdio_add_devices();
+
+	return 0;
 }

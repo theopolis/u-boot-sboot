@@ -5,21 +5,7 @@
  * Copyright (C) 2007 Eurotech S.p.A.  <info@eurotech.it>
  * Copyright (C) 2008 Vivek Kutal      <vivek.kutal@azingo.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 
@@ -30,6 +16,7 @@
 #include <asm/arch/hardware.h>
 #include <asm/io.h>
 #include <usb/pxa27x_udc.h>
+#include <usb/udc.h>
 
 #include "ep0.h"
 
@@ -78,7 +65,8 @@ static int udc_write_urb(struct usb_endpoint_instance *endpoint)
 	if (!urb || !urb->actual_length)
 		return -1;
 
-	n = MIN(urb->actual_length - endpoint->sent, endpoint->tx_packetSize);
+	n = min_t(unsigned int, urb->actual_length - endpoint->sent,
+		  endpoint->tx_packetSize);
 	if (n <= 0)
 		return -1;
 
@@ -151,7 +139,7 @@ static int udc_read_urb(struct usb_endpoint_instance *endpoint)
 	struct urb *urb = endpoint->rcv_urb;
 	int ep_num = endpoint->endpoint_address & USB_ENDPOINT_NUMBER_MASK;
 	u32 *data32 = (u32 *) urb->buffer;
-	unsigned int i, n, is_short ;
+	unsigned int i, n;
 
 	usbdbg("read urb on ep %d", ep_num);
 #if defined(USBDDBG) && defined(USBDPARANOIA)
@@ -165,9 +153,8 @@ static int udc_read_urb(struct usb_endpoint_instance *endpoint)
 		n = readl(UDCBCN(ep_num)) & 0x3ff;
 	else /* zlp */
 		n = 0;
-	is_short = n != endpoint->rcv_packetSize;
 
-	usbdbg("n %d%s", n, is_short ? "-s" : "");
+	usbdbg("n %d%s", n, n != endpoint->rcv_packetSize ? "-s" : "");
 	for (i = 0; i < n; i += 4)
 		data32[urb->actual_length / 4 + i / 4] = readl(UDCDN(ep_num));
 
@@ -402,16 +389,13 @@ static void udc_handle_ep(struct usb_endpoint_instance *endpoint)
 
 static void udc_state_changed(void)
 {
-	int config, interface, alternate;
 
 	writel(readl(UDCCR) | UDCCR_SMAC, UDCCR);
 
-	config = (readl(UDCCR) & UDCCR_ACN) >> UDCCR_ACN_S;
-	interface = (readl(UDCCR) & UDCCR_AIN) >> UDCCR_AIN_S;
-	alternate = (readl(UDCCR) & UDCCR_AAISN) >> UDCCR_AAISN_S;
-
 	usbdbg("New UDC settings are: conf %d - inter %d - alter %d",
-		config, interface, alternate);
+	       (readl(UDCCR) & UDCCR_ACN) >> UDCCR_ACN_S,
+	       (readl(UDCCR) & UDCCR_AIN) >> UDCCR_AIN_S,
+	       (readl(UDCCR) & UDCCR_AAISN) >> UDCCR_AAISN_S);
 
 	usbd_device_event_irq(udc_device, DEVICE_CONFIGURED, 0);
 	writel(UDCISR1_IRCC, UDCISR1);
@@ -610,7 +594,9 @@ void udc_connect(void)
 
 #ifdef CONFIG_USB_DEV_PULLUP_GPIO
 	/* Turn on the USB connection by enabling the pullup resistor */
-	set_GPIO_mode(CONFIG_USB_DEV_PULLUP_GPIO | GPIO_OUT);
+	writel(readl(GPDR(CONFIG_USB_DEV_PULLUP_GPIO))
+		     | GPIO_bit(CONFIG_USB_DEV_PULLUP_GPIO),
+	       GPDR(CONFIG_USB_DEV_PULLUP_GPIO));
 	writel(GPIO_bit(CONFIG_USB_DEV_PULLUP_GPIO), GPSR(CONFIG_USB_DEV_PULLUP_GPIO));
 #else
 	/* Host port 2 transceiver D+ pull up enable */

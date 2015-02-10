@@ -10,20 +10,7 @@
  * Which was based on a (non-working) driver which was:
  * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -37,186 +24,31 @@
 
 #define	MXS_I2C_MAX_TIMEOUT	1000000
 
-void mxs_i2c_reset(void)
+static struct mxs_i2c_regs *mxs_i2c_get_base(struct i2c_adapter *adap)
 {
-	struct mxs_i2c_regs *i2c_regs = (struct mxs_i2c_regs *)MXS_I2C0_BASE;
-	int ret;
-	int speed = i2c_get_bus_speed();
-
-	ret = mxs_reset_block(&i2c_regs->hw_i2c_ctrl0_reg);
-	if (ret) {
-		debug("MXS I2C: Block reset timeout\n");
-		return;
-	}
-
-	writel(I2C_CTRL1_DATA_ENGINE_CMPLT_IRQ | I2C_CTRL1_NO_SLAVE_ACK_IRQ |
-		I2C_CTRL1_EARLY_TERM_IRQ | I2C_CTRL1_MASTER_LOSS_IRQ |
-		I2C_CTRL1_SLAVE_STOP_IRQ | I2C_CTRL1_SLAVE_IRQ,
-		&i2c_regs->hw_i2c_ctrl1_clr);
-
-	writel(I2C_QUEUECTRL_PIO_QUEUE_MODE, &i2c_regs->hw_i2c_queuectrl_set);
-
-	i2c_set_bus_speed(speed);
+	if (adap->hwadapnr == 0)
+		return (struct mxs_i2c_regs *)MXS_I2C0_BASE;
+	else
+		return (struct mxs_i2c_regs *)MXS_I2C1_BASE;
 }
 
-void mxs_i2c_setup_read(uint8_t chip, int len)
+static unsigned int mxs_i2c_get_bus_speed(struct i2c_adapter *adap)
 {
-	struct mxs_i2c_regs *i2c_regs = (struct mxs_i2c_regs *)MXS_I2C0_BASE;
+	struct mxs_i2c_regs *i2c_regs = mxs_i2c_get_base(adap);
+	uint32_t clk = mxc_get_clock(MXC_XTAL_CLK);
+	uint32_t timing0;
 
-	writel(I2C_QUEUECMD_RETAIN_CLOCK | I2C_QUEUECMD_PRE_SEND_START |
-		I2C_QUEUECMD_MASTER_MODE | I2C_QUEUECMD_DIRECTION |
-		(1 << I2C_QUEUECMD_XFER_COUNT_OFFSET),
-		&i2c_regs->hw_i2c_queuecmd);
-
-	writel((chip << 1) | 1, &i2c_regs->hw_i2c_data);
-
-	writel(I2C_QUEUECMD_SEND_NAK_ON_LAST | I2C_QUEUECMD_MASTER_MODE |
-		(len << I2C_QUEUECMD_XFER_COUNT_OFFSET) |
-		I2C_QUEUECMD_POST_SEND_STOP, &i2c_regs->hw_i2c_queuecmd);
-
-	writel(I2C_QUEUECTRL_QUEUE_RUN, &i2c_regs->hw_i2c_queuectrl_set);
+	timing0 = readl(&i2c_regs->hw_i2c_timing0);
+	/*
+	 * This is a reverse version of the algorithm presented in
+	 * i2c_set_bus_speed(). Please refer there for details.
+	 */
+	return clk / ((((timing0 >> 16) - 3) * 2) + 38);
 }
 
-void mxs_i2c_write(uchar chip, uint addr, int alen,
-			uchar *buf, int blen, int stop)
+static uint mxs_i2c_set_bus_speed(struct i2c_adapter *adap, uint speed)
 {
-	struct mxs_i2c_regs *i2c_regs = (struct mxs_i2c_regs *)MXS_I2C0_BASE;
-	uint32_t data;
-	int i, remain, off;
-
-	if ((alen > 4) || (alen == 0)) {
-		debug("MXS I2C: Invalid address length\n");
-		return;
-	}
-
-	if (stop)
-		stop = I2C_QUEUECMD_POST_SEND_STOP;
-
-	writel(I2C_QUEUECMD_PRE_SEND_START |
-		I2C_QUEUECMD_MASTER_MODE | I2C_QUEUECMD_DIRECTION |
-		((blen + alen + 1) << I2C_QUEUECMD_XFER_COUNT_OFFSET) | stop,
-		&i2c_regs->hw_i2c_queuecmd);
-
-	data = (chip << 1) << 24;
-
-	for (i = 0; i < alen; i++) {
-		data >>= 8;
-		data |= ((char *)&addr)[alen - i - 1] << 24;
-		if ((i & 3) == 2)
-			writel(data, &i2c_regs->hw_i2c_data);
-	}
-
-	off = i;
-	for (; i < off + blen; i++) {
-		data >>= 8;
-		data |= buf[i - off] << 24;
-		if ((i & 3) == 2)
-			writel(data, &i2c_regs->hw_i2c_data);
-	}
-
-	remain = 24 - ((i & 3) * 8);
-	if (remain)
-		writel(data >> remain, &i2c_regs->hw_i2c_data);
-
-	writel(I2C_QUEUECTRL_QUEUE_RUN, &i2c_regs->hw_i2c_queuectrl_set);
-}
-
-int mxs_i2c_wait_for_ack(void)
-{
-	struct mxs_i2c_regs *i2c_regs = (struct mxs_i2c_regs *)MXS_I2C0_BASE;
-	uint32_t tmp;
-	int timeout = MXS_I2C_MAX_TIMEOUT;
-
-	for (;;) {
-		tmp = readl(&i2c_regs->hw_i2c_ctrl1);
-		if (tmp & I2C_CTRL1_NO_SLAVE_ACK_IRQ) {
-			debug("MXS I2C: No slave ACK\n");
-			goto err;
-		}
-
-		if (tmp & (
-			I2C_CTRL1_EARLY_TERM_IRQ | I2C_CTRL1_MASTER_LOSS_IRQ |
-			I2C_CTRL1_SLAVE_STOP_IRQ | I2C_CTRL1_SLAVE_IRQ)) {
-			debug("MXS I2C: Error (CTRL1 = %08x)\n", tmp);
-			goto err;
-		}
-
-		if (tmp & I2C_CTRL1_DATA_ENGINE_CMPLT_IRQ)
-			break;
-
-		if (!timeout--) {
-			debug("MXS I2C: Operation timed out\n");
-			goto err;
-		}
-
-		udelay(1);
-	}
-
-	return 0;
-
-err:
-	mxs_i2c_reset();
-	return 1;
-}
-
-int i2c_read(uchar chip, uint addr, int alen, uchar *buffer, int len)
-{
-	struct mxs_i2c_regs *i2c_regs = (struct mxs_i2c_regs *)MXS_I2C0_BASE;
-	uint32_t tmp = 0;
-	int ret;
-	int i;
-
-	mxs_i2c_write(chip, addr, alen, NULL, 0, 0);
-	ret = mxs_i2c_wait_for_ack();
-	if (ret) {
-		debug("MXS I2C: Failed writing address\n");
-		return ret;
-	}
-
-	mxs_i2c_setup_read(chip, len);
-	ret = mxs_i2c_wait_for_ack();
-	if (ret) {
-		debug("MXS I2C: Failed reading address\n");
-		return ret;
-	}
-
-	for (i = 0; i < len; i++) {
-		if (!(i & 3)) {
-			while (readl(&i2c_regs->hw_i2c_queuestat) &
-				I2C_QUEUESTAT_RD_QUEUE_EMPTY)
-				;
-			tmp = readl(&i2c_regs->hw_i2c_queuedata);
-		}
-		buffer[i] = tmp & 0xff;
-		tmp >>= 8;
-	}
-
-	return 0;
-}
-
-int i2c_write(uchar chip, uint addr, int alen, uchar *buffer, int len)
-{
-	int ret;
-	mxs_i2c_write(chip, addr, alen, buffer, len, 1);
-	ret = mxs_i2c_wait_for_ack();
-	if (ret)
-		debug("MXS I2C: Failed writing address\n");
-
-	return ret;
-}
-
-int i2c_probe(uchar chip)
-{
-	int ret;
-	mxs_i2c_write(chip, 0, 1, NULL, 0, 1);
-	ret = mxs_i2c_wait_for_ack();
-	mxs_i2c_reset();
-	return ret;
-}
-
-int i2c_set_bus_speed(unsigned int speed)
-{
-	struct mxs_i2c_regs *i2c_regs = (struct mxs_i2c_regs *)MXS_I2C0_BASE;
+	struct mxs_i2c_regs *i2c_regs = mxs_i2c_get_base(adap);
 	/*
 	 * The timing derivation algorithm. There is no documentation for this
 	 * algorithm available, it was derived by using the scope and fiddling
@@ -255,24 +87,234 @@ int i2c_set_bus_speed(unsigned int speed)
 	return 0;
 }
 
-unsigned int i2c_get_bus_speed(void)
+static void mxs_i2c_reset(struct i2c_adapter *adap)
 {
-	struct mxs_i2c_regs *i2c_regs = (struct mxs_i2c_regs *)MXS_I2C0_BASE;
-	uint32_t clk = mxc_get_clock(MXC_XTAL_CLK);
-	uint32_t timing0;
+	struct mxs_i2c_regs *i2c_regs = mxs_i2c_get_base(adap);
+	int ret;
+	int speed = mxs_i2c_get_bus_speed(adap);
 
-	timing0 = readl(&i2c_regs->hw_i2c_timing0);
-	/*
-	 * This is a reverse version of the algorithm presented in
-	 * i2c_set_bus_speed(). Please refer there for details.
-	 */
-	return clk / ((((timing0 >> 16) - 3) * 2) + 38);
+	ret = mxs_reset_block(&i2c_regs->hw_i2c_ctrl0_reg);
+	if (ret) {
+		debug("MXS I2C: Block reset timeout\n");
+		return;
+	}
+
+	writel(I2C_CTRL1_DATA_ENGINE_CMPLT_IRQ | I2C_CTRL1_NO_SLAVE_ACK_IRQ |
+		I2C_CTRL1_EARLY_TERM_IRQ | I2C_CTRL1_MASTER_LOSS_IRQ |
+		I2C_CTRL1_SLAVE_STOP_IRQ | I2C_CTRL1_SLAVE_IRQ,
+		&i2c_regs->hw_i2c_ctrl1_clr);
+
+	writel(I2C_QUEUECTRL_PIO_QUEUE_MODE, &i2c_regs->hw_i2c_queuectrl_set);
+
+	mxs_i2c_set_bus_speed(adap, speed);
 }
 
-void i2c_init(int speed, int slaveadd)
+static void mxs_i2c_setup_read(struct i2c_adapter *adap, uint8_t chip, int len)
 {
-	mxs_i2c_reset();
-	i2c_set_bus_speed(speed);
+	struct mxs_i2c_regs *i2c_regs = mxs_i2c_get_base(adap);
+
+	writel(I2C_QUEUECMD_RETAIN_CLOCK | I2C_QUEUECMD_PRE_SEND_START |
+		I2C_QUEUECMD_MASTER_MODE | I2C_QUEUECMD_DIRECTION |
+		(1 << I2C_QUEUECMD_XFER_COUNT_OFFSET),
+		&i2c_regs->hw_i2c_queuecmd);
+
+	writel((chip << 1) | 1, &i2c_regs->hw_i2c_data);
+
+	writel(I2C_QUEUECMD_SEND_NAK_ON_LAST | I2C_QUEUECMD_MASTER_MODE |
+		(len << I2C_QUEUECMD_XFER_COUNT_OFFSET) |
+		I2C_QUEUECMD_POST_SEND_STOP, &i2c_regs->hw_i2c_queuecmd);
+
+	writel(I2C_QUEUECTRL_QUEUE_RUN, &i2c_regs->hw_i2c_queuectrl_set);
+}
+
+static int mxs_i2c_write(struct i2c_adapter *adap, uchar chip, uint addr,
+			 int alen, uchar *buf, int blen, int stop)
+{
+	struct mxs_i2c_regs *i2c_regs = mxs_i2c_get_base(adap);
+	uint32_t data, tmp;
+	int i, remain, off;
+	int timeout = MXS_I2C_MAX_TIMEOUT;
+
+	if ((alen > 4) || (alen == 0)) {
+		debug("MXS I2C: Invalid address length\n");
+		return -EINVAL;
+	}
+
+	if (stop)
+		stop = I2C_QUEUECMD_POST_SEND_STOP;
+
+	writel(I2C_QUEUECMD_PRE_SEND_START |
+		I2C_QUEUECMD_MASTER_MODE | I2C_QUEUECMD_DIRECTION |
+		((blen + alen + 1) << I2C_QUEUECMD_XFER_COUNT_OFFSET) | stop,
+		&i2c_regs->hw_i2c_queuecmd);
+
+	data = (chip << 1) << 24;
+
+	for (i = 0; i < alen; i++) {
+		data >>= 8;
+		data |= ((char *)&addr)[alen - i - 1] << 24;
+		if ((i & 3) == 2)
+			writel(data, &i2c_regs->hw_i2c_data);
+	}
+
+	off = i;
+	for (; i < off + blen; i++) {
+		data >>= 8;
+		data |= buf[i - off] << 24;
+		if ((i & 3) == 2)
+			writel(data, &i2c_regs->hw_i2c_data);
+	}
+
+	remain = 24 - ((i & 3) * 8);
+	if (remain)
+		writel(data >> remain, &i2c_regs->hw_i2c_data);
+
+	writel(I2C_QUEUECTRL_QUEUE_RUN, &i2c_regs->hw_i2c_queuectrl_set);
+
+	while (--timeout) {
+		tmp = readl(&i2c_regs->hw_i2c_queuestat);
+		if (tmp & I2C_QUEUESTAT_WR_QUEUE_EMPTY)
+			break;
+	}
+
+	if (!timeout) {
+		debug("MXS I2C: Failed transmitting data!\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int mxs_i2c_wait_for_ack(struct i2c_adapter *adap)
+{
+	struct mxs_i2c_regs *i2c_regs = mxs_i2c_get_base(adap);
+	uint32_t tmp;
+	int timeout = MXS_I2C_MAX_TIMEOUT;
+
+	for (;;) {
+		tmp = readl(&i2c_regs->hw_i2c_ctrl1);
+		if (tmp & I2C_CTRL1_NO_SLAVE_ACK_IRQ) {
+			debug("MXS I2C: No slave ACK\n");
+			goto err;
+		}
+
+		if (tmp & (
+			I2C_CTRL1_EARLY_TERM_IRQ | I2C_CTRL1_MASTER_LOSS_IRQ |
+			I2C_CTRL1_SLAVE_STOP_IRQ | I2C_CTRL1_SLAVE_IRQ)) {
+			debug("MXS I2C: Error (CTRL1 = %08x)\n", tmp);
+			goto err;
+		}
+
+		if (tmp & I2C_CTRL1_DATA_ENGINE_CMPLT_IRQ)
+			break;
+
+		if (!timeout--) {
+			debug("MXS I2C: Operation timed out\n");
+			goto err;
+		}
+
+		udelay(1);
+	}
+
+	return 0;
+
+err:
+	mxs_i2c_reset(adap);
+	return 1;
+}
+
+static int mxs_i2c_if_read(struct i2c_adapter *adap, uint8_t chip,
+			   uint addr, int alen, uint8_t *buffer,
+			   int len)
+{
+	struct mxs_i2c_regs *i2c_regs = mxs_i2c_get_base(adap);
+	uint32_t tmp = 0;
+	int timeout = MXS_I2C_MAX_TIMEOUT;
+	int ret;
+	int i;
+
+	ret = mxs_i2c_write(adap, chip, addr, alen, NULL, 0, 0);
+	if (ret) {
+		debug("MXS I2C: Failed writing address\n");
+		return ret;
+	}
+
+	ret = mxs_i2c_wait_for_ack(adap);
+	if (ret) {
+		debug("MXS I2C: Failed writing address\n");
+		return ret;
+	}
+
+	mxs_i2c_setup_read(adap, chip, len);
+	ret = mxs_i2c_wait_for_ack(adap);
+	if (ret) {
+		debug("MXS I2C: Failed reading address\n");
+		return ret;
+	}
+
+	for (i = 0; i < len; i++) {
+		if (!(i & 3)) {
+			while (--timeout) {
+				tmp = readl(&i2c_regs->hw_i2c_queuestat);
+				if (!(tmp & I2C_QUEUESTAT_RD_QUEUE_EMPTY))
+					break;
+			}
+
+			if (!timeout) {
+				debug("MXS I2C: Failed receiving data!\n");
+				return -ETIMEDOUT;
+			}
+
+			tmp = readl(&i2c_regs->hw_i2c_queuedata);
+		}
+		buffer[i] = tmp & 0xff;
+		tmp >>= 8;
+	}
+
+	return 0;
+}
+
+static int mxs_i2c_if_write(struct i2c_adapter *adap, uint8_t chip,
+			    uint addr, int alen, uint8_t *buffer,
+			    int len)
+{
+	int ret;
+	ret = mxs_i2c_write(adap, chip, addr, alen, buffer, len, 1);
+	if (ret) {
+		debug("MXS I2C: Failed writing address\n");
+		return ret;
+	}
+
+	ret = mxs_i2c_wait_for_ack(adap);
+	if (ret)
+		debug("MXS I2C: Failed writing address\n");
+
+	return ret;
+}
+
+static int mxs_i2c_probe(struct i2c_adapter *adap, uint8_t chip)
+{
+	int ret;
+	ret = mxs_i2c_write(adap, chip, 0, 1, NULL, 0, 1);
+	if (!ret)
+		ret = mxs_i2c_wait_for_ack(adap);
+	mxs_i2c_reset(adap);
+	return ret;
+}
+
+static void mxs_i2c_init(struct i2c_adapter *adap, int speed, int slaveaddr)
+{
+	mxs_i2c_reset(adap);
+	mxs_i2c_set_bus_speed(adap, speed);
 
 	return;
 }
+
+U_BOOT_I2C_ADAP_COMPLETE(mxs0, mxs_i2c_init, mxs_i2c_probe,
+			 mxs_i2c_if_read, mxs_i2c_if_write,
+			 mxs_i2c_set_bus_speed,
+			 CONFIG_SYS_I2C_SPEED, 0, 0)
+U_BOOT_I2C_ADAP_COMPLETE(mxs1, mxs_i2c_init, mxs_i2c_probe,
+			 mxs_i2c_if_read, mxs_i2c_if_write,
+			 mxs_i2c_set_bus_speed,
+			 CONFIG_SYS_I2C_SPEED, 0, 1)

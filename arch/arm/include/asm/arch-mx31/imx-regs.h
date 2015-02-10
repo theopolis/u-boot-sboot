@@ -1,24 +1,7 @@
 /*
- *
  * (c) 2007 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_ARCH_MX31_IMX_REGS_H
@@ -68,7 +51,7 @@ struct cspi_regs {
 	u32 test;
 };
 
-/* IIM Control Registers */
+/* IIM control registers */
 struct iim_regs {
 	u32 iim_stat;
 	u32 iim_statm;
@@ -80,11 +63,28 @@ struct iim_regs {
 	u32 iim_sdat;
 	u32 iim_prev;
 	u32 iim_srev;
-	u32 iim_prog_p;
+	u32 iim_prg_p;
 	u32 iim_scs0;
 	u32 iim_scs1;
 	u32 iim_scs2;
 	u32 iim_scs3;
+	u32 res[0x1f1];
+	struct fuse_bank {
+		u32 fuse_regs[0x20];
+		u32 fuse_rsvd[0xe0];
+	} bank[3];
+};
+
+struct fuse_bank0_regs {
+	u32 fuse0_5[6];
+	u32 usr;
+	u32 fuse7_15[9];
+};
+
+struct fuse_bank2_regs {
+	u32 fuse0;
+	u32 uid[8];
+	u32 fuse9_15[7];
 };
 
 struct iomuxc_regs {
@@ -557,6 +557,7 @@ struct esdc_regs {
 #define CCMR_CKIH	(2 << 1)
 
 #define MX31_IIM_BASE_ADDR	0x5001C000
+#define IIM_BASE_ADDR		MX31_IIM_BASE_ADDR
 
 #define PDR0_CSI_PODF(x)	(((x) & 0x3f) << 26)
 #define PDR0_CSI_PRDF(x)	(((x) & 0x7) << 23)
@@ -908,9 +909,19 @@ struct esdc_regs {
 #define MXC_CSPIPERIOD_32KHZ	(1 << 15)
 #define MAX_SPI_BYTES	4
 
+
 #define MXC_SPI_BASE_ADDRESSES \
 	0x43fa4000, \
 	0x50010000, \
 	0x53f84000,
+
+/*
+ * Generic timer support
+ */
+#ifdef CONFIG_MX31_CLK32
+#define	CONFIG_SYS_TIMER_RATE	CONFIG_MX31_CLK32
+#else
+#define	CONFIG_SYS_TIMER_RATE	32768
+#endif
 
 #endif /* __ASM_ARCH_MX31_IMX_REGS_H */

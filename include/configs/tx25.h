@@ -2,37 +2,33 @@
  * (C) Copyright 2009 DENX Software Engineering
  * Author: John Rigby <jrigby@gmail.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
+#include <asm/arch/imx-regs.h>
 
 /*
  * KARO TX25 board - SoC Configuration
  */
 #define CONFIG_MX25
 #define CONFIG_MX25_CLK32		32000	/* OSC32K frequency */
-#define CONFIG_SYS_HZ			1000
+#define CONFIG_SYS_TIMER_RATE		CONFIG_MX25_CLK32
+#define CONFIG_SYS_TIMER_COUNTER	\
+	(&((struct gpt_regs *)IMX_GPT1_BASE)->counter)
 
 #define	CONFIG_SYS_MONITOR_LEN		(256 << 10)	/* 256 kB for U-Boot */
 
-/* NAND BOOT is the only boot method */
-#define CONFIG_NAND_U_BOOT
+#define CONFIG_SPL_TARGET		"u-boot-with-spl.bin"
+#define CONFIG_SPL_LDSCRIPT		"arch/$(ARCH)/cpu/u-boot-spl.lds"
+#define CONFIG_SPL_MAX_SIZE		2048
+#define CONFIG_SPL_NAND_SUPPORT
+#define CONFIG_SPL_LIBGENERIC_SUPPORT
+
+#define CONFIG_SPL_TEXT_BASE		0x810c0000
+#define CONFIG_SYS_TEXT_BASE		0x81200000
 
 #ifndef MACH_TYPE_TX25
 #define MACH_TYPE_TX25	2177
@@ -40,16 +36,16 @@
 
 #define CONFIG_MACH_TYPE MACH_TYPE_TX25
 
-#ifdef CONFIG_NAND_SPL
+#ifdef CONFIG_SPL_BUILD
 /* Start copying real U-boot from the second page */
-#define CONFIG_SYS_NAND_U_BOOT_OFFS	0x800
+#define CONFIG_SYS_NAND_U_BOOT_OFFS	CONFIG_SPL_PAD_TO
 #define CONFIG_SYS_NAND_U_BOOT_SIZE	0x30000
 
-#define CONFIG_SYS_NAND_U_BOOT_DST      (0x81200000)
+#define CONFIG_SYS_NAND_U_BOOT_DST      CONFIG_SYS_TEXT_BASE
 #define CONFIG_SYS_NAND_U_BOOT_START    CONFIG_SYS_NAND_U_BOOT_DST
 
 #define CONFIG_SYS_NAND_PAGE_SIZE	2048
-#define CONFIG_SYS_NAND_SPARE_SIZE	64
+#define CONFIG_SYS_NAND_OOBSIZE		64
 #define CONFIG_SYS_NAND_BLOCK_SIZE	(128 * 1024)
 #define CONFIG_SYS_NAND_PAGE_COUNT	64
 #define CONFIG_SYS_NAND_SIZE		(128 * 1024 * 1024)
@@ -115,7 +111,6 @@
 #define CONFIG_SYS_NAND_LARGEPAGE
 
 /* U-Boot general configuration */
-#define CONFIG_SYS_PROMPT	"=> "	/* Monitor Command Prompt */
 #define CONFIG_SYS_CBSIZE	1024	/* Console I/O Buffer Size  */
 /* Print buffer sz */
 #define CONFIG_SYS_PBSIZE	(CONFIG_SYS_CBSIZE + \
@@ -173,7 +168,6 @@
 
 /* additions for new relocation code, must be added to all boards */
 #define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
-#define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SYS_SDRAM_BASE + 0x1000 - /* Fix this */ \
-					GENERATED_GBL_DATA_SIZE)
+#define CONFIG_SYS_INIT_SP_ADDR		(IMX_RAM_BASE + IMX_RAM_SIZE)
 
 #endif /* __CONFIG_H */

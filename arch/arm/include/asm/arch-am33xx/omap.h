@@ -9,50 +9,28 @@
  * Derived from OMAP4 work by
  *	Aneesh V <aneesh@ti.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR /PURPOSE.  See the
- * GNU General Public License for more details.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _OMAP_H_
 #define _OMAP_H_
 
-/*
- * Non-secure SRAM Addresses
- * Non-secure RAM starts at 0x40300000 for GP devices. But we keep SRAM_BASE
- * at 0x40304000(EMU base) so that our code works for both EMU and GP
- */
-#define NON_SECURE_SRAM_START	0x40304000
-#define NON_SECURE_SRAM_END	0x4030E000
-
-/* ROM code defines */
-/* Boot device */
-#define BOOT_DEVICE_MASK	0xFF
-#define BOOT_DEVICE_OFFSET	0x8
-#define DEV_DESC_PTR_OFFSET	0x4
-#define DEV_DATA_PTR_OFFSET	0x18
-#define BOOT_MODE_OFFSET	0x8
-#define RESET_REASON_OFFSET	0x9
-#define CH_FLAGS_OFFSET		0xA
-
-#define CH_FLAGS_CHSETTINGS	(0x1 << 0)
-#define CH_FLAGS_CHRAM		(0x1 << 1)
-#define CH_FLAGS_CHFLASH	(0x1 << 2)
-#define CH_FLAGS_CHMMCSD	(0x1 << 3)
-
-#ifndef __ASSEMBLY__
-struct omap_boot_parameters {
-	char *boot_message;
-	unsigned int mem_boot_descriptor;
-	unsigned char omap_bootdevice;
-	unsigned char reset_reason;
-	unsigned char ch_flags;
-};
+#ifdef CONFIG_AM33XX
+#define NON_SECURE_SRAM_START	0x402F0400
+#define NON_SECURE_SRAM_END	0x40310000
+#define SRAM_SCRATCH_SPACE_ADDR	0x4030B800
+#elif defined(CONFIG_TI81XX)
+#define NON_SECURE_SRAM_START	0x40300000
+#define NON_SECURE_SRAM_END	0x40320000
+#define SRAM_SCRATCH_SPACE_ADDR	0x4031B800
+#elif defined(CONFIG_AM43XX)
+#define NON_SECURE_SRAM_START	0x402F0400
+#define NON_SECURE_SRAM_END	0x40340000
+#define SRAM_SCRATCH_SPACE_ADDR	0x40337C00
+#define AM4372_BOARD_NAME_START	SRAM_SCRATCH_SPACE_ADDR
+#define AM4372_BOARD_NAME_END	SRAM_SCRATCH_SPACE_ADDR + 0xC
+#define AM4372_BOARD_VERSION_START	SRAM_SCRATCH_SPACE_ADDR + 0xD
+#define AM4372_BOARD_VERSION_END	SRAM_SCRATCH_SPACE_ADDR + 0x14
+#define QSPI_BASE              0x47900000
 #endif
 #endif

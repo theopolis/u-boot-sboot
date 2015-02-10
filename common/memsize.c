@@ -2,26 +2,13 @@
  * (C) Copyright 2004
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <config.h>
+#include <common.h>
+
+DECLARE_GLOBAL_DATA_PTR;
+
 #ifdef __PPC__
 /*
  * At least on G2 PowerPC cores, sequential accesses to non-existent
@@ -46,43 +33,46 @@ long get_ram_size(long *base, long maxsize)
 	long           size;
 	int            i = 0;
 
-	for (cnt = (maxsize / sizeof (long)) >> 1; cnt > 0; cnt >>= 1) {
+	for (cnt = (maxsize / sizeof(long)) >> 1; cnt > 0; cnt >>= 1) {
 		addr = base + cnt;	/* pointer arith! */
-		sync ();
+		sync();
 		save[i++] = *addr;
-		sync ();
+		sync();
 		*addr = ~cnt;
 	}
 
 	addr = base;
-	sync ();
+	sync();
 	save[i] = *addr;
-	sync ();
+	sync();
 	*addr = 0;
 
-	sync ();
+	sync();
 	if ((val = *addr) != 0) {
-		/* Restore the original data before leaving the function.
-		 */
-		sync ();
+		/* Restore the original data before leaving the function. */
+		sync();
 		*addr = save[i];
 		for (cnt = 1; cnt < maxsize / sizeof(long); cnt <<= 1) {
 			addr  = base + cnt;
-			sync ();
+			sync();
 			*addr = save[--i];
 		}
 		return (0);
 	}
 
-	for (cnt = 1; cnt < maxsize / sizeof (long); cnt <<= 1) {
+	for (cnt = 1; cnt < maxsize / sizeof(long); cnt <<= 1) {
 		addr = base + cnt;	/* pointer arith! */
 		val = *addr;
 		*addr = save[--i];
 		if (val != ~cnt) {
-			size = cnt * sizeof (long);
-			/* Restore the original data before leaving the function.
+			size = cnt * sizeof(long);
+			/*
+			 * Restore the original data
+			 * before leaving the function.
 			 */
-			for (cnt <<= 1; cnt < maxsize / sizeof (long); cnt <<= 1) {
+			for (cnt <<= 1;
+			     cnt < maxsize / sizeof(long);
+			     cnt <<= 1) {
 				addr  = base + cnt;
 				*addr = save[--i];
 			}
@@ -91,4 +81,15 @@ long get_ram_size(long *base, long maxsize)
 	}
 
 	return (maxsize);
+}
+
+phys_size_t __weak get_effective_memsize(void)
+{
+#ifndef CONFIG_VERY_BIG_RAM
+	return gd->ram_size;
+#else
+	/* limit stack to what we can reasonable map */
+	return ((gd->ram_size > CONFIG_MAX_MEM_MAPPED) ?
+		CONFIG_MAX_MEM_MAPPED : gd->ram_size);
+#endif
 }

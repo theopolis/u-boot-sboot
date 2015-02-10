@@ -11,31 +11,17 @@
  *	Santosh Shilimkar <santosh.shilimkar@ti.com>
  *	Rajendra Nayak <rnayak@ti.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
+#include <i2c.h>
 #include <asm/omap_common.h>
 #include <asm/gpio.h>
-#include <asm/arch/clocks.h>
+#include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/utils.h>
 #include <asm/omap_gpio.h>
+#include <asm/emif.h>
 
 #ifndef CONFIG_SPL_BUILD
 /*
@@ -46,9 +32,19 @@
 #define puts(s)
 #endif
 
+const u32 sys_clk_array[8] = {
+	12000000,	       /* 12 MHz */
+	20000000,		/* 20 MHz */
+	16800000,	       /* 16.8 MHz */
+	19200000,	       /* 19.2 MHz */
+	26000000,	       /* 26 MHz */
+	27000000,	       /* 27 MHz */
+	38400000,	       /* 38.4 MHz */
+};
+
 static inline u32 __get_sys_clk_index(void)
 {
-	u32 ind;
+	s8 ind;
 	/*
 	 * For ES1 the ROM code calibration of sys clock is not reliable
 	 * due to hw issue. So, use hard-coded value. If this value is not
@@ -60,7 +56,7 @@ static inline u32 __get_sys_clk_index(void)
 		ind = OMAP_SYS_CLK_IND_38_4_MHZ;
 	else {
 		/* SYS_CLKSEL - 1 to match the dpll param array indices */
-		ind = (readl(&prcm->cm_sys_clksel) &
+		ind = (readl((*prcm)->cm_sys_clksel) &
 			CM_SYS_CLKSEL_SYS_CLKSEL_MASK) - 1;
 	}
 	return ind;
@@ -75,7 +71,34 @@ u32 get_sys_clk_freq(void)
 	return sys_clk_array[index];
 }
 
-static inline void do_bypass_dpll(u32 *const base)
+void setup_post_dividers(u32 const base, const struct dpll_params *params)
+{
+	struct dpll_regs *const dpll_regs = (struct dpll_regs *)base;
+
+	/* Setup post-dividers */
+	if (params->m2 >= 0)
+		writel(params->m2, &dpll_regs->cm_div_m2_dpll);
+	if (params->m3 >= 0)
+		writel(params->m3, &dpll_regs->cm_div_m3_dpll);
+	if (params->m4_h11 >= 0)
+		writel(params->m4_h11, &dpll_regs->cm_div_m4_h11_dpll);
+	if (params->m5_h12 >= 0)
+		writel(params->m5_h12, &dpll_regs->cm_div_m5_h12_dpll);
+	if (params->m6_h13 >= 0)
+		writel(params->m6_h13, &dpll_regs->cm_div_m6_h13_dpll);
+	if (params->m7_h14 >= 0)
+		writel(params->m7_h14, &dpll_regs->cm_div_m7_h14_dpll);
+	if (params->h21 >= 0)
+		writel(params->h21, &dpll_regs->cm_div_h21_dpll);
+	if (params->h22 >= 0)
+		writel(params->h22, &dpll_regs->cm_div_h22_dpll);
+	if (params->h23 >= 0)
+		writel(params->h23, &dpll_regs->cm_div_h23_dpll);
+	if (params->h24 >= 0)
+		writel(params->h24, &dpll_regs->cm_div_h24_dpll);
+}
+
+static inline void do_bypass_dpll(u32 const base)
 {
 	struct dpll_regs *dpll_regs = (struct dpll_regs *)base;
 
@@ -85,17 +108,17 @@ static inline void do_bypass_dpll(u32 *const base)
 			CM_CLKMODE_DPLL_EN_SHIFT);
 }
 
-static inline void wait_for_bypass(u32 *const base)
+static inline void wait_for_bypass(u32 const base)
 {
 	struct dpll_regs *const dpll_regs = (struct dpll_regs *)base;
 
 	if (!wait_on_value(ST_DPLL_CLK_MASK, 0, &dpll_regs->cm_idlest_dpll,
 				LDELAY)) {
-		printf("Bypassing DPLL failed %p\n", base);
+		printf("Bypassing DPLL failed %x\n", base);
 	}
 }
 
-static inline void do_lock_dpll(u32 *const base)
+static inline void do_lock_dpll(u32 const base)
 {
 	struct dpll_regs *const dpll_regs = (struct dpll_regs *)base;
 
@@ -104,18 +127,18 @@ static inline void do_lock_dpll(u32 *const base)
 		      DPLL_EN_LOCK << CM_CLKMODE_DPLL_EN_SHIFT);
 }
 
-static inline void wait_for_lock(u32 *const base)
+static inline void wait_for_lock(u32 const base)
 {
 	struct dpll_regs *const dpll_regs = (struct dpll_regs *)base;
 
 	if (!wait_on_value(ST_DPLL_CLK_MASK, ST_DPLL_CLK_MASK,
 		&dpll_regs->cm_idlest_dpll, LDELAY)) {
-		printf("DPLL locking failed for %p\n", base);
+		printf("DPLL locking failed for %x\n", base);
 		hang();
 	}
 }
 
-inline u32 check_for_lock(u32 *const base)
+inline u32 check_for_lock(u32 const base)
 {
 	struct dpll_regs *const dpll_regs = (struct dpll_regs *)base;
 	u32 lock = readl(&dpll_regs->cm_idlest_dpll) & ST_DPLL_CLK_MASK;
@@ -123,11 +146,76 @@ inline u32 check_for_lock(u32 *const base)
 	return lock;
 }
 
-static void do_setup_dpll(u32 *const base, const struct dpll_params *params,
+const struct dpll_params *get_mpu_dpll_params(struct dplls const *dpll_data)
+{
+	u32 sysclk_ind = get_sys_clk_index();
+	return &dpll_data->mpu[sysclk_ind];
+}
+
+const struct dpll_params *get_core_dpll_params(struct dplls const *dpll_data)
+{
+	u32 sysclk_ind = get_sys_clk_index();
+	return &dpll_data->core[sysclk_ind];
+}
+
+const struct dpll_params *get_per_dpll_params(struct dplls const *dpll_data)
+{
+	u32 sysclk_ind = get_sys_clk_index();
+	return &dpll_data->per[sysclk_ind];
+}
+
+const struct dpll_params *get_iva_dpll_params(struct dplls const *dpll_data)
+{
+	u32 sysclk_ind = get_sys_clk_index();
+	return &dpll_data->iva[sysclk_ind];
+}
+
+const struct dpll_params *get_usb_dpll_params(struct dplls const *dpll_data)
+{
+	u32 sysclk_ind = get_sys_clk_index();
+	return &dpll_data->usb[sysclk_ind];
+}
+
+const struct dpll_params *get_abe_dpll_params(struct dplls const *dpll_data)
+{
+#ifdef CONFIG_SYS_OMAP_ABE_SYSCK
+	u32 sysclk_ind = get_sys_clk_index();
+	return &dpll_data->abe[sysclk_ind];
+#else
+	return dpll_data->abe;
+#endif
+}
+
+static const struct dpll_params *get_ddr_dpll_params
+			(struct dplls const *dpll_data)
+{
+	u32 sysclk_ind = get_sys_clk_index();
+
+	if (!dpll_data->ddr)
+		return NULL;
+	return &dpll_data->ddr[sysclk_ind];
+}
+
+#ifdef CONFIG_DRIVER_TI_CPSW
+static const struct dpll_params *get_gmac_dpll_params
+			(struct dplls const *dpll_data)
+{
+	u32 sysclk_ind = get_sys_clk_index();
+
+	if (!dpll_data->gmac)
+		return NULL;
+	return &dpll_data->gmac[sysclk_ind];
+}
+#endif
+
+static void do_setup_dpll(u32 const base, const struct dpll_params *params,
 				u8 lock, char *dpll)
 {
 	u32 temp, M, N;
 	struct dpll_regs *const dpll_regs = (struct dpll_regs *)base;
+
+	if (!params)
+		return;
 
 	temp = readl(&dpll_regs->cm_clksel_dpll);
 
@@ -183,7 +271,7 @@ u32 omap_ddr_clk(void)
 	omap_rev = omap_revision();
 	sys_clk_khz = get_sys_clk_freq() / 1000;
 
-	core_dpll_params = get_core_dpll_params();
+	core_dpll_params = get_core_dpll_params(*dplls_data);
 
 	debug("sys_clk %d\n ", sys_clk_khz * 1000);
 
@@ -235,28 +323,23 @@ void configure_mpu_dpll(void)
 	 */
 	if ((omap_rev >= OMAP4460_ES1_0) && (omap_rev < OMAP5430_ES1_0)) {
 		mpu_dpll_regs =
-			(struct dpll_regs *)&prcm->cm_clkmode_dpll_mpu;
-		bypass_dpll(&prcm->cm_clkmode_dpll_mpu);
-		clrbits_le32(&prcm->cm_mpu_mpu_clkctrl,
+			(struct dpll_regs *)((*prcm)->cm_clkmode_dpll_mpu);
+		bypass_dpll((*prcm)->cm_clkmode_dpll_mpu);
+		clrbits_le32((*prcm)->cm_mpu_mpu_clkctrl,
 			MPU_CLKCTRL_CLKSEL_EMIF_DIV_MODE_MASK);
-		setbits_le32(&prcm->cm_mpu_mpu_clkctrl,
+		setbits_le32((*prcm)->cm_mpu_mpu_clkctrl,
 			MPU_CLKCTRL_CLKSEL_ABE_DIV_MODE_MASK);
 		clrbits_le32(&mpu_dpll_regs->cm_clksel_dpll,
 			CM_CLKSEL_DCC_EN_MASK);
 	}
 
-	setbits_le32(&prcm->cm_mpu_mpu_clkctrl,
-		MPU_CLKCTRL_CLKSEL_EMIF_DIV_MODE_MASK);
-	setbits_le32(&prcm->cm_mpu_mpu_clkctrl,
-		MPU_CLKCTRL_CLKSEL_ABE_DIV_MODE_MASK);
+	params = get_mpu_dpll_params(*dplls_data);
 
-	params = get_mpu_dpll_params();
-
-	do_setup_dpll(&prcm->cm_clkmode_dpll_mpu, params, DPLL_LOCK, "mpu");
+	do_setup_dpll((*prcm)->cm_clkmode_dpll_mpu, params, DPLL_LOCK, "mpu");
 	debug("MPU DPLL locked\n");
 }
 
-#ifdef CONFIG_USB_EHCI_OMAP
+#if defined(CONFIG_USB_EHCI_OMAP) || defined(CONFIG_USB_XHCI_OMAP)
 static void setup_usb_dpll(void)
 {
 	const struct dpll_params *params;
@@ -271,17 +354,17 @@ static void setup_usb_dpll(void)
 	 * Use CLKINP in KHz and adjust the denominator accordingly so
 	 * that we have enough accuracy and at the same time no overflow
 	 */
-	params = get_usb_dpll_params();
+	params = get_usb_dpll_params(*dplls_data);
 	num = params->m * sys_clk_khz;
 	den = (params->n + 1) * 250 * 1000;
 	num += den - 1;
 	sd_div = num / den;
-	clrsetbits_le32(&prcm->cm_clksel_dpll_usb,
+	clrsetbits_le32((*prcm)->cm_clksel_dpll_usb,
 			CM_CLKSEL_DPLL_DPLL_SD_DIV_MASK,
 			sd_div << CM_CLKSEL_DPLL_DPLL_SD_DIV_SHIFT);
 
 	/* Now setup the dpll with the regular function */
-	do_setup_dpll(&prcm->cm_clkmode_dpll_usb, params, DPLL_LOCK, "usb");
+	do_setup_dpll((*prcm)->cm_clkmode_dpll_usb, params, DPLL_LOCK, "usb");
 }
 #endif
 
@@ -293,137 +376,251 @@ static void setup_dplls(void)
 	debug("setup_dplls\n");
 
 	/* CORE dpll */
-	params = get_core_dpll_params();	/* default - safest */
+	params = get_core_dpll_params(*dplls_data);	/* default - safest */
 	/*
 	 * Do not lock the core DPLL now. Just set it up.
 	 * Core DPLL will be locked after setting up EMIF
 	 * using the FREQ_UPDATE method(freq_update_core())
 	 */
-	if (omap_revision() != OMAP5432_ES1_0)
-		do_setup_dpll(&prcm->cm_clkmode_dpll_core, params,
+	if (emif_sdram_type() == EMIF_SDRAM_TYPE_LPDDR2)
+		do_setup_dpll((*prcm)->cm_clkmode_dpll_core, params,
 							DPLL_NO_LOCK, "core");
 	else
-		do_setup_dpll(&prcm->cm_clkmode_dpll_core, params,
+		do_setup_dpll((*prcm)->cm_clkmode_dpll_core, params,
 							DPLL_LOCK, "core");
 	/* Set the ratios for CORE_CLK, L3_CLK, L4_CLK */
 	temp = (CLKSEL_CORE_X2_DIV_1 << CLKSEL_CORE_SHIFT) |
 	    (CLKSEL_L3_CORE_DIV_2 << CLKSEL_L3_SHIFT) |
 	    (CLKSEL_L4_L3_DIV_2 << CLKSEL_L4_SHIFT);
-	writel(temp, &prcm->cm_clksel_core);
+	writel(temp, (*prcm)->cm_clksel_core);
 	debug("Core DPLL configured\n");
 
 	/* lock PER dpll */
-	params = get_per_dpll_params();
-	do_setup_dpll(&prcm->cm_clkmode_dpll_per,
+	params = get_per_dpll_params(*dplls_data);
+	do_setup_dpll((*prcm)->cm_clkmode_dpll_per,
 			params, DPLL_LOCK, "per");
 	debug("PER DPLL locked\n");
 
 	/* MPU dpll */
 	configure_mpu_dpll();
 
-#ifdef CONFIG_USB_EHCI_OMAP
+#if defined(CONFIG_USB_EHCI_OMAP) || defined(CONFIG_USB_XHCI_OMAP)
 	setup_usb_dpll();
 #endif
+	params = get_ddr_dpll_params(*dplls_data);
+	do_setup_dpll((*prcm)->cm_clkmode_dpll_ddrphy,
+		      params, DPLL_LOCK, "ddr");
+
+#ifdef CONFIG_DRIVER_TI_CPSW
+	params = get_gmac_dpll_params(*dplls_data);
+	do_setup_dpll((*prcm)->cm_clkmode_dpll_gmac, params,
+		      DPLL_LOCK, "gmac");
+#endif
 }
 
-#ifdef CONFIG_SYS_CLOCKS_ENABLE_ALL
-static void setup_non_essential_dplls(void)
+u32 get_offset_code(u32 volt_offset, struct pmic_data *pmic)
 {
-	u32 abe_ref_clk;
-	const struct dpll_params *params;
+	u32 offset_code;
 
-	/* IVA */
-	clrsetbits_le32(&prcm->cm_bypclk_dpll_iva,
-		CM_BYPCLK_DPLL_IVA_CLKSEL_MASK, DPLL_IVA_CLKSEL_CORE_X2_DIV_2);
+	volt_offset -= pmic->base_offset;
 
-	params = get_iva_dpll_params();
-	do_setup_dpll(&prcm->cm_clkmode_dpll_iva, params, DPLL_LOCK, "iva");
+	offset_code = (volt_offset + pmic->step - 1) / pmic->step;
 
-	/* Configure ABE dpll */
-	params = get_abe_dpll_params();
-#ifdef CONFIG_SYS_OMAP_ABE_SYSCK
-	abe_ref_clk = CM_ABE_PLL_REF_CLKSEL_CLKSEL_SYSCLK;
-#else
-	abe_ref_clk = CM_ABE_PLL_REF_CLKSEL_CLKSEL_32KCLK;
 	/*
-	 * We need to enable some additional options to achieve
-	 * 196.608MHz from 32768 Hz
+	 * Offset codes 1-6 all give the base voltage in Palmas
+	 * Offset code 0 switches OFF the SMPS
 	 */
-	setbits_le32(&prcm->cm_clkmode_dpll_abe,
-			CM_CLKMODE_DPLL_DRIFTGUARD_EN_MASK|
-			CM_CLKMODE_DPLL_RELOCK_RAMP_EN_MASK|
-			CM_CLKMODE_DPLL_LPMODE_EN_MASK|
-			CM_CLKMODE_DPLL_REGM4XEN_MASK);
-	/* Spend 4 REFCLK cycles at each stage */
-	clrsetbits_le32(&prcm->cm_clkmode_dpll_abe,
-			CM_CLKMODE_DPLL_RAMP_RATE_MASK,
-			1 << CM_CLKMODE_DPLL_RAMP_RATE_SHIFT);
-#endif
-
-	/* Select the right reference clk */
-	clrsetbits_le32(&prcm->cm_abe_pll_ref_clksel,
-			CM_ABE_PLL_REF_CLKSEL_CLKSEL_MASK,
-			abe_ref_clk << CM_ABE_PLL_REF_CLKSEL_CLKSEL_SHIFT);
-	/* Lock the dpll */
-	do_setup_dpll(&prcm->cm_clkmode_dpll_abe, params, DPLL_LOCK, "abe");
-}
-#endif
-
-void do_scale_tps62361(int gpio, u32 reg, u32 volt_mv)
-{
-	u32 step;
-	int ret = 0;
-
-	/* See if we can first get the GPIO if needed */
-	if (gpio >= 0)
-		ret = gpio_request(gpio, "TPS62361_VSEL0_GPIO");
-	if (ret < 0) {
-		printf("%s: gpio %d request failed %d\n", __func__, gpio, ret);
-		gpio = -1;
-	}
-
-	/* Pull the GPIO low to select SET0 register, while we program SET1 */
-	if (gpio >= 0)
-		gpio_direction_output(gpio, 0);
-
-	step = volt_mv - TPS62361_BASE_VOLT_MV;
-	step /= 10;
-
-	debug("do_scale_tps62361: volt - %d step - 0x%x\n", volt_mv, step);
-	if (omap_vc_bypass_send_value(TPS62361_I2C_SLAVE_ADDR, reg, step))
-		puts("Scaling voltage failed for vdd_mpu from TPS\n");
-
-	/* Pull the GPIO high to select SET1 register */
-	if (gpio >= 0)
-		gpio_direction_output(gpio, 1);
+	return offset_code + pmic->start_code;
 }
 
-void do_scale_vcore(u32 vcore_reg, u32 volt_mv)
+void do_scale_vcore(u32 vcore_reg, u32 volt_mv, struct pmic_data *pmic)
 {
 	u32 offset_code;
 	u32 offset = volt_mv;
+#ifndef	CONFIG_DRA7XX
+	int ret = 0;
+#endif
 
+	if (!volt_mv)
+		return;
+
+	pmic->pmic_bus_init();
+#ifndef	CONFIG_DRA7XX
+	/* See if we can first get the GPIO if needed */
+	if (pmic->gpio_en)
+		ret = gpio_request(pmic->gpio, "PMIC_GPIO");
+
+	if (ret < 0) {
+		printf("%s: gpio %d request failed %d\n", __func__,
+							pmic->gpio, ret);
+		return;
+	}
+
+	/* Pull the GPIO low to select SET0 register, while we program SET1 */
+	if (pmic->gpio_en)
+		gpio_direction_output(pmic->gpio, 0);
+#endif
 	/* convert to uV for better accuracy in the calculations */
 	offset *= 1000;
 
-	offset_code = get_offset_code(offset);
+	offset_code = get_offset_code(offset, pmic);
 
 	debug("do_scale_vcore: volt - %d offset_code - 0x%x\n", volt_mv,
 		offset_code);
 
-	if (omap_vc_bypass_send_value(SMPS_I2C_SLAVE_ADDR,
-				vcore_reg, offset_code))
+	if (pmic->pmic_write(pmic->i2c_slave_addr, vcore_reg, offset_code))
 		printf("Scaling voltage failed for 0x%x\n", vcore_reg);
+#ifndef	CONFIG_DRA7XX
+	if (pmic->gpio_en)
+		gpio_direction_output(pmic->gpio, 1);
+#endif
 }
 
-static inline void enable_clock_domain(u32 *const clkctrl_reg, u32 enable_mode)
+static u32 optimize_vcore_voltage(struct volts const *v)
+{
+	u32 val;
+	if (!v->value)
+		return 0;
+	if (!v->efuse.reg)
+		return v->value;
+
+	switch (v->efuse.reg_bits) {
+	case 16:
+		val = readw(v->efuse.reg);
+		break;
+	case 32:
+		val = readl(v->efuse.reg);
+		break;
+	default:
+		printf("Error: efuse 0x%08x bits=%d unknown\n",
+		       v->efuse.reg, v->efuse.reg_bits);
+		return v->value;
+	}
+
+	if (!val) {
+		printf("Error: efuse 0x%08x bits=%d val=0, using %d\n",
+		       v->efuse.reg, v->efuse.reg_bits, v->value);
+		return v->value;
+	}
+
+	debug("%s:efuse 0x%08x bits=%d Vnom=%d, using efuse value %d\n",
+	      __func__, v->efuse.reg, v->efuse.reg_bits, v->value, val);
+	return val;
+}
+
+/*
+ * Setup the voltages for the main SoC core power domains.
+ * We start with the maximum voltages allowed here, as set in the corresponding
+ * vcores_data struct, and then scale (usually down) to the fused values that
+ * are retrieved from the SoC. The scaling happens only if the efuse.reg fields
+ * are initialised.
+ * Rail grouping is supported for the DRA7xx SoCs only, therefore the code is
+ * compiled conditionally. Note that the new code writes the scaled (or zeroed)
+ * values back to the vcores_data struct for eventual reuse. Zero values mean
+ * that the corresponding rails are not controlled separately, and are not sent
+ * to the PMIC.
+ */
+void scale_vcores(struct vcores_data const *vcores)
+{
+#if defined(CONFIG_DRA7XX)
+	int i;
+	struct volts *pv = (struct volts *)vcores;
+	struct volts *px;
+
+	for (i=0; i<(sizeof(struct vcores_data)/sizeof(struct volts)); i++) {
+		debug("%d -> ", pv->value);
+		if (pv->value) {
+			/* Handle non-empty members only */
+			pv->value = optimize_vcore_voltage(pv);
+     			px = (struct volts *)vcores;
+			while (px < pv) {
+				/*
+				 * Scan already handled non-empty members to see
+				 * if we have a group and find the max voltage,
+				 * which is set to the first occurance of the
+				 * particular SMPS; the other group voltages are
+				 * zeroed.
+				 */
+				if (px->value) {
+					if ((pv->pmic->i2c_slave_addr ==
+					     px->pmic->i2c_slave_addr) &&
+					    (pv->addr == px->addr)) {
+					    	/* Same PMIC, same SMPS */
+						if (pv->value > px->value)
+							px->value = pv->value;
+
+						pv->value = 0;
+					}
+		     		}
+				px++;
+			}
+		}
+	     	debug("%d\n", pv->value);
+		pv++;
+	}
+
+	debug("cor: %d\n", vcores->core.value);
+	do_scale_vcore(vcores->core.addr, vcores->core.value, vcores->core.pmic);
+	debug("mpu: %d\n", vcores->mpu.value);
+	do_scale_vcore(vcores->mpu.addr, vcores->mpu.value, vcores->mpu.pmic);
+	/* Configure MPU ABB LDO after scale */
+	abb_setup((*ctrl)->control_std_fuse_opp_vdd_mpu_2,
+		  (*ctrl)->control_wkup_ldovbb_mpu_voltage_ctrl,
+		  (*prcm)->prm_abbldo_mpu_setup,
+		  (*prcm)->prm_abbldo_mpu_ctrl,
+		  (*prcm)->prm_irqstatus_mpu_2,
+		  OMAP_ABB_MPU_TXDONE_MASK,
+		  OMAP_ABB_FAST_OPP);
+
+	/* The .mm member is not used for the DRA7xx */
+
+	debug("gpu: %d\n", vcores->gpu.value);
+	do_scale_vcore(vcores->gpu.addr, vcores->gpu.value, vcores->gpu.pmic);
+	debug("eve: %d\n", vcores->eve.value);
+	do_scale_vcore(vcores->eve.addr, vcores->eve.value, vcores->eve.pmic);
+	debug("iva: %d\n", vcores->iva.value);
+	do_scale_vcore(vcores->iva.addr, vcores->iva.value, vcores->iva.pmic);
+	/* Might need udelay(1000) here if debug is enabled to see all prints */
+#else
+	u32 val;
+
+	val = optimize_vcore_voltage(&vcores->core);
+	do_scale_vcore(vcores->core.addr, val, vcores->core.pmic);
+
+	val = optimize_vcore_voltage(&vcores->mpu);
+	do_scale_vcore(vcores->mpu.addr, val, vcores->mpu.pmic);
+
+	/* Configure MPU ABB LDO after scale */
+	abb_setup((*ctrl)->control_std_fuse_opp_vdd_mpu_2,
+		  (*ctrl)->control_wkup_ldovbb_mpu_voltage_ctrl,
+		  (*prcm)->prm_abbldo_mpu_setup,
+		  (*prcm)->prm_abbldo_mpu_ctrl,
+		  (*prcm)->prm_irqstatus_mpu_2,
+		  OMAP_ABB_MPU_TXDONE_MASK,
+		  OMAP_ABB_FAST_OPP);
+
+	val = optimize_vcore_voltage(&vcores->mm);
+	do_scale_vcore(vcores->mm.addr, val, vcores->mm.pmic);
+
+	val = optimize_vcore_voltage(&vcores->gpu);
+	do_scale_vcore(vcores->gpu.addr, val, vcores->gpu.pmic);
+
+	val = optimize_vcore_voltage(&vcores->eve);
+	do_scale_vcore(vcores->eve.addr, val, vcores->eve.pmic);
+
+	val = optimize_vcore_voltage(&vcores->iva);
+	do_scale_vcore(vcores->iva.addr, val, vcores->iva.pmic);
+#endif
+}
+
+static inline void enable_clock_domain(u32 const clkctrl_reg, u32 enable_mode)
 {
 	clrsetbits_le32(clkctrl_reg, CD_CLKCTRL_CLKTRCTRL_MASK,
 			enable_mode << CD_CLKCTRL_CLKTRCTRL_SHIFT);
-	debug("Enable clock domain - %p\n", clkctrl_reg);
+	debug("Enable clock domain - %x\n", clkctrl_reg);
 }
 
-static inline void wait_for_clk_enable(u32 *clkctrl_addr)
+static inline void wait_for_clk_enable(u32 clkctrl_addr)
 {
 	u32 clkctrl, idlest = MODULE_CLKCTRL_IDLEST_DISABLED;
 	u32 bound = LDELAY;
@@ -435,19 +632,19 @@ static inline void wait_for_clk_enable(u32 *clkctrl_addr)
 		idlest = (clkctrl & MODULE_CLKCTRL_IDLEST_MASK) >>
 			 MODULE_CLKCTRL_IDLEST_SHIFT;
 		if (--bound == 0) {
-			printf("Clock enable failed for 0x%p idlest 0x%x\n",
+			printf("Clock enable failed for 0x%x idlest 0x%x\n",
 				clkctrl_addr, clkctrl);
 			return;
 		}
 	}
 }
 
-static inline void enable_clock_module(u32 *const clkctrl_addr, u32 enable_mode,
+static inline void enable_clock_module(u32 const clkctrl_addr, u32 enable_mode,
 				u32 wait_for_enable)
 {
 	clrsetbits_le32(clkctrl_addr, MODULE_CLKCTRL_MODULEMODE_MASK,
 			enable_mode << MODULE_CLKCTRL_MODULEMODE_SHIFT);
-	debug("Enable clock module - %p\n", clkctrl_addr);
+	debug("Enable clock module - %x\n", clkctrl_addr);
 	if (wait_for_enable)
 		wait_for_clk_enable(clkctrl_addr);
 }
@@ -458,12 +655,12 @@ void freq_update_core(void)
 	const struct dpll_params *core_dpll_params;
 	u32 omap_rev = omap_revision();
 
-	core_dpll_params = get_core_dpll_params();
+	core_dpll_params = get_core_dpll_params(*dplls_data);
 	/* Put EMIF clock domain in sw wakeup mode */
-	enable_clock_domain(&prcm->cm_memif_clkstctrl,
+	enable_clock_domain((*prcm)->cm_memif_clkstctrl,
 				CD_CLKCTRL_CLKTRCTRL_SW_WKUP);
-	wait_for_clk_enable(&prcm->cm_memif_emif_1_clkctrl);
-	wait_for_clk_enable(&prcm->cm_memif_emif_2_clkctrl);
+	wait_for_clk_enable((*prcm)->cm_memif_emif_1_clkctrl);
+	wait_for_clk_enable((*prcm)->cm_memif_emif_2_clkctrl);
 
 	freq_config1 = SHADOW_FREQ_CONFIG1_FREQ_UPDATE_MASK |
 	    SHADOW_FREQ_CONFIG1_DLL_RESET_MASK;
@@ -475,34 +672,34 @@ void freq_update_core(void)
 			SHADOW_FREQ_CONFIG1_M2_DIV_SHIFT) &
 			SHADOW_FREQ_CONFIG1_M2_DIV_MASK;
 
-	writel(freq_config1, &prcm->cm_shadow_freq_config1);
+	writel(freq_config1, (*prcm)->cm_shadow_freq_config1);
 	if (!wait_on_value(SHADOW_FREQ_CONFIG1_FREQ_UPDATE_MASK, 0,
-				&prcm->cm_shadow_freq_config1, LDELAY)) {
+			(u32 *) (*prcm)->cm_shadow_freq_config1, LDELAY)) {
 		puts("FREQ UPDATE procedure failed!!");
 		hang();
 	}
 
 	/*
 	 * Putting EMIF in HW_AUTO is seen to be causing issues with
-	 * EMIF clocks and the master DLL. Put EMIF in SW_WKUP
+	 * EMIF clocks and the master DLL. Keep EMIF in SW_WKUP
 	 * in OMAP5430 ES1.0 silicon
 	 */
 	if (omap_rev != OMAP5430_ES1_0) {
 		/* Put EMIF clock domain back in hw auto mode */
-		enable_clock_domain(&prcm->cm_memif_clkstctrl,
+		enable_clock_domain((*prcm)->cm_memif_clkstctrl,
 					CD_CLKCTRL_CLKTRCTRL_HW_AUTO);
-		wait_for_clk_enable(&prcm->cm_memif_emif_1_clkctrl);
-		wait_for_clk_enable(&prcm->cm_memif_emif_2_clkctrl);
+		wait_for_clk_enable((*prcm)->cm_memif_emif_1_clkctrl);
+		wait_for_clk_enable((*prcm)->cm_memif_emif_2_clkctrl);
 	}
 }
 
-void bypass_dpll(u32 *const base)
+void bypass_dpll(u32 const base)
 {
 	do_bypass_dpll(base);
 	wait_for_bypass(base);
 }
 
-void lock_dpll(u32 *const base)
+void lock_dpll(u32 const base)
 {
 	do_lock_dpll(base);
 	wait_for_lock(base);
@@ -511,39 +708,39 @@ void lock_dpll(u32 *const base)
 void setup_clocks_for_console(void)
 {
 	/* Do not add any spl_debug prints in this function */
-	clrsetbits_le32(&prcm->cm_l4per_clkstctrl, CD_CLKCTRL_CLKTRCTRL_MASK,
+	clrsetbits_le32((*prcm)->cm_l4per_clkstctrl, CD_CLKCTRL_CLKTRCTRL_MASK,
 			CD_CLKCTRL_CLKTRCTRL_SW_WKUP <<
 			CD_CLKCTRL_CLKTRCTRL_SHIFT);
 
 	/* Enable all UARTs - console will be on one of them */
-	clrsetbits_le32(&prcm->cm_l4per_uart1_clkctrl,
+	clrsetbits_le32((*prcm)->cm_l4per_uart1_clkctrl,
 			MODULE_CLKCTRL_MODULEMODE_MASK,
 			MODULE_CLKCTRL_MODULEMODE_SW_EXPLICIT_EN <<
 			MODULE_CLKCTRL_MODULEMODE_SHIFT);
 
-	clrsetbits_le32(&prcm->cm_l4per_uart2_clkctrl,
+	clrsetbits_le32((*prcm)->cm_l4per_uart2_clkctrl,
 			MODULE_CLKCTRL_MODULEMODE_MASK,
 			MODULE_CLKCTRL_MODULEMODE_SW_EXPLICIT_EN <<
 			MODULE_CLKCTRL_MODULEMODE_SHIFT);
 
-	clrsetbits_le32(&prcm->cm_l4per_uart3_clkctrl,
+	clrsetbits_le32((*prcm)->cm_l4per_uart3_clkctrl,
 			MODULE_CLKCTRL_MODULEMODE_MASK,
 			MODULE_CLKCTRL_MODULEMODE_SW_EXPLICIT_EN <<
 			MODULE_CLKCTRL_MODULEMODE_SHIFT);
 
-	clrsetbits_le32(&prcm->cm_l4per_uart3_clkctrl,
+	clrsetbits_le32((*prcm)->cm_l4per_uart4_clkctrl,
 			MODULE_CLKCTRL_MODULEMODE_MASK,
 			MODULE_CLKCTRL_MODULEMODE_SW_EXPLICIT_EN <<
 			MODULE_CLKCTRL_MODULEMODE_SHIFT);
 
-	clrsetbits_le32(&prcm->cm_l4per_clkstctrl, CD_CLKCTRL_CLKTRCTRL_MASK,
+	clrsetbits_le32((*prcm)->cm_l4per_clkstctrl, CD_CLKCTRL_CLKTRCTRL_MASK,
 			CD_CLKCTRL_CLKTRCTRL_HW_AUTO <<
 			CD_CLKCTRL_CLKTRCTRL_SHIFT);
 }
 
-void do_enable_clocks(u32 *const *clk_domains,
-			    u32 *const *clk_modules_hw_auto,
-			    u32 *const *clk_modules_explicit_en,
+void do_enable_clocks(u32 const *clk_domains,
+			    u32 const *clk_modules_hw_auto,
+			    u32 const *clk_modules_explicit_en,
 			    u8 wait_for_enable)
 {
 	u32 i, max = 100;
@@ -582,12 +779,10 @@ void prcm_init(void)
 	case OMAP_INIT_CONTEXT_UBOOT_FROM_NOR:
 	case OMAP_INIT_CONTEXT_UBOOT_AFTER_CH:
 		enable_basic_clocks();
-		scale_vcores();
+		timer_init();
+		scale_vcores(*omap_vcores);
 		setup_dplls();
-#ifdef CONFIG_SYS_CLOCKS_ENABLE_ALL
-		setup_non_essential_dplls();
-		enable_non_essential_clocks();
-#endif
+		setup_warmreset_time();
 		break;
 	default:
 		break;
@@ -595,4 +790,15 @@ void prcm_init(void)
 
 	if (OMAP_INIT_CONTEXT_SPL != omap_hw_init_context())
 		enable_basic_uboot_clocks();
+}
+
+void gpi2c_init(void)
+{
+	static int gpi2c = 1;
+
+	if (gpi2c) {
+		i2c_init(CONFIG_SYS_OMAP24_I2C_SPEED,
+			 CONFIG_SYS_OMAP24_I2C_SLAVE);
+		gpi2c = 0;
+	}
 }

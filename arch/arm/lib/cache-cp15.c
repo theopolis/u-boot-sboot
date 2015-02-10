@@ -2,37 +2,25 @@
  * (C) Copyright 2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <asm/system.h>
+#include <asm/cache.h>
+#include <linux/compiler.h>
 
 #if !(defined(CONFIG_SYS_ICACHE_OFF) && defined(CONFIG_SYS_DCACHE_OFF))
 
 DECLARE_GLOBAL_DATA_PTR;
 
-void __arm_init_before_mmu(void)
+__weak void arm_init_before_mmu(void)
 {
 }
-void arm_init_before_mmu(void)
-	__attribute__((weak, alias("__arm_init_before_mmu")));
+
+__weak void arm_init_domains(void)
+{
+}
 
 static void cp_delay (void)
 {
@@ -46,7 +34,7 @@ static void cp_delay (void)
 
 void set_section_dcache(int section, enum dcache_option option)
 {
-	u32 *page_table = (u32 *)gd->tlb_addr;
+	u32 *page_table = (u32 *)gd->arch.tlb_addr;
 	u32 value;
 
 	value = (section << MMU_SECTION_SHIFT) | (3 << 10);
@@ -54,40 +42,39 @@ void set_section_dcache(int section, enum dcache_option option)
 	page_table[section] = value;
 }
 
-void __mmu_page_table_flush(unsigned long start, unsigned long stop)
+__weak void mmu_page_table_flush(unsigned long start, unsigned long stop)
 {
 	debug("%s: Warning: not implemented\n", __func__);
 }
 
-void mmu_page_table_flush(unsigned long start, unsigned long stop)
-	__attribute__((weak, alias("__mmu_page_table_flush")));
-
-void mmu_set_region_dcache_behaviour(u32 start, int size,
+void mmu_set_region_dcache_behaviour(phys_addr_t start, size_t size,
 				     enum dcache_option option)
 {
-	u32 *page_table = (u32 *)gd->tlb_addr;
-	u32 upto, end;
+	u32 *page_table = (u32 *)gd->arch.tlb_addr;
+	unsigned long upto, end;
 
 	end = ALIGN(start + size, MMU_SECTION_SIZE) >> MMU_SECTION_SHIFT;
 	start = start >> MMU_SECTION_SHIFT;
-	debug("%s: start=%x, size=%x, option=%d\n", __func__, start, size,
+	debug("%s: start=%pa, size=%zu, option=%d\n", __func__, &start, size,
 	      option);
 	for (upto = start; upto < end; upto++)
 		set_section_dcache(upto, option);
 	mmu_page_table_flush((u32)&page_table[start], (u32)&page_table[end]);
 }
 
-static inline void dram_bank_mmu_setup(int bank)
+__weak void dram_bank_mmu_setup(int bank)
 {
 	bd_t *bd = gd->bd;
 	int	i;
 
 	debug("%s: bank: %d\n", __func__, bank);
 	for (i = bd->bi_dram[bank].start >> 20;
-	     i < (bd->bi_dram[bank].start + bd->bi_dram[bank].size) >> 20;
+	     i < (bd->bi_dram[bank].start >> 20) + (bd->bi_dram[bank].size >> 20);
 	     i++) {
 #if defined(CONFIG_SYS_ARM_CACHE_WRITETHROUGH)
 		set_section_dcache(i, DCACHE_WRITETHROUGH);
+#elif defined(CONFIG_SYS_ARM_CACHE_WRITEALLOC)
+		set_section_dcache(i, DCACHE_WRITEALLOC);
 #else
 		set_section_dcache(i, DCACHE_WRITEBACK);
 #endif
@@ -111,10 +98,13 @@ static inline void mmu_setup(void)
 
 	/* Copy the page table address to cp15 */
 	asm volatile("mcr p15, 0, %0, c2, c0, 0"
-		     : : "r" (gd->tlb_addr) : "memory");
+		     : : "r" (gd->arch.tlb_addr) : "memory");
 	/* Set the access control to all-supervisor */
 	asm volatile("mcr p15, 0, %0, c3, c0, 0"
 		     : : "r" (~0));
+
+	arm_init_domains();
+
 	/* and enable the mmu */
 	reg = get_cr();	/* get control reg. */
 	cp_delay();

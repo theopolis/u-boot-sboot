@@ -2,23 +2,7 @@
  * (C) Copyright 2001
  * Erik Theisen, Wave 7 Optics, etheisen@mindspring.com
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -27,7 +11,9 @@
 
 #include <dtt.h>
 #include <i2c.h>
+#include <tmu.h>
 
+#if defined CONFIG_DTT_SENSORS
 static unsigned long sensor_initialized;
 
 static void _initialize_dtt(void)
@@ -59,9 +45,11 @@ void dtt_init(void)
 	/* switch back to original I2C bus */
 	I2C_SET_BUS(old_bus);
 }
+#endif
 
-int do_dtt (cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
+int dtt_i2c(void)
 {
+#if defined CONFIG_DTT_SENSORS
 	int i;
 	unsigned char sensors[] = CONFIG_DTT_SENSORS;
 	int old_bus;
@@ -69,8 +57,13 @@ int do_dtt (cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 	/* Force a compilation error, if there are more then 32 sensors */
 	BUILD_BUG_ON(sizeof(sensors) > 32);
 	/* switch to correct I2C bus */
+#ifdef CONFIG_SYS_I2C
+	old_bus = i2c_get_bus_num();
+	i2c_set_bus_num(CONFIG_SYS_DTT_BUS_NUM);
+#else
 	old_bus = I2C_GET_BUS();
 	I2C_SET_BUS(CONFIG_SYS_DTT_BUS_NUM);
+#endif
 
 	_initialize_dtt();
 
@@ -82,9 +75,39 @@ int do_dtt (cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 		printf("DTT%d: %i C\n", i + 1, dtt_get_temp(sensors[i]));
 
 	/* switch back to original I2C bus */
+#ifdef CONFIG_SYS_I2C
+	i2c_set_bus_num(old_bus);
+#else
 	I2C_SET_BUS(old_bus);
+#endif
+#endif
 
 	return 0;
+}
+
+int dtt_tmu(void)
+{
+#if defined CONFIG_TMU_CMD_DTT
+	int cur_temp;
+
+	/* Sense and return latest thermal info */
+	if (tmu_monitor(&cur_temp) == TMU_STATUS_INIT) {
+		puts("TMU is in unknown state, temperature is invalid\n");
+		return -1;
+	}
+	printf("Current temperature: %u degrees Celsius\n", cur_temp);
+#endif
+	return 0;
+}
+
+int do_dtt(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
+{
+	int err = 0;
+
+	err |= dtt_i2c();
+	err |= dtt_tmu();
+
+	return err;
 }	/* do_dtt() */
 
 /***************************************************/

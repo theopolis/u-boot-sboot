@@ -4,23 +4,7 @@
  * (C) Copyright 2008-2009
  * Stefan Roese, DENX Software Engineering, sr@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _PPC4xx_UIC_H_
@@ -31,7 +15,7 @@
  */
 #if defined(CONFIG_440GX) || defined(CONFIG_440SPE) || \
     defined(CONFIG_460EX) || defined(CONFIG_460GT) || \
-    defined(CONFIG_460SX) || defined(CONFIG_APM821XX)
+    defined(CONFIG_460SX)
 #define UIC_MAX		4
 #elif defined(CONFIG_440EPX) || defined(CONFIG_440GRX) || \
     defined(CONFIG_405EX)
@@ -252,8 +236,7 @@
 #define VECNUM_ETH0		(32 + 28)
 #endif /* CONFIG_440SPE */
 
-#if defined(CONFIG_460EX) || defined(CONFIG_460GT) || \
-    defined(CONFIG_APM821XX)
+#if defined(CONFIG_460EX) || defined(CONFIG_460GT)
 /* UIC 0 */
 #define VECNUM_UIC2NCI		10
 #define VECNUM_UIC2CI		11

@@ -6,23 +6,7 @@
  * (C) Copyright 2002
  * Gary Jennejohn, DENX Software Engineering, <garyj@denx.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -32,6 +16,7 @@
 #include <common.h>
 #include <command.h>
 #include <asm/system.h>
+#include <asm/io.h>
 
 static void cache_flush(void);
 
@@ -67,3 +52,15 @@ static void cache_flush (void)
 	asm ("mcr p15, 0, %0, c7, c5, 0": :"r" (i));
 	asm ("mcr p15, 0, %0, c7, c6, 0": :"r" (i));
 }
+
+#ifndef CONFIG_INTEGRATOR
+
+__attribute__((noreturn)) void reset_cpu(ulong addr __attribute__((unused)))
+{
+	writew(0x0, 0xfffece10);
+	writew(0x8, 0xfffece10);
+	for (;;)
+		;
+}
+
+#endif	/* #ifdef CONFIG_INTEGRATOR */

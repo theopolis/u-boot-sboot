@@ -19,20 +19,7 @@
  *      Shashi Ranjan <shashiranjanmca05@gmail.com>
  *      Manikandan Pillai <mani.pillai@ti.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -148,6 +135,9 @@ void do_sdrc_init(u32 cs, u32 early)
 	sdrc_actim_base0 = (struct sdrc_actim *)SDRC_ACTIM_CTRL0_BASE;
 	sdrc_actim_base1 = (struct sdrc_actim *)SDRC_ACTIM_CTRL1_BASE;
 
+	/* set some default timings */
+	timings.sharing = SDRC_SHARING;
+
 	/*
 	 * When called in the early context this may be SPL and we will
 	 * need to set all of the timings.  This ends up being board
@@ -158,6 +148,7 @@ void do_sdrc_init(u32 cs, u32 early)
 	 * setup CS1.
 	 */
 #ifdef CONFIG_SPL_BUILD
+	/* set/modify board-specific timings */
 	get_board_mem_timings(&timings);
 #endif
 	if (early) {
@@ -168,7 +159,7 @@ void do_sdrc_init(u32 cs, u32 early)
 		writel(0, &sdrc_base->sysconfig);
 
 		/* setup sdrc to ball mux */
-		writel(SDRC_SHARING, &sdrc_base->sharing);
+		writel(timings.sharing, &sdrc_base->sharing);
 
 		/* Disable Power Down of CKE because of 1 CKE on combo part */
 		writel(WAKEUPPROC | SRFRONRESET | PAGEPOLICY_HIGH,

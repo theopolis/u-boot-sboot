@@ -4,20 +4,7 @@
  * Copyright (C) 2012 Samsung Electronics Co.Ltd
  *	Vivek Gautam <gautam.vivek@samsung.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -29,6 +16,7 @@
 #include <asm/arch/ehci.h>
 #include <asm/arch/system.h>
 #include <asm/arch/power.h>
+#include <asm/gpio.h>
 #include <asm-generic/errno.h>
 #include <linux/compat.h>
 #include "ehci.h"
@@ -42,11 +30,16 @@ DECLARE_GLOBAL_DATA_PTR;
  */
 struct exynos_ehci {
 	struct exynos_usb_phy *usb;
-	unsigned int *hcd;
+	struct ehci_hccr *hcd;
+	struct gpio_desc vbus_gpio;
 };
 
+static struct exynos_ehci exynos;
+
+#ifdef CONFIG_OF_CONTROL
 static int exynos_usb_parse_dt(const void *blob, struct exynos_ehci *exynos)
 {
+	fdt_addr_t addr;
 	unsigned int node;
 	int depth;
 
@@ -59,11 +52,17 @@ static int exynos_usb_parse_dt(const void *blob, struct exynos_ehci *exynos)
 	/*
 	 * Get the base address for EHCI controller from the device node
 	 */
-	exynos->hcd = (unsigned int *)fdtdec_get_addr(blob, node, "reg");
-	if (exynos->hcd == NULL) {
+	addr = fdtdec_get_addr(blob, node, "reg");
+	if (addr == FDT_ADDR_T_NONE) {
 		debug("Can't get the EHCI register address\n");
 		return -ENXIO;
 	}
+
+	exynos->hcd = (struct ehci_hccr *)addr;
+
+	/* Vbus gpio */
+	gpio_request_by_name_nodev(blob, node, "samsung,vbus-gpio", 0,
+				   &exynos->vbus_gpio, GPIOD_IS_OUT);
 
 	depth = 0;
 	node = fdtdec_next_compatible_subnode(blob, node,
@@ -85,13 +84,11 @@ static int exynos_usb_parse_dt(const void *blob, struct exynos_ehci *exynos)
 
 	return 0;
 }
+#endif
 
-/* Setup the EHCI host controller. */
-static void setup_usb_phy(struct exynos_usb_phy *usb)
+static void exynos5_setup_usb_phy(struct exynos_usb_phy *usb)
 {
-	set_usbhost_mode(USB20_PHY_CFG_HOST_LINK_EN);
-
-	set_usbhost_phy_ctrl(POWER_USB_HOST_PHY_CTRL_EN);
+	u32 hsic_ctrl;
 
 	clrbits_le32(&usb->usbphyctrl0,
 			HOST_CTRL0_FSEL_MASK |
@@ -113,6 +110,32 @@ static void setup_usb_phy(struct exynos_usb_phy *usb)
 	clrbits_le32(&usb->usbphyctrl0,
 			HOST_CTRL0_LINKSWRST |
 			HOST_CTRL0_UTMISWRST);
+
+	/* HSIC Phy Setting */
+	hsic_ctrl = (HSIC_CTRL_FORCESUSPEND |
+			HSIC_CTRL_FORCESLEEP |
+			HSIC_CTRL_SIDDQ);
+
+	clrbits_le32(&usb->hsicphyctrl1, hsic_ctrl);
+	clrbits_le32(&usb->hsicphyctrl2, hsic_ctrl);
+
+	hsic_ctrl = (((HSIC_CTRL_REFCLKDIV_12 & HSIC_CTRL_REFCLKDIV_MASK)
+				<< HSIC_CTRL_REFCLKDIV_SHIFT)
+			| ((HSIC_CTRL_REFCLKSEL & HSIC_CTRL_REFCLKSEL_MASK)
+				<< HSIC_CTRL_REFCLKSEL_SHIFT)
+			| HSIC_CTRL_UTMISWRST);
+
+	setbits_le32(&usb->hsicphyctrl1, hsic_ctrl);
+	setbits_le32(&usb->hsicphyctrl2, hsic_ctrl);
+
+	udelay(10);
+
+	clrbits_le32(&usb->hsicphyctrl1, HSIC_CTRL_PHYSWRST |
+					HSIC_CTRL_UTMISWRST);
+
+	clrbits_le32(&usb->hsicphyctrl2, HSIC_CTRL_PHYSWRST |
+					HSIC_CTRL_UTMISWRST);
+
 	udelay(20);
 
 	/* EHCI Ctrl setting */
@@ -123,9 +146,37 @@ static void setup_usb_phy(struct exynos_usb_phy *usb)
 			EHCICTRL_ENAINCR16);
 }
 
-/* Reset the EHCI host controller. */
-static void reset_usb_phy(struct exynos_usb_phy *usb)
+static void exynos4412_setup_usb_phy(struct exynos4412_usb_phy *usb)
 {
+	writel(CLK_24MHZ, &usb->usbphyclk);
+
+	clrbits_le32(&usb->usbphyctrl, (PHYPWR_NORMAL_MASK_HSIC0 |
+		PHYPWR_NORMAL_MASK_HSIC1 | PHYPWR_NORMAL_MASK_PHY1 |
+		PHYPWR_NORMAL_MASK_PHY0));
+
+	setbits_le32(&usb->usbphyrstcon, (RSTCON_HOSTPHY_SWRST | RSTCON_SWRST));
+	udelay(10);
+	clrbits_le32(&usb->usbphyrstcon, (RSTCON_HOSTPHY_SWRST | RSTCON_SWRST));
+}
+
+static void setup_usb_phy(struct exynos_usb_phy *usb)
+{
+	set_usbhost_mode(USB20_PHY_CFG_HOST_LINK_EN);
+
+	set_usbhost_phy_ctrl(POWER_USB_HOST_PHY_CTRL_EN);
+
+	if (cpu_is_exynos5())
+		exynos5_setup_usb_phy(usb);
+	else if (cpu_is_exynos4())
+		if (proid_is_exynos4412())
+			exynos4412_setup_usb_phy((struct exynos4412_usb_phy *)
+						 usb);
+}
+
+static void exynos5_reset_usb_phy(struct exynos_usb_phy *usb)
+{
+	u32 hsic_ctrl;
+
 	/* HOST_PHY reset */
 	setbits_le32(&usb->usbphyctrl0,
 			HOST_CTRL0_PHYSWRST |
@@ -133,6 +184,33 @@ static void reset_usb_phy(struct exynos_usb_phy *usb)
 			HOST_CTRL0_SIDDQ |
 			HOST_CTRL0_FORCESUSPEND |
 			HOST_CTRL0_FORCESLEEP);
+
+	/* HSIC Phy reset */
+	hsic_ctrl = (HSIC_CTRL_FORCESUSPEND |
+			HSIC_CTRL_FORCESLEEP |
+			HSIC_CTRL_SIDDQ |
+			HSIC_CTRL_PHYSWRST);
+
+	setbits_le32(&usb->hsicphyctrl1, hsic_ctrl);
+	setbits_le32(&usb->hsicphyctrl2, hsic_ctrl);
+}
+
+static void exynos4412_reset_usb_phy(struct exynos4412_usb_phy *usb)
+{
+	setbits_le32(&usb->usbphyctrl, (PHYPWR_NORMAL_MASK_HSIC0 |
+		PHYPWR_NORMAL_MASK_HSIC1 | PHYPWR_NORMAL_MASK_PHY1 |
+		PHYPWR_NORMAL_MASK_PHY0));
+}
+
+/* Reset the EHCI host controller. */
+static void reset_usb_phy(struct exynos_usb_phy *usb)
+{
+	if (cpu_is_exynos5())
+		exynos5_reset_usb_phy(usb);
+	else if (cpu_is_exynos4())
+		if (proid_is_exynos4412())
+			exynos4412_reset_usb_phy((struct exynos4412_usb_phy *)
+						 usb);
 
 	set_usbhost_phy_ctrl(POWER_USB_HOST_PHY_CTRL_DISABLE);
 }
@@ -142,30 +220,38 @@ static void reset_usb_phy(struct exynos_usb_phy *usb)
  * Create the appropriate control structures to manage
  * a new EHCI host controller.
  */
-int ehci_hcd_init(int index, struct ehci_hccr **hccr, struct ehci_hcor **hcor)
+int ehci_hcd_init(int index, enum usb_init_type init,
+		struct ehci_hccr **hccr, struct ehci_hcor **hcor)
 {
-	struct exynos_ehci *exynos = NULL;
+	struct exynos_ehci *ctx = &exynos;
 
-	exynos = (struct exynos_ehci *)
-			kzalloc(sizeof(struct exynos_ehci), GFP_KERNEL);
-	if (!exynos) {
-		debug("failed to allocate exynos ehci context\n");
-		return -ENOMEM;
+#ifdef CONFIG_OF_CONTROL
+	if (exynos_usb_parse_dt(gd->fdt_blob, ctx)) {
+		debug("Unable to parse device tree for ehci-exynos\n");
+		return -ENODEV;
 	}
+#else
+	ctx->usb = (struct exynos_usb_phy *)samsung_get_base_usb_phy();
+	ctx->hcd = (struct ehci_hccr *)samsung_get_base_usb_ehci();
+#endif
 
-	exynos_usb_parse_dt(gd->fdt_blob, exynos);
+#ifdef CONFIG_OF_CONTROL
+	/* setup the Vbus gpio here */
+	if (dm_gpio_is_valid(&ctx->vbus_gpio))
+		dm_gpio_set_value(&ctx->vbus_gpio, 1);
+#endif
 
-	setup_usb_phy(exynos->usb);
+	setup_usb_phy(ctx->usb);
 
-	*hccr = (struct ehci_hccr *)(exynos->hcd);
+	board_usb_init(index, init);
+
+	*hccr = ctx->hcd;
 	*hcor = (struct ehci_hcor *)((uint32_t) *hccr
 				+ HC_LENGTH(ehci_readl(&(*hccr)->cr_capbase)));
 
 	debug("Exynos5-ehci: init hccr %x and hcor %x hc_length %d\n",
 		(uint32_t)*hccr, (uint32_t)*hcor,
 		(uint32_t)HC_LENGTH(ehci_readl(&(*hccr)->cr_capbase)));
-
-	kfree(exynos);
 
 	return 0;
 }
@@ -176,20 +262,9 @@ int ehci_hcd_init(int index, struct ehci_hccr **hccr, struct ehci_hcor **hcor)
  */
 int ehci_hcd_stop(int index)
 {
-	struct exynos_ehci *exynos = NULL;
+	struct exynos_ehci *ctx = &exynos;
 
-	exynos = (struct exynos_ehci *)
-			kzalloc(sizeof(struct exynos_ehci), GFP_KERNEL);
-	if (!exynos) {
-		debug("failed to allocate exynos ehci context\n");
-		return -ENOMEM;
-	}
-
-	exynos_usb_parse_dt(gd->fdt_blob, exynos);
-
-	reset_usb_phy(exynos->usb);
-
-	kfree(exynos);
+	reset_usb_phy(ctx->usb);
 
 	return 0;
 }

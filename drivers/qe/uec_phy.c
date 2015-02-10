@@ -7,18 +7,14 @@
  *		Driver for UEC on QE
  *		Based on 8260_io/fcc_enet.c
  *
- * This program is free software; you can redistribute	it and/or modify it
- * under  the terms of	the GNU General	 Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include "common.h"
 #include "net.h"
 #include "malloc.h"
 #include "asm/errno.h"
-#include "asm/immap_qe.h"
+#include "linux/immap_qe.h"
 #include "asm/io.h"
 #include "qe.h"
 #include "uccf.h"

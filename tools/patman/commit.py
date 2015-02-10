@@ -1,28 +1,12 @@
 # Copyright (c) 2011 The Chromium OS Authors.
 #
-# See file CREDITS for list of people who contributed to this
-# project.
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307 USA
+# SPDX-License-Identifier:	GPL-2.0+
 #
 
 import re
 
 # Separates a tag: at the beginning of the subject from the rest of it
-re_subject_tag = re.compile('([^:]*):\s*(.*)')
+re_subject_tag = re.compile('([^:\s]*):\s*(.*)')
 
 class Commit:
     """Holds information about a single commit/patch in the series.
@@ -37,6 +21,7 @@ class Commit:
         changes: Dict containing a list of changes (single line strings).
             The dict is indexed by change version (an integer)
         cc_list: List of people to aliases/emails to cc on this commit
+        notes: List of lines in the commit (not series) notes
     """
     def __init__(self, hash):
         self.hash = hash
@@ -44,6 +29,8 @@ class Commit:
         self.tags = []
         self.changes = {}
         self.cc_list = []
+        self.signoff_set = set()
+        self.notes = []
 
     def AddChange(self, version, info):
         """Add a new change line to the change list for a version.
@@ -61,9 +48,10 @@ class Commit:
 
         Subject tags look like this:
 
-            propounder: Change the widget to propound correctly
+            propounder: fort: Change the widget to propound correctly
 
-        Multiple tags are supported. The list is updated in self.tag
+        Here the tags are propounder and fort. Multiple tags are supported.
+        The list is updated in self.tag.
 
         Returns:
             None if ok, else the name of a tag with no email alias
@@ -85,3 +73,16 @@ class Commit:
             cc_list:    List of aliases or email addresses
         """
         self.cc_list += cc_list
+
+    def CheckDuplicateSignoff(self, signoff):
+        """Check a list of signoffs we have send for this patch
+
+        Args:
+            signoff:    Signoff line
+        Returns:
+            True if this signoff is new, False if we have already seen it.
+        """
+        if signoff in self.signoff_set:
+          return False
+        self.signoff_set.add(signoff)
+        return True

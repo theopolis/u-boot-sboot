@@ -5,33 +5,17 @@
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <command.h>
 #include <hash.h>
-#include <sha1.h>
+#include <u-boot/sha1.h>
 
 int do_sha1sum(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-	int verify = 0;
+	int flags = HASH_FLAG_ENV;
 	int ac;
 	char * const *av;
 
@@ -42,13 +26,13 @@ int do_sha1sum(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	ac = argc - 1;
 #ifdef CONFIG_SHA1SUM_VERIFY
 	if (strcmp(*av, "-v") == 0) {
-		verify = 1;
+		flags |= HASH_FLAG_VERIFY;
 		av++;
 		ac--;
 	}
 #endif
 
-	return hash_command("sha1", verify, cmdtp, flag, ac, av);
+	return hash_command("sha1", flags, cmdtp, flag, ac, av);
 }
 
 #ifdef CONFIG_SHA1SUM_VERIFY

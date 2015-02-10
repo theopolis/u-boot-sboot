@@ -4,24 +4,7 @@
  * (C) Copyright 2007
  * Daniel Hellstrom, Gaisler Research, daniel@gaisler.com
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -29,6 +12,9 @@
 #include <asm/leon.h>
 
 #include <config.h>
+
+#define TIMER_BASE_CLK 1000000
+#define US_PER_TICK (1000000 / CONFIG_SYS_HZ)
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -107,7 +93,7 @@ void cpu_wait_ticks(unsigned long ticks)
 	while (get_timer(start) < ticks) ;
 }
 
-/* initiate and setup timer0 interrupt to 1MHz
+/* initiate and setup timer0 interrupt to configured HZ. Base clock is 1MHz.
  * Return irq number for timer int or a negative number for
  * dealing with self
  */
@@ -115,13 +101,18 @@ int timer_interrupt_init_cpu(void)
 {
 	LEON2_regs *leon2 = (LEON2_regs *) LEON2_PREGS;
 
-	/* 1ms ticks */
+	/* SYS_HZ ticks per second */
 	leon2->Timer_Counter_1 = 0;
-	leon2->Timer_Reload_1 = 999;	/* (((1000000 / 100) - 1)) */
+	leon2->Timer_Reload_1 = (TIMER_BASE_CLK / CONFIG_SYS_HZ) - 1;
 	leon2->Timer_Control_1 =
 	    (LEON2_TIMER_CTRL_EN | LEON2_TIMER_CTRL_RS | LEON2_TIMER_CTRL_LD);
 
 	return LEON2_TIMER1_IRQNO;
+}
+
+ulong get_tbclk(void)
+{
+	return TIMER_BASE_CLK;
 }
 
 /*
@@ -129,14 +120,12 @@ int timer_interrupt_init_cpu(void)
  */
 unsigned long cpu_usec2ticks(unsigned long usec)
 {
-	/* timer set to 1kHz ==> 1 clk tick = 1 msec */
-	if (usec < 1000)
+	if (usec < US_PER_TICK)
 		return 1;
-	return (usec / 1000);
+	return usec / US_PER_TICK;
 }
 
 unsigned long cpu_ticks2usec(unsigned long ticks)
 {
-	/* 1tick = 1usec */
-	return ticks * 1000;
+	return ticks * US_PER_TICK;
 }

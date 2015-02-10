@@ -1,23 +1,7 @@
 /*
  * Copyright (C) 2007 Atmel Corporation
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <spi.h>
@@ -29,6 +13,15 @@
 #include <asm/arch/hardware.h>
 
 #include "atmel_spi.h"
+
+static int spi_has_wdrbt(struct atmel_spi_slave *slave)
+{
+	unsigned int ver;
+
+	ver = spi_readl(slave, VERSION);
+
+	return (ATMEL_SPI_VERSION_REV(ver) >= 0x210);
+}
 
 void spi_init()
 {
@@ -84,18 +77,16 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 	if (mode & SPI_CPOL)
 		csrx |= ATMEL_SPI_CSRx_CPOL;
 
-	as = malloc(sizeof(struct atmel_spi_slave));
+	as = spi_alloc_slave(struct atmel_spi_slave, bus, cs);
 	if (!as)
 		return NULL;
 
-	as->slave.bus = bus;
-	as->slave.cs = cs;
 	as->regs = regs;
 	as->mr = ATMEL_SPI_MR_MSTR | ATMEL_SPI_MR_MODFDIS
-#if defined(CONFIG_AT91SAM9X5) || defined(CONFIG_AT91SAM9M10G45)
-			| ATMEL_SPI_MR_WDRBT
-#endif
 			| ATMEL_SPI_MR_PCS(~(1 << cs) & 0xf);
+	if (spi_has_wdrbt(as))
+		as->mr |= ATMEL_SPI_MR_WDRBT;
+
 	spi_writel(as, CSR(cs), csrx);
 
 	return &as->slave;

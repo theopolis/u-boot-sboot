@@ -15,26 +15,13 @@
  * GRUB  --  GRand Unified Bootloader
  * Copyright (C) 2003, 2004  Free Software Foundation, Inc.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __EXT_COMMON__
 #define __EXT_COMMON__
 #include <command.h>
 #define SECTOR_SIZE		0x200
-#define SECTOR_BITS		9
 
 /* Magic value used to identify an ext2 filesystem.  */
 #define	EXT2_MAGIC			0xEF53
@@ -58,18 +45,13 @@
 #define FILETYPE_INO_SYMLINK		0120000
 #define EXT2_ROOT_INO			2 /* Root inode */
 
-/* Bits used as offset in sector */
-#define DISK_SECTOR_BITS		9
 /* The size of an ext2 block in bytes.  */
 #define EXT2_BLOCK_SIZE(data)	   (1 << LOG2_BLOCK_SIZE(data))
 
-/* Log2 size of ext2 block in 512 blocks.  */
-#define LOG2_EXT2_BLOCK_SIZE(data) (__le32_to_cpu \
-				(data->sblock.log2_block_size) + 1)
-
 /* Log2 size of ext2 block in bytes.  */
-#define LOG2_BLOCK_SIZE(data)	   (__le32_to_cpu \
-		(data->sblock.log2_block_size) + 10)
+#define LOG2_BLOCK_SIZE(data)	   (__le32_to_cpu		   \
+				    (data->sblock.log2_block_size) \
+				    + EXT2_MIN_BLOCK_LOG_SIZE)
 #define INODE_SIZE_FILESYSTEM(data)	(__le32_to_cpu \
 			(data->sblock.inode_size))
 
@@ -186,7 +168,7 @@ struct ext2_data {
 	struct ext2fs_node diropen;
 };
 
-extern unsigned long part_offset;
+extern lbaint_t part_offset;
 
 int do_ext2ls(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
 int do_ext2load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);

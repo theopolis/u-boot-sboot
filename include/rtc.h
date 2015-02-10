@@ -2,23 +2,7 @@
  * (C) Copyright 2001
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -65,5 +49,42 @@ void GregorianDay (struct rtc_time *);
 void to_tm (int, struct rtc_time *);
 unsigned long mktime (unsigned int, unsigned int, unsigned int,
 		      unsigned int, unsigned int, unsigned int);
+
+/**
+ * rtc_read8() - Read an 8-bit register
+ *
+ * @reg:	Register to read
+ * @return value read
+ */
+int rtc_read8(int reg);
+
+/**
+ * rtc_write8() - Write an 8-bit register
+ *
+ * @reg:	Register to write
+ * @value:	Value to write
+ */
+void rtc_write8(int reg, uchar val);
+
+/**
+ * rtc_read32() - Read a 32-bit value from the RTC
+ *
+ * @reg:	Offset to start reading from
+ * @return value read
+ */
+u32 rtc_read32(int reg);
+
+/**
+ * rtc_write32() - Write a 32-bit value to the RTC
+ *
+ * @reg:	Register to start writing to
+ * @value:	Value to write
+ */
+void rtc_write32(int reg, u32 value);
+
+/**
+ * rtc_init() - Set up the real time clock ready for use
+ */
+void rtc_init(void);
 
 #endif	/* _RTC_H_ */

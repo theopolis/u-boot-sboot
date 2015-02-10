@@ -1,21 +1,7 @@
 /*
  * (C) Copyright 2012 Samsung Electronics
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __TZPC_H_
@@ -47,6 +33,26 @@ struct exynos_tzpc {
 	unsigned int pcellid2;
 	unsigned int pcellid3;
 };
+
+#define EXYNOS4_NR_TZPC_BANKS		6
+#define EXYNOS5_NR_TZPC_BANKS		10
+
+/* TZPC : Register Offsets */
+#define TZPC_BASE_OFFSET		0x10000
+
+/*
+ * TZPC Register Value :
+ * R0SIZE: 0x0 : Size of secured ram
+ */
+#define R0SIZE			0x0
+
+/*
+ * TZPC Decode Protection Register Value :
+ * DECPROTXSET: 0xFF : Set Decode region to non-secure
+ */
+#define DECPROTXSET		0xFF
+void tzpc_init(void);
+
 #endif
 
 #endif

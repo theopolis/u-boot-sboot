@@ -1,23 +1,7 @@
 /*
  * arch/asm-arm/mach-kirkwood/include/mach/gpio.h
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -37,14 +21,14 @@
 
 #define GPIO_MAX		50
 #define GPIO_OFF(pin)		(((pin) >> 5) ? 0x0040 : 0x0000)
-#define GPIO_OUT(pin)		(KW_GPIO0_BASE + GPIO_OFF(pin) + 0x00)
-#define GPIO_IO_CONF(pin)	(KW_GPIO0_BASE + GPIO_OFF(pin) + 0x04)
-#define GPIO_BLINK_EN(pin)	(KW_GPIO0_BASE + GPIO_OFF(pin) + 0x08)
-#define GPIO_IN_POL(pin)	(KW_GPIO0_BASE + GPIO_OFF(pin) + 0x0c)
-#define GPIO_DATA_IN(pin)	(KW_GPIO0_BASE + GPIO_OFF(pin) + 0x10)
-#define GPIO_EDGE_CAUSE(pin)	(KW_GPIO0_BASE + GPIO_OFF(pin) + 0x14)
-#define GPIO_EDGE_MASK(pin)	(KW_GPIO0_BASE + GPIO_OFF(pin) + 0x18)
-#define GPIO_LEVEL_MASK(pin)	(KW_GPIO0_BASE + GPIO_OFF(pin) + 0x1c)
+#define GPIO_OUT(pin)		(MVEBU_GPIO0_BASE + GPIO_OFF(pin) + 0x00)
+#define GPIO_IO_CONF(pin)	(MVEBU_GPIO0_BASE + GPIO_OFF(pin) + 0x04)
+#define GPIO_BLINK_EN(pin)	(MVEBU_GPIO0_BASE + GPIO_OFF(pin) + 0x08)
+#define GPIO_IN_POL(pin)	(MVEBU_GPIO0_BASE + GPIO_OFF(pin) + 0x0c)
+#define GPIO_DATA_IN(pin)	(MVEBU_GPIO0_BASE + GPIO_OFF(pin) + 0x10)
+#define GPIO_EDGE_CAUSE(pin)	(MVEBU_GPIO0_BASE + GPIO_OFF(pin) + 0x14)
+#define GPIO_EDGE_MASK(pin)	(MVEBU_GPIO0_BASE + GPIO_OFF(pin) + 0x18)
+#define GPIO_LEVEL_MASK(pin)	(MVEBU_GPIO0_BASE + GPIO_OFF(pin) + 0x1c)
 
 /*
  * Kirkwood-specific GPIO API

@@ -87,7 +87,7 @@ static int create_bbt(struct mtd_info *mtd, uint8_t * buf,
 	startblock = 0;
 	from = 0;
 
-	ops.mode = MTD_OOB_PLACE;
+	ops.mode = MTD_OPS_PLACE_OOB;
 	ops.ooblen = readlen;
 	ops.oobbuf = buf;
 	ops.len = ops.ooboffs = ops.retlen = ops.oobretlen = 0;
@@ -140,7 +140,6 @@ static inline int onenand_memory_bbt(struct mtd_info *mtd,
 {
 	unsigned char data_buf[MAX_ONENAND_PAGESIZE];
 
-	bd->options &= ~NAND_BBT_SCANEMPTY;
 	return create_bbt(mtd, data_buf, bd, -1);
 }
 
@@ -200,10 +199,8 @@ int onenand_scan_bbt(struct mtd_info *mtd, struct nand_bbt_descr *bd)
 	len = this->chipsize >> (this->erase_shift + 2);
 	/* Allocate memory (2bit per block) */
 	bbm->bbt = malloc(len);
-	if (!bbm->bbt) {
-		printk(KERN_ERR "onenand_scan_bbt: Out of memory\n");
+	if (!bbm->bbt)
 		return -ENOMEM;
-	}
 	/* Clear the memory bad block table */
 	memset(bbm->bbt, 0x00, len);
 

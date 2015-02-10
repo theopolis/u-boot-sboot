@@ -3,20 +3,7 @@
  *
  * Author: Donghwa Lee <dh09.lee@samsung.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -29,7 +16,7 @@ static void s6e8ax0_panel_cond(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
 	int reverse = dsim_dev->dsim_lcd_dev->reverse_panel;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xf8, 0x3d, 0x35, 0x00, 0x00, 0x00, 0x8d, 0x00, 0x4c,
 		0x6e, 0x10, 0x27, 0x7d, 0x3f, 0x10, 0x00, 0x00, 0x20,
 		0x04, 0x08, 0x6e, 0x00, 0x00, 0x00, 0x02, 0x08, 0x08,
@@ -37,7 +24,7 @@ static void s6e8ax0_panel_cond(struct mipi_dsim_device *dsim_dev)
 		0xff, 0xff, 0xc8
 	};
 
-	const unsigned char data_to_send_reverse[] = {
+	static const unsigned char data_to_send_reverse[] = {
 		0xf8, 0x19, 0x35, 0x00, 0x00, 0x00, 0x93, 0x00, 0x3c,
 		0x7d, 0x08, 0x27, 0x7d, 0x3f, 0x00, 0x00, 0x00, 0x20,
 		0x04, 0x08, 0x6e, 0x00, 0x00, 0x00, 0x02, 0x08, 0x08,
@@ -47,174 +34,181 @@ static void s6e8ax0_panel_cond(struct mipi_dsim_device *dsim_dev)
 
 	if (reverse) {
 		ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-			(unsigned int)data_to_send_reverse,
+			data_to_send_reverse,
 			ARRAY_SIZE(data_to_send_reverse));
 	} else {
 		ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-			(unsigned int)data_to_send, ARRAY_SIZE(data_to_send));
+			data_to_send, ARRAY_SIZE(data_to_send));
 	}
 }
 
 static void s6e8ax0_display_cond(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xf2, 0x80, 0x03, 0x0d
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-			(unsigned int)data_to_send,
-			ARRAY_SIZE(data_to_send));
+			data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_gamma_cond(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
 	/* 7500K 2.2 Set : 30cd */
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xfa, 0x01, 0x60, 0x10, 0x60, 0xf5, 0x00, 0xff, 0xad,
 		0xaf, 0xba, 0xc3, 0xd8, 0xc5, 0x9f, 0xc6, 0x9e, 0xc1,
 		0xdc, 0xc0, 0x00, 0x61, 0x00, 0x5a, 0x00, 0x74,
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-			(unsigned int)data_to_send,
-			ARRAY_SIZE(data_to_send));
+			data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_gamma_update(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
+	static const unsigned char data_to_send[] = {
+		0xf7, 0x03
+	};
 
-	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_SHORT_WRITE_PARAM, 0xf7, 0x3);
+	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_SHORT_WRITE_PARAM, data_to_send,
+			ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_etc_source_control(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xf6, 0x00, 0x02, 0x00
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-			(unsigned int)data_to_send,
-			ARRAY_SIZE(data_to_send));
+			data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_etc_pentile_control(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xb6, 0x0c, 0x02, 0x03, 0x32, 0xff, 0x44, 0x44, 0xc0,
 		0x00
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-			(unsigned int)data_to_send,
-			ARRAY_SIZE(data_to_send));
+			data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_etc_mipi_control1(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xe1, 0x10, 0x1c, 0x17, 0x08, 0x1d
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-			(unsigned int)data_to_send,
-			ARRAY_SIZE(data_to_send));
+			data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_etc_mipi_control2(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xe2, 0xed, 0x07, 0xc3, 0x13, 0x0d, 0x03
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-			(unsigned int)data_to_send,
-			ARRAY_SIZE(data_to_send));
+			data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_etc_power_control(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xf4, 0xcf, 0x0a, 0x12, 0x10, 0x19, 0x33, 0x02
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-		(unsigned int)data_to_send, ARRAY_SIZE(data_to_send));
+		data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_etc_mipi_control3(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
+	static const unsigned char data_to_send[] = {
+		0xe3, 0x40
+	};
 
-	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_SHORT_WRITE_PARAM, 0xe3, 0x40);
+	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_SHORT_WRITE_PARAM, data_to_send,
+		       ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_etc_mipi_control4(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xe4, 0x00, 0x00, 0x14, 0x80, 0x00, 0x00, 0x00
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-		(unsigned int)data_to_send, ARRAY_SIZE(data_to_send));
+		data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_elvss_set(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xb1, 0x04, 0x00
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-			(unsigned int)data_to_send,
-			ARRAY_SIZE(data_to_send));
+			data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_display_on(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
+	static const unsigned char data_to_send[] = {
+		0x29, 0x00
+	};
 
-	ops->cmd_write(dsim_dev,
-		MIPI_DSI_DCS_SHORT_WRITE, 0x29, 0x00);
+	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_SHORT_WRITE, data_to_send,
+		       ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_sleep_out(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
+	static const unsigned char data_to_send[] = {
+		0x11, 0x00
+	};
 
-	ops->cmd_write(dsim_dev,
-		MIPI_DSI_DCS_SHORT_WRITE, 0x11, 0x00);
+	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_SHORT_WRITE, data_to_send,
+		       ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_apply_level1_key(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xf0, 0x5a, 0x5a
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-		(unsigned int)data_to_send, ARRAY_SIZE(data_to_send));
+		data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_apply_mtp_key(struct mipi_dsim_device *dsim_dev)
 {
 	struct mipi_dsim_master_ops *ops = dsim_dev->master_ops;
-	const unsigned char data_to_send[] = {
+	static const unsigned char data_to_send[] = {
 		0xf1, 0x5a, 0x5a
 	};
 
 	ops->cmd_write(dsim_dev, MIPI_DSI_DCS_LONG_WRITE,
-		(unsigned int)data_to_send, ARRAY_SIZE(data_to_send));
+		data_to_send, ARRAY_SIZE(data_to_send));
 }
 
 static void s6e8ax0_panel_init(struct mipi_dsim_device *dsim_dev)

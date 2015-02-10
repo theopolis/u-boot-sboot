@@ -1,22 +1,7 @@
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
- * See file CREDITS for list of people who contributed to this
- * project.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -43,6 +28,20 @@ static const struct usb_eth_prob_dev prob_dev[] = {
 		.before_probe = asix_eth_before_probe,
 		.probe = asix_eth_probe,
 		.get_info = asix_eth_get_info,
+	},
+#endif
+#ifdef CONFIG_USB_ETHER_ASIX88179
+	{
+		.before_probe = ax88179_eth_before_probe,
+		.probe = ax88179_eth_probe,
+		.get_info = ax88179_eth_get_info,
+	},
+#endif
+#ifdef CONFIG_USB_ETHER_MCS7830
+	{
+		.before_probe = mcs7830_eth_before_probe,
+		.probe = mcs7830_eth_probe,
+		.get_info = mcs7830_eth_get_info,
 	},
 #endif
 #ifdef CONFIG_USB_ETHER_SMSC95XX

@@ -68,8 +68,11 @@ enum law_trgt_if {
 	LAW_TRGT_IF_DDR_INTLV_1234 = 0x16,
 	LAW_TRGT_IF_BMAN = 0x18,
 	LAW_TRGT_IF_DCSR = 0x1d,
+	LAW_TRGT_IF_CCSR = 0x1e,
 	LAW_TRGT_IF_LBC = 0x1f,
 	LAW_TRGT_IF_QMAN = 0x3c,
+
+	LAW_TRGT_IF_MAPLE = 0x50,
 };
 #define LAW_TRGT_IF_DDR		LAW_TRGT_IF_DDR_1
 #define LAW_TRGT_IF_IFC		LAW_TRGT_IF_LBC
@@ -80,14 +83,24 @@ enum law_trgt_if {
 #ifndef CONFIG_MPC8641
 	LAW_TRGT_IF_PCIE_1 = 0x02,
 #endif
+#if defined(CONFIG_BSC9131) || defined(CONFIG_BSC9132)
+	LAW_TRGT_IF_OCN_DSP = 0x03,
+#else
 #if !defined(CONFIG_MPC8572) && !defined(CONFIG_P2020)
 	LAW_TRGT_IF_PCIE_3 = 0x03,
 #endif
+#endif
 	LAW_TRGT_IF_LBC = 0x04,
 	LAW_TRGT_IF_CCSR = 0x08,
+	LAW_TRGT_IF_DSP_CCSR = 0x09,
+	LAW_TRGT_IF_PLATFORM_SRAM = 0x0a,
 	LAW_TRGT_IF_DDR_INTRLV = 0x0b,
 	LAW_TRGT_IF_RIO = 0x0c,
+#if defined(CONFIG_BSC9132)
+	LAW_TRGT_IF_CLASS_DSP = 0x0d,
+#else
 	LAW_TRGT_IF_RIO_2 = 0x0d,
+#endif
 	LAW_TRGT_IF_DPAA_SWP_SRAM = 0x0e,
 	LAW_TRGT_IF_DDR = 0x0f,
 	LAW_TRGT_IF_DDR_2 = 0x16,	/* 2nd controller */

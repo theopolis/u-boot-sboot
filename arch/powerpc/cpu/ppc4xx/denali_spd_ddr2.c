@@ -13,24 +13,7 @@
  *
  * COPYRIGHT   AMCC   CORPORATION 2004
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* define DEBUG for debugging output (obviously ;-)) */
@@ -53,13 +36,6 @@
 /*-----------------------------------------------------------------------------+
  * Defines
  *-----------------------------------------------------------------------------*/
-#ifndef	TRUE
-#define TRUE		1
-#endif
-#ifndef FALSE
-#define FALSE		0
-#endif
-
 #define MAXDIMMS	2
 #define MAXRANKS	2
 
@@ -279,7 +255,7 @@ static void get_spd_info(unsigned long dimm_ranks[],
 			 unsigned long num_dimm_banks)
 {
 	unsigned long dimm_num;
-	unsigned long dimm_found = FALSE;
+	unsigned long dimm_found = false;
 	unsigned long const max_ranks_per_dimm = (1 == num_dimm_banks) ? 2 : 1;
 	unsigned char num_of_bytes;
 	unsigned char total_size;
@@ -334,7 +310,7 @@ static void get_spd_info(unsigned long dimm_ranks[],
 				       "\n\n");
 				spd_ddr_init_hang();
 			}
-			dimm_found = TRUE;
+			dimm_found = true;
 			debug("DIMM slot %lu: populated with %lu-rank DDR2 DIMM"
 			      "\n", dimm_num, ranks_on_dimm);
 			if (ranks_on_dimm > max_ranks_per_dimm) {
@@ -355,7 +331,7 @@ static void get_spd_info(unsigned long dimm_ranks[],
 			debug("DIMM slot %lu: Not populated\n", dimm_num);
 		}
 	}
-	if (dimm_found == FALSE) {
+	if (dimm_found == false) {
 		printf("ERROR: No memory installed.\n");
 		printf("Install at least one DDR2 DIMM.\n\n");
 		spd_ddr_init_hang();
@@ -882,7 +858,7 @@ static void program_ddr0_22(unsigned long dimm_ranks[],
 			/* Check for ECC */
 			if (0 == (spd_read(iic0_dimm_addr[dimm_num], 11) &
 				  0x02)) {
-				ecc_available = FALSE;
+				ecc_available = false;
 			}
 		}
 	}
@@ -1048,8 +1024,7 @@ phys_size_t initdram(int board_type)
 	 * before continuing.
 	 */
 	/* switch to correct I2C bus */
-	I2C_SET_BUS(CONFIG_SYS_SPD_BUS_NUM);
-	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
+	i2c_set_bus_num(CONFIG_SYS_SPD_BUS_NUM);
 
 	/*------------------------------------------------------------------
 	 * Clear out the serial presence detect buffers.

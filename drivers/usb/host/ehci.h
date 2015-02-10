@@ -22,25 +22,11 @@
 #ifndef USB_EHCI_H
 #define USB_EHCI_H
 
+#include <usb.h>
+
 #if !defined(CONFIG_SYS_USB_EHCI_MAX_ROOT_PORTS)
 #define CONFIG_SYS_USB_EHCI_MAX_ROOT_PORTS	2
 #endif
-
-/* (shifted) direction/type/recipient from the USB 2.0 spec, table 9.2 */
-#define DeviceRequest \
-	((USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE) << 8)
-
-#define DeviceOutRequest \
-	((USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE) << 8)
-
-#define InterfaceRequest \
-	((USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_INTERFACE) << 8)
-
-#define EndpointRequest \
-	((USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_INTERFACE) << 8)
-
-#define EndpointOutRequest \
-	((USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE) << 8)
 
 /*
  * Register Space.
@@ -61,14 +47,15 @@ struct ehci_hcor {
 	uint32_t or_usbcmd;
 #define CMD_PARK	(1 << 11)		/* enable "park" */
 #define CMD_PARK_CNT(c)	(((c) >> 8) & 3)	/* how many transfers to park */
-#define CMD_ASE		(1 << 5)		/* async schedule enable */
 #define CMD_LRESET	(1 << 7)		/* partial reset */
-#define CMD_IAAD	(1 << 5)		/* "doorbell" interrupt */
+#define CMD_IAAD	(1 << 6)		/* "doorbell" interrupt */
+#define CMD_ASE		(1 << 5)		/* async schedule enable */
 #define CMD_PSE		(1 << 4)		/* periodic schedule enable */
 #define CMD_RESET	(1 << 1)		/* reset HC not bus */
 #define CMD_RUN		(1 << 0)		/* start/stop HC */
 	uint32_t or_usbsts;
 #define STS_ASS		(1 << 15)
+#define	STS_PSS		(1 << 14)
 #define STS_HALT	(1 << 12)
 	uint32_t or_usbintr;
 #define INTR_UE         (1 << 0)                /* USB interrupt enable */
@@ -245,11 +232,27 @@ struct QH {
 	 * Add dummy fill value to make the size of this struct
 	 * aligned to 32 bytes
 	 */
-	uint8_t fill[16];
+	union {
+		uint32_t fill[4];
+		void *buffer;
+	};
+};
+
+struct ehci_ctrl {
+	struct ehci_hccr *hccr;	/* R/O registers, not need for volatile */
+	struct ehci_hcor *hcor;
+	int rootdev;
+	uint16_t portreset;
+	struct QH qh_list __aligned(USB_DMA_MINALIGN);
+	struct QH periodic_queue __aligned(USB_DMA_MINALIGN);
+	uint32_t *periodic_list;
+	int periodic_schedules;
+	int ntds;
 };
 
 /* Low level init functions */
-int ehci_hcd_init(int index, struct ehci_hccr **hccr, struct ehci_hcor **hcor);
+int ehci_hcd_init(int index, enum usb_init_type init,
+		struct ehci_hccr **hccr, struct ehci_hcor **hcor);
 int ehci_hcd_stop(int index);
 
 #endif /* USB_EHCI_H */

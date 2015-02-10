@@ -2,23 +2,7 @@
  * (C) Copyright 2010 - 2011
  * NVIDIA Corporation <www.nvidia.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -31,6 +15,7 @@
 #include <asm/arch/sdram_param.h>
 #include <asm/arch/tegra.h>
 #include <asm/arch-tegra/ap.h>
+#include <asm/arch-tegra/apb_misc.h>
 #include <asm/arch-tegra/clk_rst.h>
 #include <asm/arch-tegra/pmc.h>
 #include <asm/arch-tegra/fuse.h>
@@ -46,7 +31,7 @@ DECLARE_GLOBAL_DATA_PTR;
  * This is the place in SRAM where the SDRAM parameters are stored. There
  * are 4 blocks, one for each RAM code
  */
-#define SDRAM_PARAMS_BASE	(AP20_BASE_PA_SRAM + 0x188)
+#define SDRAM_PARAMS_BASE	(NV_PA_BASE_SRAM + 0x188)
 
 /* TODO: If we later add support for the Misc GP controller, refactor this */
 union xm2cfga_reg {
@@ -138,7 +123,8 @@ int warmboot_save_sdram_params(void)
 {
 	u32 ram_code;
 	struct sdram_params sdram;
-	struct pmux_tri_ctlr *pmt = (struct pmux_tri_ctlr *)NV_PA_APB_MISC_BASE;
+	struct apb_misc_pp_ctlr *apb_misc =
+				(struct apb_misc_pp_ctlr *)NV_PA_APB_MISC_BASE;
 	struct pmc_ctlr *pmc = (struct pmc_ctlr *)NV_PA_PMC_BASE;
 	struct apb_misc_gp_ctlr *gp =
 			(struct apb_misc_gp_ctlr *)NV_PA_APB_MISC_GP_BASE;
@@ -151,8 +137,8 @@ int warmboot_save_sdram_params(void)
 	union fbio_spare_reg fbio_spare;
 
 	/* get ram code that is used as index to array sdram_params in BCT */
-	ram_code = (readl(&pmt->pmt_strap_opt_a) >>
-			STRAP_OPT_A_RAM_CODE_SHIFT) & 3;
+	ram_code = (readl(&apb_misc->strapping_opt_a) >>
+			  STRAP_OPT_A_RAM_CODE_SHIFT) & 3;
 	memcpy(&sdram,
 	       (char *)((struct sdram_params *)SDRAM_PARAMS_BASE + ram_code),
 	       sizeof(sdram));

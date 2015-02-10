@@ -1,48 +1,38 @@
 /*
- * Copyright 2012 Freescale Semiconductor, Inc.
+ * Copyright 2012-2014 Freescale Semiconductor, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
-#define _GNU_SOURCE
-
-#include "mkimage.h"
+#include "imagetool.h"
 #include <image.h>
 #include "pblimage.h"
+#include "pbl_crc32.h"
+
+#define roundup(x, y)		((((x) + ((y) - 1)) / (y)) * (y))
+#define PBL_ACS_CONT_CMD	0x81000000
+#define PBL_ADDR_24BIT_MASK	0x00ffffff
 
 /*
- * The PBL can load up to 64 bytes at a time, so we split the U-Boot
- * image into 64 byte chunks. PBL needs a command for each piece, of
- * the form "81xxxxxx", where "xxxxxx" is the offset. SYS_TEXT_BASE
- * is 0xFFF80000 for PBL boot, and PBL only cares about low 24-bit,
- * so it starts from 0x81F80000.
+ * Initialize to an invalid value.
  */
-static uint32_t next_pbl_cmd = 0x81F80000;
+static uint32_t next_pbl_cmd = 0x82000000;
 /*
  * need to store all bytes in memory for calculating crc32, then write the
  * bytes to image file for PBL boot.
  */
-static unsigned char mem_buf[600000];
+static unsigned char mem_buf[1000000];
 static unsigned char *pmem_buf = mem_buf;
 static int pbl_size;
 static char *fname = "Unknown";
 static int lineno = -1;
 static struct pbl_header pblimage_header;
+static int uboot_size;
+static int arch_flag;
+
+static uint32_t pbl_cmd_initaddr;
+static uint32_t pbi_crc_cmd1;
+static uint32_t pbi_crc_cmd2;
+static uint32_t pbl_end_cmd[4];
 
 static union
 {
@@ -52,6 +42,13 @@ static union
 
 #define ENDIANNESS ((char)endian_test.l)
 
+/*
+ * The PBL can load up to 64 bytes at a time, so we split the U-Boot
+ * image into 64 byte chunks. PBL needs a command for each piece, of
+ * the form "81xxxxxx", where "xxxxxx" is the offset. Calculate the
+ * start offset by subtracting the size of the u-boot image from the
+ * top of the allowable 24-bit range.
+ */
 static void generate_pbl_cmd(void)
 {
 	uint32_t val = next_pbl_cmd;
@@ -66,11 +63,15 @@ static void generate_pbl_cmd(void)
 
 static void pbl_fget(size_t size, FILE *stream)
 {
-	unsigned char c;
+	unsigned char c = 0xff;
 	int c_temp;
 
-	while (size && (c_temp = fgetc(stream)) != EOF) {
-		c = (unsigned char)c_temp;
+	while (size) {
+		c_temp = fgetc(stream);
+		if (c_temp != EOF)
+			c = (unsigned char)c_temp;
+		else if ((c_temp == EOF) && (arch_flag == IH_ARCH_ARM))
+			c = 0xff;
 		*pmem_buf++ = c;
 		pbl_size++;
 		size--;
@@ -80,7 +81,8 @@ static void pbl_fget(size_t size, FILE *stream)
 /* load split u-boot with PBI command 81xxxxxx. */
 static void load_uboot(FILE *fp_uboot)
 {
-	while (next_pbl_cmd < 0x82000000) {
+	next_pbl_cmd = pbl_cmd_initaddr - uboot_size;
+	while (next_pbl_cmd < pbl_cmd_initaddr) {
 		generate_pbl_cmd();
 		pbl_fget(64, fp_uboot);
 	}
@@ -137,52 +139,6 @@ static void pbl_parser(char *name)
 	fclose(fd);
 }
 
-static uint32_t crc_table[256];
-
-static void make_crc_table(void)
-{
-	uint32_t mask;
-	int i, j;
-	uint32_t poly; /* polynomial exclusive-or pattern */
-
-	/*
-	 * the polynomial used by PBL is 1 + x1 + x2 + x4 + x5 + x7 + x8 + x10
-	 * + x11 + x12 + x16 + x22 + x23 + x26 + x32.
-	 */
-	poly = 0x04c11db7;
-
-	for (i = 0; i < 256; i++) {
-		mask = i << 24;
-		for (j = 0; j < 8; j++) {
-			if (mask & 0x80000000)
-				mask = (mask << 1) ^ poly;
-			else
-				mask <<= 1;
-		}
-		crc_table[i] = mask;
-	}
-}
-
-unsigned long pbl_crc32(unsigned long crc, const char *buf, uint32_t len)
-{
-	uint32_t crc32_val = 0xffffffff;
-	uint32_t xor = 0x0;
-	int i;
-
-	make_crc_table();
-
-	for (i = 0; i < len; i++)
-		crc32_val = (crc32_val << 8) ^
-			crc_table[(crc32_val >> 24) ^ (*buf++ & 0xff)];
-
-	crc32_val = crc32_val ^ xor;
-	if (crc32_val < 0) {
-		crc32_val += 0xffffffff;
-		crc32_val += 1;
-	}
-	return crc32_val;
-}
-
 static uint32_t reverse_byte(uint32_t val)
 {
 	uint32_t temp;
@@ -199,8 +155,6 @@ static uint32_t reverse_byte(uint32_t val)
 /* write end command and crc command to memory. */
 static void add_end_cmd(void)
 {
-	uint32_t pbl_end_cmd[4] = {0x09138000, 0x00000000,
-		0x091380c0, 0x00000000};
 	uint32_t crc32_pbl;
 	int i;
 	unsigned char *p = (unsigned char *)&pbl_end_cmd;
@@ -217,8 +171,8 @@ static void add_end_cmd(void)
 
 	/* Add PBI CRC command. */
 	*pmem_buf++ = 0x08;
-	*pmem_buf++ = 0x13;
-	*pmem_buf++ = 0x80;
+	*pmem_buf++ = pbi_crc_cmd1;
+	*pmem_buf++ = pbi_crc_cmd2;
 	*pmem_buf++ = 0x40;
 	pbl_size += 4;
 
@@ -229,20 +183,9 @@ static void add_end_cmd(void)
 	*pmem_buf++ = (crc32_pbl >> 8) & 0xff;
 	*pmem_buf++ = (crc32_pbl) & 0xff;
 	pbl_size += 4;
-
-	if ((pbl_size % 16) != 0) {
-		for (i = 0; i < 8; i++) {
-			*pmem_buf++ = 0x0;
-			pbl_size++;
-		}
-	}
-	if ((pbl_size % 16 != 0)) {
-		printf("Error: Bad size of image file\n");
-		exit(EXIT_FAILURE);
-	}
 }
 
-void pbl_load_uboot(int ifd, struct mkimage_params *params)
+void pbl_load_uboot(int ifd, struct image_tool_params *params)
 {
 	FILE *fp_uboot;
 	int size;
@@ -281,7 +224,7 @@ static int pblimage_check_image_types(uint8_t type)
 }
 
 static int pblimage_verify_header(unsigned char *ptr, int image_size,
-			struct mkimage_params *params)
+			struct image_tool_params *params)
 {
 	struct pbl_header *pbl_hdr = (struct pbl_header *) ptr;
 
@@ -308,24 +251,74 @@ static void pblimage_print_header(const void *ptr)
 }
 
 static void pblimage_set_header(void *ptr, struct stat *sbuf, int ifd,
-				struct mkimage_params *params)
+				struct image_tool_params *params)
 {
 	/*nothing need to do, pbl_load_uboot takes care of whole file. */
 }
 
-/* pblimage parameters */
-static struct image_type_params pblimage_params = {
-	.name		= "Freescale PBL Boot Image support",
-	.header_size	= sizeof(struct pbl_header),
-	.hdr		= (void *)&pblimage_header,
-	.check_image_type = pblimage_check_image_types,
-	.verify_header	= pblimage_verify_header,
-	.print_header	= pblimage_print_header,
-	.set_header	= pblimage_set_header,
+int pblimage_check_params(struct image_tool_params *params)
+{
+	FILE *fp_uboot;
+	int fd;
+	struct stat st;
+
+	if (!params)
+		return EXIT_FAILURE;
+
+	fp_uboot = fopen(params->datafile, "r");
+	if (fp_uboot == NULL) {
+		printf("Error: %s open failed\n", params->datafile);
+		exit(EXIT_FAILURE);
+	}
+	fd = fileno(fp_uboot);
+
+	if (fstat(fd, &st) == -1) {
+		printf("Error: Could not determine u-boot image size. %s\n",
+		       strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	/* For the variable size, we need to pad it to 64 byte boundary */
+	uboot_size = roundup(st.st_size, 64);
+
+	if (params->arch == IH_ARCH_ARM) {
+		arch_flag = IH_ARCH_ARM;
+		pbi_crc_cmd1 = 0x61;
+		pbi_crc_cmd2 = 0;
+		pbl_cmd_initaddr = params->addr & PBL_ADDR_24BIT_MASK;
+		pbl_cmd_initaddr |= PBL_ACS_CONT_CMD;
+		pbl_cmd_initaddr |= uboot_size;
+		pbl_end_cmd[0] = 0x09610000;
+		pbl_end_cmd[1] = 0x00000000;
+		pbl_end_cmd[2] = 0x096100c0;
+		pbl_end_cmd[3] = 0x00000000;
+	} else if (params->arch == IH_ARCH_PPC) {
+		arch_flag = IH_ARCH_PPC;
+		pbi_crc_cmd1 = 0x13;
+		pbi_crc_cmd2 = 0x80;
+		pbl_cmd_initaddr = 0x82000000;
+		pbl_end_cmd[0] = 0x09138000;
+		pbl_end_cmd[1] = 0x00000000;
+		pbl_end_cmd[2] = 0x091380c0;
+		pbl_end_cmd[3] = 0x00000000;
+	}
+
+	next_pbl_cmd = pbl_cmd_initaddr;
+	return 0;
 };
 
-void init_pbl_image_type(void)
-{
-	pbl_size = 0;
-	mkimage_register(&pblimage_params);
-}
+/* pblimage parameters */
+U_BOOT_IMAGE_TYPE(
+	pblimage,
+	"Freescale PBL Boot Image support",
+	sizeof(struct pbl_header),
+	(void *)&pblimage_header,
+	pblimage_check_params,
+	pblimage_verify_header,
+	pblimage_print_header,
+	pblimage_set_header,
+	NULL,
+	pblimage_check_image_types,
+	NULL,
+	NULL
+);

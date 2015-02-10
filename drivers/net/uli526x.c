@@ -7,10 +7,7 @@
  * ULI 526x Ethernet port driver.
  * Based on the Linux driver: drivers/net/tulip/uli526x.c
  *
- * This is free software; you can redistribute it and/or modify
- * it under the terms of  the GNU General  Public License as published by
- * the Free Software Foundation;  either version 2 of the  License, or
- * (at your option) any later version.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -551,7 +548,7 @@ static int uli526x_rx_packet(struct eth_device *dev)
 
 	rdes0 = le32_to_cpu(rxptr->rdes0);
 #ifdef RX_DEBUG
-	printf("%s(): rxptr->rdes0=%x:%x\n", __FUNCTION__, rxptr->rdes0);
+	printf("%s(): rxptr->rdes0=%x\n", __FUNCTION__, rxptr->rdes0);
 #endif
 	if (!(rdes0 & 0x80000000)) {	/* packet owner check */
 		if ((rdes0 & 0x300) != 0x300) {

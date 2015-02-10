@@ -2,23 +2,7 @@
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -189,20 +173,6 @@ static int smc_init (void)
 # endif
 #endif
 
-#if defined(CONFIG_FADS) || defined(CONFIG_ADS)
-	/* Enable RS232 */
-#if defined(CONFIG_8xx_CONS_SMC1)
-	*((uint *) BCSR1) &= ~BCSR1_RS232EN_1;
-#else
-	*((uint *) BCSR1) &= ~BCSR1_RS232EN_2;
-#endif
-#endif	/* CONFIG_FADS */
-
-#if defined(CONFIG_RPXLITE) || defined(CONFIG_RPXCLASSIC)
-	/* Enable Monitor Port Transceiver */
-	*((uchar *) BCSR0) |= BCSR0_ENMONXCVR ;
-#endif /* CONFIG_RPXLITE */
-
 	/* Set the physical address of the host memory buffers in
 	 * the buffer descriptors.
 	 */
@@ -240,10 +210,6 @@ static int smc_init (void)
 	up->smc_rstate = 0;
 	up->smc_tstate = 0;
 #endif
-
-#if defined(CONFIG_MBX)
-	board_serial_init();
-#endif	/* CONFIG_MBX */
 
 	/* Set UART mode, 8 bit, no parity, one stop.
 	 * Enable receive and transmit.
@@ -439,22 +405,6 @@ static int scc_init (void)
 	sp = (scc_t *) &(cp->cp_scc[SCC_INDEX]);
 	up = (scc_uart_t *) &cp->cp_dparam[PROFF_SCC];
 
-#if defined(CONFIG_LWMON) && defined(CONFIG_8xx_CONS_SCC2)
-    {	/* Disable Ethernet, enable Serial */
-	uchar c;
-
-	c = pic_read  (0x61);
-	c &= ~0x40;	/* enable COM3 */
-	c |=  0x80;	/* disable Ethernet */
-	pic_write (0x61, c);
-
-	/* enable RTS2 */
-	cp->cp_pbpar |=  0x2000;
-	cp->cp_pbdat |=  0x2000;
-	cp->cp_pbdir |=  0x2000;
-    }
-#endif	/* CONFIG_LWMON */
-
 	/* Disable transmitter/receiver. */
 	sp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
 
@@ -466,18 +416,13 @@ static int scc_init (void)
 	cp->cp_pbdir &= ~0x06;
 	cp->cp_pbodr &= ~0x06;
 
-#elif (SCC_INDEX < 2) || !defined(CONFIG_IP860)
+#elif (SCC_INDEX < 2)
 	/*
 	 * Standard configuration for SCC's is on Part A
 	 */
 	ip->iop_papar |=  ((3 << (2 * SCC_INDEX)));
 	ip->iop_padir &= ~((3 << (2 * SCC_INDEX)));
 	ip->iop_paodr &= ~((3 << (2 * SCC_INDEX)));
-#else
-	/*
-	 * The IP860 has SCC3 and SCC4 on Port D
-	 */
-	ip->iop_pdpar |=  ((3 << (2 * SCC_INDEX)));
 #endif
 
 	/* Allocate space for two buffer descriptors in the DP ram. */

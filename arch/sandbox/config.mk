@@ -1,21 +1,26 @@
 # Copyright (c) 2011 The Chromium OS Authors.
-# See file CREDITS for list of people who contributed to this
-# project.
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307 USA
+# SPDX-License-Identifier:	GPL-2.0+
 
-PLATFORM_CPPFLAGS += -DCONFIG_SANDBOX -D__SANDBOX__ -U_FORTIFY_SOURCE
+PLATFORM_CPPFLAGS += -D__SANDBOX__ -U_FORTIFY_SOURCE
+PLATFORM_CPPFLAGS += -DCONFIG_ARCH_MAP_SYSMEM -DCONFIG_SYS_GENERIC_BOARD
 PLATFORM_LIBS += -lrt
+
+ifdef CONFIG_SANDBOX_SDL
+PLATFORM_LIBS += $(shell sdl-config --libs)
+PLATFORM_CPPFLAGS += $(shell sdl-config --cflags)
+endif
+
+# Support generic board on sandbox
+__HAVE_ARCH_GENERIC_BOARD := y
+
+cmd_u-boot__ = $(CC) -o $@ -T u-boot.lds \
+	-Wl,--start-group $(u-boot-main) -Wl,--end-group \
+	$(PLATFORM_LIBS) -Wl,-Map -Wl,u-boot.map
+
+CONFIG_ARCH_DEVICE_TREE := sandbox
+
+# Define this to avoid linking with SDL, which requires SDL libraries
+# This can solve 'sdl-config: Command not found' errors
+ifneq ($(NO_SDL),)
+PLATFORM_CPPFLAGS += -DSANDBOX_NO_SDL
+endif

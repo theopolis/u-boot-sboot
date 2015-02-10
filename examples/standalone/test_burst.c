@@ -2,23 +2,7 @@
  * (C) Copyright 2005
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * The test exercises SDRAM accesses in burst mode
  */
@@ -46,25 +30,6 @@
    the following flash address
 */
 #define TEST_FLASH_ADDR	0x40100000
-
-/* Define GPIO ports to signal start of burst transfers and errors */
-#ifdef CONFIG_LWMON
-/* Use PD.8 to signal start of burst transfers */
-#define GPIO1_DAT	(((volatile immap_t *)CONFIG_SYS_IMMR)->im_ioport.iop_pddat)
-#define GPIO1_BIT	0x0080
-/* Configure PD.8 as general purpose output */
-#define GPIO1_INIT \
-	((volatile immap_t *)CONFIG_SYS_IMMR)->im_ioport.iop_pdpar &= ~GPIO1_BIT; \
-	((volatile immap_t *)CONFIG_SYS_IMMR)->im_ioport.iop_pddir |=  GPIO1_BIT;
-/* Use PD.9 to signal error */
-#define GPIO2_DAT	(((volatile immap_t *)CONFIG_SYS_IMMR)->im_ioport.iop_pddat)
-#define GPIO2_BIT	0x0040
-/* Configure PD.9 as general purpose output */
-#define GPIO2_INIT \
-	((volatile immap_t *)CONFIG_SYS_IMMR)->im_ioport.iop_pdpar &= ~GPIO2_BIT; \
-	((volatile immap_t *)CONFIG_SYS_IMMR)->im_ioport.iop_pddir |=  GPIO2_BIT;
-#endif /* CONFIG_LWMON */
-
 
 static void test_prepare (void);
 static int test_burst_start (unsigned long size, unsigned long pattern);

@@ -4,21 +4,7 @@
  * Copyright (C) 2006-2007 Rodolfo Giometti <giometti@linux.it>
  * Copyright (C) 2006-2007 Eurotech S.p.A. <info@eurotech.it>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * Derived in part from the SL811 HCD driver "u-boot/drivers/usb/sl811_usb.c"
  * (original copyright message follows):
@@ -114,12 +100,6 @@ struct isp116x_platform_data isp116x_board;
 static int got_rhsc;		/* root hub status change */
 struct usb_device *devgone;	/* device which was disconnected */
 static int rh_devnum;		/* address of Root Hub endpoint */
-
-/* ------------------------------------------------------------------------- */
-
-#define ALIGN(x,a)	(((x)+(a)-1UL)&~((a)-1UL))
-#define min_t(type,x,y)	\
-	({ type __x = (x); type __y = (y); __x < __y ? __x : __y; })
 
 /* ------------------------------------------------------------------------- */
 
@@ -268,105 +248,7 @@ static inline void dump_ptd_data(struct ptd *ptd, u8 * buf, int type)
 
 /* --- Virtual Root Hub ---------------------------------------------------- */
 
-/* Device descriptor */
-static __u8 root_hub_dev_des[] = {
-	0x12,			/*  __u8  bLength; */
-	0x01,			/*  __u8  bDescriptorType; Device */
-	0x10,			/*  __u16 bcdUSB; v1.1 */
-	0x01,
-	0x09,			/*  __u8  bDeviceClass; HUB_CLASSCODE */
-	0x00,			/*  __u8  bDeviceSubClass; */
-	0x00,			/*  __u8  bDeviceProtocol; */
-	0x08,			/*  __u8  bMaxPacketSize0; 8 Bytes */
-	0x00,			/*  __u16 idVendor; */
-	0x00,
-	0x00,			/*  __u16 idProduct; */
-	0x00,
-	0x00,			/*  __u16 bcdDevice; */
-	0x00,
-	0x00,			/*  __u8  iManufacturer; */
-	0x01,			/*  __u8  iProduct; */
-	0x00,			/*  __u8  iSerialNumber; */
-	0x01			/*  __u8  bNumConfigurations; */
-};
-
-/* Configuration descriptor */
-static __u8 root_hub_config_des[] = {
-	0x09,			/*  __u8  bLength; */
-	0x02,			/*  __u8  bDescriptorType; Configuration */
-	0x19,			/*  __u16 wTotalLength; */
-	0x00,
-	0x01,			/*  __u8  bNumInterfaces; */
-	0x01,			/*  __u8  bConfigurationValue; */
-	0x00,			/*  __u8  iConfiguration; */
-	0x40,			/*  __u8  bmAttributes;
-				   Bit 7: Bus-powered, 6: Self-powered, 5 Remote-wakwup, 4..0: resvd */
-	0x00,			/*  __u8  MaxPower; */
-
-	/* interface */
-	0x09,			/*  __u8  if_bLength; */
-	0x04,			/*  __u8  if_bDescriptorType; Interface */
-	0x00,			/*  __u8  if_bInterfaceNumber; */
-	0x00,			/*  __u8  if_bAlternateSetting; */
-	0x01,			/*  __u8  if_bNumEndpoints; */
-	0x09,			/*  __u8  if_bInterfaceClass; HUB_CLASSCODE */
-	0x00,			/*  __u8  if_bInterfaceSubClass; */
-	0x00,			/*  __u8  if_bInterfaceProtocol; */
-	0x00,			/*  __u8  if_iInterface; */
-
-	/* endpoint */
-	0x07,			/*  __u8  ep_bLength; */
-	0x05,			/*  __u8  ep_bDescriptorType; Endpoint */
-	0x81,			/*  __u8  ep_bEndpointAddress; IN Endpoint 1 */
-	0x03,			/*  __u8  ep_bmAttributes; Interrupt */
-	0x00,			/*  __u16 ep_wMaxPacketSize; ((MAX_ROOT_PORTS + 1) / 8 */
-	0x02,
-	0xff			/*  __u8  ep_bInterval; 255 ms */
-};
-
-static unsigned char root_hub_str_index0[] = {
-	0x04,			/*  __u8  bLength; */
-	0x03,			/*  __u8  bDescriptorType; String-descriptor */
-	0x09,			/*  __u8  lang ID */
-	0x04,			/*  __u8  lang ID */
-};
-
-static unsigned char root_hub_str_index1[] = {
-	0x22,			/*  __u8  bLength; */
-	0x03,			/*  __u8  bDescriptorType; String-descriptor */
-	'I',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'S',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'P',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'1',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'1',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'6',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'x',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	' ',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'R',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'o',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'o',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	't',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	' ',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'H',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'u',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-	'b',			/*  __u8  Unicode */
-	0,			/*  __u8  Unicode */
-};
+#include <usbroothubdes.h>
 
 /*
  * Hub class-specific descriptor is constructed dynamically
@@ -1391,7 +1273,7 @@ int isp116x_check_id(struct isp116x *isp116x)
 	return 0;
 }
 
-int usb_lowlevel_init(int index, void **controller))
+int usb_lowlevel_init(int index, enum usb_init_type init, void **controller))
 {
 	struct isp116x *isp116x = &isp116x_dev;
 

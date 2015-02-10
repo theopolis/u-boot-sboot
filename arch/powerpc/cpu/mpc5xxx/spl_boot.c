@@ -1,18 +1,7 @@
 /*
  * Copyright (C) 2012 Stefan Roese <sr@denx.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -41,13 +30,12 @@ void board_init_f(ulong bootflag)
 	end_align = (u32)__spl_flash_end;
 
 	/*
-	 * First we need to initialize the SDRAM, so that the real
-	 * U-Boot or the OS (Linux) can be loaded
+	 * On MPC5200, the initial RAM (and gd) is located in the internal
+	 * SRAM. So we can actually call the preloader console init code
+	 * before calling initdram(). This makes serial output (printf)
+	 * available very early, even before SDRAM init, which has been
+	 * an U-Boot priciple from day 1.
 	 */
-	initdram(0);
-
-	/* Clear bss */
-	memset(__bss_start, '\0', __bss_end__ - __bss_start);
 
 	/*
 	 * Init global_data pointer. Has to be done before calling
@@ -69,6 +57,15 @@ void board_init_f(ulong bootflag)
 	 * Do rudimental console / serial setup
 	 */
 	preloader_console_init();
+
+	/*
+	 * First we need to initialize the SDRAM, so that the real
+	 * U-Boot or the OS (Linux) can be loaded
+	 */
+	initdram(0);
+
+	/* Clear bss */
+	memset(__bss_start, '\0', __bss_end - __bss_start);
 
 	/*
 	 * Call board_init_r() (SPL framework version) to load and boot

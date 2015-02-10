@@ -2,23 +2,7 @@
  * (C) Copyright 2000 - 2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * Hacked for MPC8260 by Murray.Jensen@cmst.csiro.au, 19-Oct-00, with
  * changes based on the file arch/powerpc/mbxboot/m8260_tty.c from the
@@ -89,7 +73,7 @@ int serial_init_dev (unsigned long dev_base)
 
 	/* select clock sources */
 	psc->psc_clock_select = 0;
-	baseclk = (gd->ipb_clk + 16) / 32;
+	baseclk = (gd->arch.ipb_clk + 16) / 32;
 
 	/* switch to UART mode */
 	psc->sicr = 0;
@@ -169,7 +153,7 @@ void serial_setbrg_dev (unsigned long dev_base)
 	volatile struct mpc5xxx_psc *psc = (struct mpc5xxx_psc *)dev_base;
 	unsigned long baseclk, div;
 
-	baseclk = (gd->ipb_clk + 16) / 32;
+	baseclk = (gd->arch.ipb_clk + 16) / 32;
 
 	/* set up UART divisor */
 	div = (baseclk + (gd->baudrate/2)) / gd->baudrate;

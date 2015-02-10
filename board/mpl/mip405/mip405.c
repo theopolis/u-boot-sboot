@@ -2,24 +2,7 @@
  * (C) Copyright 2001
  * Denis Peter, MPL AG Switzerland, d.peter@mpl.ch
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * TODO: clean-up
  */
@@ -77,8 +60,6 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #undef SDRAM_DEBUG
 #define ENABLE_ECC /* for ecc boards */
-#define FALSE           0
-#define TRUE            1
 
 /* stdlib.h causes some compatibility problems; should fixe these! -- wd */
 #ifndef __ldiv_t_defined
@@ -771,7 +752,8 @@ int last_stage_init (void)
 
 int overwrite_console (void)
 {
-	return ((in8 (PLD_EXT_CONF_REG) & 0x1)==0);	/* return TRUE if console should be overwritten */
+	/* return true if console should be overwritten */
+	return ((in8(PLD_EXT_CONF_REG) & 0x1) == 0);
 }
 
 

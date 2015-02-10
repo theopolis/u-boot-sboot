@@ -1,12 +1,9 @@
 #ifndef _LINUX_TYPES_H
 #define _LINUX_TYPES_H
 
-#ifdef	__KERNEL__
-#include <linux/config.h>
-#endif
-
 #include <linux/posix_types.h>
 #include <asm/types.h>
+#include <stdbool.h>
 
 #ifndef __KERNEL_STRICT_NAMES
 
@@ -107,13 +104,20 @@ typedef		__u8		uint8_t;
 typedef		__u16		uint16_t;
 typedef		__u32		uint32_t;
 
-#if defined(__GNUC__) && !defined(__STRICT_ANSI__)
+#if defined(__GNUC__) && !defined(__STRICT_ANSI__) && \
+	(!defined(CONFIG_USE_STDINT) || !defined(__INT64_TYPE__))
 typedef		__u64		uint64_t;
 typedef		__u64		u_int64_t;
 typedef		__s64		int64_t;
 #endif
 
 #endif /* __KERNEL_STRICT_NAMES */
+
+#if defined(CONFIG_USE_STDINT) && defined(__INT64_TYPE__)
+typedef		__UINT64_TYPE__	uint64_t;
+typedef		__UINT64_TYPE__	u_int64_t;
+typedef		__INT64_TYPE__		int64_t;
+#endif
 
 /*
  * Below are truly Linux-specific types that should never collide with

@@ -6,23 +6,7 @@
  *
  * Configuation settings for the RONETIX PM9263 board.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -34,6 +18,8 @@
  */
 #include <asm/hardware.h>
 
+#define CONFIG_SYS_GENERIC_BOARD
+
 /* ARM asynchronous clock */
 #define CONFIG_DISPLAY_CPUINFO
 #define CONFIG_DISPLAY_BOARDINFO
@@ -43,8 +29,6 @@
 #define MAIN_PLL_DIV		2	/* 2 or 4 */
 #define CONFIG_SYS_AT91_MAIN_CLOCK	18432000
 #define CONFIG_SYS_AT91_SLOW_CLOCK	32768		/* slow clock xtal */
-
-#define CONFIG_SYS_HZ		1000
 
 #define CONFIG_SYS_AT91_CPU_NAME	"AT91SAM9263"
 #define CONFIG_PM9263		1	/* on a Ronetix PM9263 Board	*/
@@ -197,8 +181,8 @@
 
 /* LED */
 #define CONFIG_AT91_LED
-#define	CONFIG_RED_LED		AT91_PIO_PORTB, 7	/* this is the power led */
-#define	CONFIG_GREEN_LED	AT91_PIO_PORTB, 8	/* this is the user1 led */
+#define CONFIG_RED_LED		GPIO_PIN_PB(7) /* this is the power led */
+#define CONFIG_GREEN_LED	GPIO_PIN_PB(8) /* this is the user1 led */
 
 #define CONFIG_BOOTDELAY	3
 
@@ -234,7 +218,6 @@
 /* DataFlash */
 #define CONFIG_ATMEL_DATAFLASH_SPI
 #define CONFIG_HAS_DATAFLASH			1
-#define CONFIG_SYS_SPI_WRITE_TOUT		(5 * CONFIG_SYS_HZ)
 #define CONFIG_SYS_MAX_DATAFLASH_BANKS		1
 #define CONFIG_SYS_DATAFLASH_LOGIC_ADDR_CS0	0xC0000000	/* CS0 */
 #define AT91_SPI_CLK				15000000
@@ -259,8 +242,8 @@
 #define CONFIG_SYS_NAND_MASK_ALE	(1 << 21)
 /* our CLE is AD22 */
 #define CONFIG_SYS_NAND_MASK_CLE	(1 << 22)
-#define CONFIG_SYS_NAND_ENABLE_PIN	AT91_PIO_PORTD, 15
-#define CONFIG_SYS_NAND_READY_PIN	AT91_PIO_PORTB, 30
+#define CONFIG_SYS_NAND_ENABLE_PIN	GPIO_PIN_PD(15)
+#define CONFIG_SYS_NAND_READY_PIN	GPIO_PIN_PB(30)
 
 #endif
 
@@ -288,6 +271,7 @@
 
 /* USB */
 #define CONFIG_USB_ATMEL
+#define CONFIG_USB_ATMEL_CLK_SEL_PLLB
 #define CONFIG_USB_OHCI_NEW			1
 #define CONFIG_DOS_PARTITION			1
 #define CONFIG_SYS_USB_OHCI_CPU_INIT		1
@@ -355,7 +339,7 @@
 
 #define CONFIG_BOOTCOMMAND		"run flashboot"
 #define CONFIG_ROOTPATH			"/ronetix/rootfs"
-#define CONFIG_AUTOBOOT_PROMPT		"autoboot in %d seconds\n"
+#define CONFIG_AUTOBOOT_PROMPT		"autoboot in %d seconds\n", bootdelay
 
 #define CONFIG_CON_ROT			"fbcon=rotate:3 "
 #define CONFIG_BOOTARGS			"root=/dev/mtdblock4 rootfstype=jffs2 "\

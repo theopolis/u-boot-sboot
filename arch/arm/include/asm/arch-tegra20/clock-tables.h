@@ -1,23 +1,8 @@
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
  * Copyright (c) 2010-2012 NVIDIA Corporation <www.nvidia.com>
- * See file CREDITS for list of people who contributed to this
- * project.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* Tegra20 clock PLL tables */
@@ -146,7 +131,7 @@ enum periph_id {
 	/* 72 */
 	PERIPH_ID_AFI,
 	PERIPH_ID_CORESIGHT,
-	PERIPH_ID_RESERVED74,
+	PERIPH_ID_PCIEXCLK,
 	PERIPH_ID_AVPUCQ,
 	PERIPH_ID_RESERVED76,
 	PERIPH_ID_RESERVED77,
@@ -192,5 +177,9 @@ enum pll_out_id {
 /* return 1 if a PLL ID is in range, and not a simple PLL */
 #define clock_id_is_pll(id) ((id) >= CLOCK_ID_FIRST && \
 		(id) < CLOCK_ID_FIRST_SIMPLE)
+
+/* return 1 if a peripheral ID is in range */
+#define clock_periph_id_isvalid(id) ((id) >= PERIPH_ID_FIRST && \
+		(id) < PERIPH_ID_COUNT)
 
 #endif	/* _CLOCK_TABLES_H_ */

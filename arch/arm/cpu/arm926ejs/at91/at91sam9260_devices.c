@@ -3,29 +3,16 @@
  * Stelian Pop <stelian@popies.net>
  * Lead Tech Design <www.leadtechdesign.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <dm.h>
 #include <asm/io.h>
+#include <asm/arch/at91sam9260_matrix.h>
 #include <asm/arch/at91_common.h>
 #include <asm/arch/at91_pmc.h>
+#include <asm/arch/at91sam9_sdramc.h>
 #include <asm/arch/gpio.h>
 
 /*
@@ -203,6 +190,10 @@ void at91_macb_hw_init(void)
 #if defined(CONFIG_GENERIC_ATMEL_MCI)
 void at91_mci_hw_init(void)
 {
+	/* Enable mci clock */
+	struct at91_pmc *pmc = (struct at91_pmc *)ATMEL_BASE_PMC;
+	writel(1 << ATMEL_ID_MCI, &pmc->pcer);
+
 	at91_set_a_periph(AT91_PIO_PORTA, 8, 1);	/* MCCK */
 #if defined(CONFIG_ATMEL_MCI_PORTB)
 	at91_set_b_periph(AT91_PIO_PORTA, 1, 1);	/* MCCDB */
@@ -219,3 +210,36 @@ void at91_mci_hw_init(void)
 #endif
 }
 #endif
+
+void at91_sdram_hw_init(void)
+{
+	at91_set_a_periph(AT91_PIO_PORTC, 16, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 17, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 18, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 19, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 20, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 21, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 22, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 23, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 24, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 25, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 26, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 27, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 28, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 29, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 30, 0);
+	at91_set_a_periph(AT91_PIO_PORTC, 31, 0);
+}
+
+/* Platform data for the GPIOs */
+static const struct at91_port_platdata at91sam9260_plat[] = {
+	{ ATMEL_BASE_PIOA, "PA" },
+	{ ATMEL_BASE_PIOB, "PB" },
+	{ ATMEL_BASE_PIOC, "PC" },
+};
+
+U_BOOT_DEVICES(at91sam9260_gpios) = {
+	{ "gpio_at91", &at91sam9260_plat[0] },
+	{ "gpio_at91", &at91sam9260_plat[1] },
+	{ "gpio_at91", &at91sam9260_plat[2] },
+};

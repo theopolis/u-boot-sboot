@@ -2,22 +2,7 @@
  * (C) Copyright 2003
  * Denis Peter d.peter@mpl.ch
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation,
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -35,6 +20,8 @@
 #define CONFIG_PATI		1		/* ...On a PATI board	*/
 
 #define	CONFIG_SYS_TEXT_BASE	0xFFF00000
+
+#define CONFIG_SYS_GENERIC_BOARD
 
 /* Serial Console Configuration */
 #define	CONFIG_5xx_CONS_SCI1
@@ -109,10 +96,9 @@
 
 #define	CONFIG_SYS_LOAD_ADDR		0x100000	/* default load address		*/
 
-#define	CONFIG_SYS_HZ			1000		/* Decrementer freq: 1 ms ticks	*/
-
 #define CONFIG_SYS_BAUDRATE_TABLE	{ 9600, 19200, 38400, 57600, 115200, 1250000 }
 
+#define CONFIG_BOARD_EARLY_INIT_F
 
 /***********************************************************************
  * Last Stage Init

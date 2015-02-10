@@ -2,23 +2,7 @@
  * (C) Copyright 2008
  * Sergei Poselenov, Emcraft Systems, sposelenov@emcraft.com.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.         See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -34,7 +18,9 @@ static void sc_nand_write_buf(struct mtd_info *mtd, const u_char *buf, int len);
 static u_char sc_nand_read_byte(struct mtd_info *mtd);
 static u16 sc_nand_read_word(struct mtd_info *mtd);
 static void sc_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len);
+#if defined(CONFIG_MTD_NAND_VERIFY_WRITE)
 static int sc_nand_verify_buf(struct mtd_info *mtd, const u_char *buf, int len);
+#endif
 static int sc_nand_device_ready(struct mtd_info *mtdinfo);
 
 #define FPGA_NAND_CMD_MASK		(0x7 << 28)
@@ -116,6 +102,7 @@ static void sc_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
 	}
 }
 
+#if defined(CONFIG_MTD_NAND_VERIFY_WRITE)
 /**
  * sc_nand_verify_buf -  Verify chip data against buffer
  * @mtd:	MTD device structure
@@ -132,6 +119,7 @@ static int sc_nand_verify_buf(struct mtd_info *mtd, const u_char *buf, int len)
 	}
 	return 0;
 }
+#endif
 
 /**
  * sc_nand_device_ready - Check the NAND device is ready for next command.
@@ -190,7 +178,9 @@ int board_nand_init(struct nand_chip *nand)
 	nand->read_word = sc_nand_read_word;
 	nand->write_buf = sc_nand_write_buf;
 	nand->read_buf = sc_nand_read_buf;
+#if defined(CONFIG_MTD_NAND_VERIFY_WRITE)
 	nand->verify_buf = sc_nand_verify_buf;
+#endif
 
 	return 0;
 }

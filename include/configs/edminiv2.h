@@ -6,23 +6,7 @@
  * Marvell Semiconductor <www.marvell.com>
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _CONFIG_EDMINIV2_H
@@ -39,9 +23,7 @@
  */
 
 #define CONFIG_MARVELL		1
-#define CONFIG_ARM926EJS	1	/* Basic Architecture */
 #define CONFIG_FEROCEON		1	/* CPU Core subversion */
-#define CONFIG_ORION5X		1	/* SOC Family Name */
 #define CONFIG_88F5182		1	/* SOC Name */
 #define CONFIG_MACH_EDMINIV2	1	/* Machine type */
 
@@ -49,8 +31,6 @@
 /*
  * CLKs configurations
  */
-
-#define CONFIG_SYS_HZ		1000
 
 /*
  * Board-specific values for Orion5x MPP low level init:
@@ -205,7 +185,8 @@
  * I2C related stuff
  */
 #ifdef CONFIG_CMD_I2C
-#define CONFIG_I2C_MVTWSI
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_MVTWSI
 #define CONFIG_I2C_MVTWSI_BASE		ORION5X_TWSI_BASE
 #define CONFIG_SYS_I2C_SLAVE		0x0
 #define CONFIG_SYS_I2C_SPEED		100000

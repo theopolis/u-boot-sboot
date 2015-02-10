@@ -1,22 +1,6 @@
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -60,76 +44,14 @@ enum {
 	LCD_MAX_LOG2_BPP	= 4,		/* 2^4 = 16 bpp */
 };
 
-int lcd_line_length;
-int lcd_color_fg;
-int lcd_color_bg;
-
-void *lcd_base;			/* Start of framebuffer memory	*/
-void *lcd_console_address;	/* Start of console buffer	*/
-
-short console_col;
-short console_row;
-
 vidinfo_t panel_info = {
 	/* Insert a value here so that we don't end up in the BSS */
 	.vl_col = -1,
 };
 
-char lcd_cursor_enabled;
-
-ushort lcd_cursor_width;
-ushort lcd_cursor_height;
-
 #ifndef CONFIG_OF_CONTROL
 #error "You must enable CONFIG_OF_CONTROL to get Tegra LCD support"
 #endif
-
-void lcd_cursor_size(ushort width, ushort height)
-{
-	lcd_cursor_width = width;
-	lcd_cursor_height = height;
-}
-
-void lcd_toggle_cursor(void)
-{
-	ushort x, y;
-	uchar *dest;
-	ushort row;
-
-	x = console_col * lcd_cursor_width;
-	y = console_row * lcd_cursor_height;
-	dest = (uchar *)(lcd_base + y * lcd_line_length + x * (1 << LCD_BPP) /
-			8);
-
-	for (row = 0; row < lcd_cursor_height; ++row, dest += lcd_line_length) {
-		ushort *d = (ushort *)dest;
-		ushort color;
-		int i;
-
-		for (i = 0; i < lcd_cursor_width; ++i) {
-			color = *d;
-			color ^= lcd_color_fg;
-			*d = color;
-			++d;
-		}
-	}
-}
-
-void lcd_cursor_on(void)
-{
-	lcd_cursor_enabled = 1;
-	lcd_toggle_cursor();
-}
-void lcd_cursor_off(void)
-{
-	lcd_cursor_enabled = 0;
-	lcd_toggle_cursor();
-}
-
-char lcd_is_cursor_enabled(void)
-{
-	return lcd_cursor_enabled;
-}
 
 static void update_panel_size(struct fdt_disp_config *config)
 {
@@ -145,12 +67,10 @@ static void update_panel_size(struct fdt_disp_config *config)
 
 void lcd_ctrl_init(void *lcdbase)
 {
-	int line_length, size;
 	int type = DCACHE_OFF;
+	int size;
 
 	assert(disp_config);
-
-	lcd_base = (void *)disp_config->frame_buffer;
 
 	/* Make sure that we can acommodate the selected LCD */
 	assert(disp_config->width <= LCD_MAX_WIDTH);
@@ -160,7 +80,7 @@ void lcd_ctrl_init(void *lcdbase)
 			&& disp_config->height <= LCD_MAX_HEIGHT
 			&& disp_config->log2_bpp <= LCD_MAX_LOG2_BPP)
 		update_panel_size(disp_config);
-	size = lcd_get_size(&line_length);
+	size = lcd_get_size(&lcd_line_length);
 
 	/* Set up the LCD caching as requested */
 	if (config.cache_type & FDT_LCD_CACHE_WRITE_THROUGH)
@@ -172,7 +92,7 @@ void lcd_ctrl_init(void *lcdbase)
 	/* Enable flushing after LCD writes if requested */
 	lcd_set_flush_dcache(config.cache_type & FDT_LCD_CACHE_FLUSH);
 
-	debug("LCD frame buffer at %p\n", lcd_base);
+	debug("LCD frame buffer at %08X\n", disp_config->frame_buffer);
 }
 
 ulong calc_fbsize(void)
@@ -229,14 +149,18 @@ static int fdt_decode_lcd(const void *blob, struct fdt_panel_config *config)
 					    FDT_LCD_CACHE_WRITE_BACK_FLUSH);
 
 	/* These GPIOs are all optional */
-	fdtdec_decode_gpio(blob, display_node, "nvidia,backlight-enable-gpios",
-			    &config->backlight_en);
-	fdtdec_decode_gpio(blob, display_node, "nvidia,lvds-shutdown-gpios",
-			   &config->lvds_shutdown);
-	fdtdec_decode_gpio(blob, display_node, "nvidia,backlight-vdd-gpios",
-			   &config->backlight_vdd);
-	fdtdec_decode_gpio(blob, display_node, "nvidia,panel-vdd-gpios",
-			   &config->panel_vdd);
+	gpio_request_by_name_nodev(blob, display_node,
+				   "nvidia,backlight-enable-gpios", 0,
+				   &config->backlight_en, GPIOD_IS_OUT);
+	gpio_request_by_name_nodev(blob, display_node,
+				   "nvidia,lvds-shutdown-gpios", 0,
+				   &config->lvds_shutdown, GPIOD_IS_OUT);
+	gpio_request_by_name_nodev(blob, display_node,
+				   "nvidia,backlight-vdd-gpios", 0,
+				   &config->backlight_vdd, GPIOD_IS_OUT);
+	gpio_request_by_name_nodev(blob, display_node,
+				   "nvidia,panel-vdd-gpios", 0,
+				   &config->panel_vdd, GPIOD_IS_OUT);
 
 	return fdtdec_get_int_array(blob, display_node, "nvidia,panel-timings",
 			config->panel_timings, FDT_LCD_TIMINGS);
@@ -276,47 +200,29 @@ static int handle_stage(const void *blob)
 		 */
 
 		funcmux_select(PERIPH_ID_DISP1, FUNCMUX_DEFAULT);
-
-		fdtdec_setup_gpio(&config.panel_vdd);
-		fdtdec_setup_gpio(&config.lvds_shutdown);
-		fdtdec_setup_gpio(&config.backlight_vdd);
-		fdtdec_setup_gpio(&config.backlight_en);
-
-		/*
-		 * TODO: If fdt includes output flag we can omit this code
-		 * since fdtdec_setup_gpio will do it for us.
-		 */
-		if (fdt_gpio_isvalid(&config.panel_vdd))
-			gpio_direction_output(config.panel_vdd.gpio, 0);
-		if (fdt_gpio_isvalid(&config.lvds_shutdown))
-			gpio_direction_output(config.lvds_shutdown.gpio, 0);
-		if (fdt_gpio_isvalid(&config.backlight_vdd))
-			gpio_direction_output(config.backlight_vdd.gpio, 0);
-		if (fdt_gpio_isvalid(&config.backlight_en))
-			gpio_direction_output(config.backlight_en.gpio, 0);
 		break;
 	case STAGE_PANEL_VDD:
-		if (fdt_gpio_isvalid(&config.panel_vdd))
-			gpio_direction_output(config.panel_vdd.gpio, 1);
+		if (dm_gpio_is_valid(&config.panel_vdd))
+			dm_gpio_set_value(&config.panel_vdd, 1);
 		break;
 	case STAGE_LVDS:
-		if (fdt_gpio_isvalid(&config.lvds_shutdown))
-			gpio_set_value(config.lvds_shutdown.gpio, 1);
+		if (dm_gpio_is_valid(&config.lvds_shutdown))
+			dm_gpio_set_value(&config.lvds_shutdown, 1);
 		break;
 	case STAGE_BACKLIGHT_VDD:
-		if (fdt_gpio_isvalid(&config.backlight_vdd))
-			gpio_set_value(config.backlight_vdd.gpio, 1);
+		if (dm_gpio_is_valid(&config.backlight_vdd))
+			dm_gpio_set_value(&config.backlight_vdd, 1);
 		break;
 	case STAGE_PWM:
 		/* Enable PWM at 15/16 high, 32768 Hz with divider 1 */
-		pinmux_set_func(PINGRP_GPU, PMUX_FUNC_PWM);
-		pinmux_tristate_disable(PINGRP_GPU);
+		pinmux_set_func(PMUX_PINGRP_GPU, PMUX_FUNC_PWM);
+		pinmux_tristate_disable(PMUX_PINGRP_GPU);
 
 		pwm_enable(config.pwm_channel, 32768, 0xdf, 1);
 		break;
 	case STAGE_BACKLIGHT_EN:
-		if (fdt_gpio_isvalid(&config.backlight_en))
-			gpio_set_value(config.backlight_en.gpio, 1);
+		if (dm_gpio_is_valid(&config.backlight_en))
+			dm_gpio_set_value(&config.backlight_en, 1);
 		break;
 	case STAGE_DONE:
 		break;

@@ -2,30 +2,13 @@
  * (C) Copyright 2009
  * Dirk Eibach,  Guntermann & Drunck GmbH, eibach@gdsys.de
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
 #define CONFIG_405EP		1	/* this is a PPC405 CPU */
-#define CONFIG_4xx		1	/*  member of PPC4xx family */
 #define CONFIG_DLVISION	        1	/*  on a Neo board */
 
 #define	CONFIG_SYS_TEXT_BASE	0xFFFC0000
@@ -34,11 +17,12 @@
  * Include common defines/options for all AMCC eval boards
  */
 #define CONFIG_HOSTNAME		dlvision
-#define CONFIG_IDENT_STRING	" dlvision 0.01"
+#define CONFIG_IDENT_STRING	" dlvision 0.02"
 #include "amcc-common.h"
 
 #define CONFIG_BOARD_EARLY_INIT_F	/* call board_early_init_f */
 #define CONFIG_MISC_INIT_R		/* call misc_init_r */
+#define CONFIG_SYS_GENERIC_BOARD
 
 #define CONFIG_SYS_CLK_FREQ	33333333 /* external frequency to pll   */
 
@@ -51,6 +35,7 @@
 /* new uImage format support */
 #define CONFIG_FIT
 #define CONFIG_FIT_VERBOSE	/* enable fit_format_{error,warning}() */
+#define CONFIG_FIT_DISABLE_SHA256
 
 #define CONFIG_ENV_IS_IN_FLASH	/* use FLASH for environment vars */
 
@@ -75,8 +60,14 @@
 /*
  * Commands additional to the ones defined in amcc-common.h
  */
-#define CONFIG_CMD_CACHE
+#define CONFIG_CMD_DTT
+#undef CONFIG_CMD_DHCP
+#undef CONFIG_CMD_DIAG
 #undef CONFIG_CMD_EEPROM
+#undef CONFIG_CMD_ELF
+#undef CONFIG_CMD_I2C
+#undef CONFIG_CMD_IRQ
+#undef CONFIG_CMD_NFS
 
 /*
  * SDRAM configuration (please see cpu/ppc/sdram.[ch])
@@ -107,7 +98,7 @@
 /*
  * I2C stuff
  */
-#define CONFIG_SYS_I2C_SPEED		100000	/* I2C speed and slave address*/
+#define CONFIG_SYS_I2C_PPC4XX_SPEED_0		100000
 
 /*
  * FLASH organization
@@ -125,7 +116,6 @@
 #define CONFIG_SYS_FLASH_WRITE_TOUT	500	/* Timeout for Flash Write/ms */
 
 #define CONFIG_SYS_FLASH_USE_BUFFER_WRITE 1	/* use buff'd writes */
-#define CONFIG_SYS_FLASH_PROTECTION	1	/* use hardware flash protect */
 
 #define CONFIG_SYS_FLASH_EMPTY_INFO	/* 'E' for empty sector on flinfo */
 #define CONFIG_SYS_FLASH_QUIET_TEST	1	/* no warn upon unknown flash */

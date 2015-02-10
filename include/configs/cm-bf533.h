@@ -98,7 +98,6 @@
 #define CONFIG_BOOTCOMMAND	"run flashboot"
 #define FLASHBOOT_ENV_SETTINGS	"flashboot=bootm 0x20040000\0"
 
-
 /*
  * Pull in common ADI header for remaining command/environment setup
  */

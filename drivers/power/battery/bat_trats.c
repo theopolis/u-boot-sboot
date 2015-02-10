@@ -2,23 +2,7 @@
  *  Copyright (C) 2012 Samsung Electronics
  *  Lukasz Majewski <l.majewski@samsung.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -35,25 +19,30 @@ static int power_battery_charge(struct pmic *bat)
 	struct battery *battery = p_bat->bat;
 	int k;
 
-	if (bat->chrg->chrg_state(p_bat->chrg, CHARGER_ENABLE, 450))
+	if (bat->chrg->chrg_state(p_bat->chrg, PMIC_CHARGER_ENABLE, 450))
 		return -1;
 
 	for (k = 0; bat->chrg->chrg_bat_present(p_bat->chrg) &&
 		     bat->chrg->chrg_type(p_bat->muic) &&
 		     battery->state_of_chrg < 100; k++) {
-		udelay(10000000);
-		puts(".");
+		udelay(2000000);
+		if (!(k % 5))
+			puts(".");
 		bat->fg->fg_battery_update(p_bat->fg, bat);
 
-		if (k == 100) {
+		if (k == 200) {
 			debug(" %d [V]", battery->voltage_uV);
 			puts("\n");
 			k = 0;
 		}
 
+		if (ctrlc()) {
+			printf("\nCharging disabled on request.\n");
+			goto exit;
+		}
 	}
-
-	bat->chrg->chrg_state(p_bat->chrg, CHARGER_DISABLE, 0);
+ exit:
+	bat->chrg->chrg_state(p_bat->chrg, PMIC_CHARGER_DISABLE, 0);
 
 	return 0;
 }

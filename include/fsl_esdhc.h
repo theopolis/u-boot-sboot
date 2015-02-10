@@ -4,23 +4,7 @@
  *
  * Copyright 2007-2008,2010-2011 Freescale Semiconductor, Inc
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
- *-------------------------------------------------------------------
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef  __FSL_ESDHC_H__
@@ -28,6 +12,9 @@
 
 #include <asm/errno.h>
 #include <asm/byteorder.h>
+
+/* needed for the mmc_cfg definition */
+#include <mmc.h>
 
 /* FSL eSDHC-specific constants */
 #define SYSCTL			0x0002e02c
@@ -63,7 +50,9 @@
 #define IRQSTAT_CC		(0x00000001)
 
 #define CMD_ERR		(IRQSTAT_CIE | IRQSTAT_CEBE | IRQSTAT_CCE)
-#define DATA_ERR	(IRQSTAT_DEBE | IRQSTAT_DCE | IRQSTAT_DTOE)
+#define DATA_ERR	(IRQSTAT_DEBE | IRQSTAT_DCE | IRQSTAT_DTOE | \
+				IRQSTAT_DMAE)
+#define DATA_COMPLETE	(IRQSTAT_TC | IRQSTAT_DINT)
 
 #define IRQSTATEN		0x0002e034
 #define IRQSTATEN_DMAE		(0x10000000)
@@ -168,10 +157,24 @@
 struct fsl_esdhc_cfg {
 	u32	esdhc_base;
 	u32	sdhc_clk;
+	u8	max_bus_width;
+	struct mmc_config cfg;
 };
 
 /* Select the correct accessors depending on endianess */
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#if defined CONFIG_SYS_FSL_ESDHC_LE
+#define esdhc_read32		in_le32
+#define esdhc_write32		out_le32
+#define esdhc_clrsetbits32	clrsetbits_le32
+#define esdhc_clrbits32		clrbits_le32
+#define esdhc_setbits32		setbits_le32
+#elif defined(CONFIG_SYS_FSL_ESDHC_BE)
+#define esdhc_read32            in_be32
+#define esdhc_write32           out_be32
+#define esdhc_clrsetbits32      clrsetbits_be32
+#define esdhc_clrbits32         clrbits_be32
+#define esdhc_setbits32         setbits_be32
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
 #define esdhc_read32		in_le32
 #define esdhc_write32		out_le32
 #define esdhc_clrsetbits32	clrsetbits_le32
@@ -195,5 +198,7 @@ void fdt_fixup_esdhc(void *blob, bd_t *bd);
 static inline int fsl_esdhc_mmc_init(bd_t *bis) { return -ENOSYS; }
 static inline void fdt_fixup_esdhc(void *blob, bd_t *bd) {}
 #endif /* CONFIG_FSL_ESDHC */
+void __noreturn mmc_boot(void);
+void mmc_spl_load_image(uint32_t offs, unsigned int size, void *vdst);
 
 #endif  /* __FSL_ESDHC_H__ */

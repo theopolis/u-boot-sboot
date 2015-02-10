@@ -2,35 +2,21 @@
  * (C) Copyright 2004, Psyent Corporation <www.psyent.com>
  * Scott McNutt <smcnutt@psyent.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <nios2.h>
-#include <nios2-io.h>
+#include <asm/nios2.h>
 #include <asm/cache.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 #if defined (CONFIG_SYS_NIOS_SYSID_BASE)
 extern void display_sysid (void);
 #endif /* CONFIG_SYS_NIOS_SYSID_BASE */
 
-int checkcpu (void)
+#ifdef CONFIG_DISPLAY_CPUINFO
+int print_cpuinfo(void)
 {
 	printf ("CPU   : Nios-II\n");
 #if !defined(CONFIG_SYS_NIOS_SYSID_BASE)
@@ -40,6 +26,7 @@ int checkcpu (void)
 #endif
 	return (0);
 }
+#endif /* CONFIG_DISPLAY_CPUINFO */
 
 int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
@@ -62,4 +49,12 @@ void dcache_enable(void)
 void dcache_disable(void)
 {
 	flush_dcache(CONFIG_SYS_DCACHE_SIZE, CONFIG_SYS_DCACHELINE_SIZE);
+}
+
+int arch_cpu_init(void)
+{
+	gd->cpu_clk = CONFIG_SYS_CLK_FREQ;
+	gd->ram_size = CONFIG_SYS_SDRAM_SIZE;
+
+	return 0;
 }

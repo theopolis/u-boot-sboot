@@ -4,27 +4,10 @@
  * (C) Copyright 2010
  * Petr Stetiar <ynezz@true.cz>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * Contains stolen code from ddcprobe project which is:
  * Copyright (C) Nalin Dahyabhai <bigfun@pobox.com>
- *
  */
 
 #ifndef __EDID_H_
@@ -71,7 +54,7 @@ struct edid_detailed_timing {
 	 (_x).vertical_blanking)
 	unsigned char hsync_offset;
 	unsigned char hsync_pulse_width;
-	unsigned char sync_offset_pulse_width;
+	unsigned char vsync_offset_pulse_width;
 	unsigned char hsync_vsync_offset_pulse_width_hi;
 #define EDID_DETAILED_TIMING_HSYNC_OFFSET(_x) \
 	((GET_BITS((_x).hsync_vsync_offset_pulse_width_hi, 7, 6) << 8) + \
@@ -103,6 +86,10 @@ struct edid_detailed_timing {
 	GET_BITS((_x).flags, 4, 3)
 #define EDID_DETAILED_TIMING_FLAG_POLARITY(_x) \
 	GET_BITS((_x).flags, 2, 1)
+#define EDID_DETAILED_TIMING_FLAG_VSYNC_POLARITY(_x) \
+	GET_BIT((_x).flags, 2)
+#define EDID_DETAILED_TIMING_FLAG_HSYNC_POLARITY(_x) \
+	GET_BIT((_x).flags, 1)
 #define EDID_DETAILED_TIMING_FLAG_INTERLEAVED(_x) \
 	GET_BIT((_x).flags, 0)
 } __attribute__ ((__packed__));
@@ -243,6 +230,25 @@ struct edid1_info {
 	unsigned char checksum;
 } __attribute__ ((__packed__));
 
+struct edid_cea861_info {
+	unsigned char extension_tag;
+#define EDID_CEA861_EXTENSION_TAG	0x02
+	unsigned char revision;
+	unsigned char dtd_offset;
+	unsigned char dtd_count;
+#define EDID_CEA861_SUPPORTS_UNDERSCAN(_x) \
+	GET_BIT(((_x).dtd_count), 7)
+#define EDID_CEA861_SUPPORTS_BASIC_AUDIO(_x) \
+	GET_BIT(((_x).dtd_count), 6)
+#define EDID_CEA861_SUPPORTS_YUV444(_x) \
+	GET_BIT(((_x).dtd_count), 5)
+#define EDID_CEA861_SUPPORTS_YUV422(_x) \
+	GET_BIT(((_x).dtd_count), 4)
+#define EDID_CEA861_DTD_COUNT(_x) \
+	GET_BITS(((_x).dtd_count), 3, 0)
+	unsigned char data[124];
+} __attribute__ ((__packed__));
+
 /**
  * Print the EDID info.
  *
@@ -257,6 +263,15 @@ void edid_print_info(struct edid1_info *edid_info);
  * @return 0 on valid, or -1 on invalid
  */
 int edid_check_info(struct edid1_info *info);
+
+/**
+ * Check checksum of a 128 bytes EDID data block
+ *
+ * @param edid_block	EDID block data
+ *
+ * @return 0 on success, or a negative errno on error
+ */
+int edid_check_checksum(u8 *edid_block);
 
 /**
  * Get the horizontal and vertical rate ranges of the monitor.

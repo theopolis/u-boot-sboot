@@ -5,23 +5,7 @@
  * (C) Copyright 2012
  * Amit Virdi, ST Microelectronics, amit.virdi@st.com.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -341,6 +325,7 @@ void fsmc_enable_hwecc(struct mtd_info *mtd, int mode)
  * @mtd:	mtd info structure
  * @chip:	nand chip info structure
  * @buf:	buffer to store read data
+ * @oob_required:	caller expects OOB data read to chip->oob_poi
  * @page:	page number to read
  *
  * This routine is needed for fsmc verison 8 as reading from NAND chip has to be
@@ -350,7 +335,7 @@ void fsmc_enable_hwecc(struct mtd_info *mtd, int mode)
  * max of 8 bits)
  */
 static int fsmc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
-				 uint8_t *buf, int page)
+				 uint8_t *buf, int oob_required, int page)
 {
 	struct fsmc_eccplace *fsmc_eccpl;
 	int i, j, s, stat, eccsize = chip->ecc.size;
@@ -452,6 +437,7 @@ int fsmc_nand_init(struct nand_chip *nand)
 	switch (fsmc_version) {
 	case FSMC_VER8:
 		nand->ecc.bytes = 13;
+		nand->ecc.strength = 8;
 		nand->ecc.correct = fsmc_bch8_correct_data;
 		nand->ecc.read_page = fsmc_read_page_hwecc;
 		if (mtd->writesize == 512)
@@ -466,6 +452,7 @@ int fsmc_nand_init(struct nand_chip *nand)
 		break;
 	default:
 		nand->ecc.bytes = 3;
+		nand->ecc.strength = 1;
 		nand->ecc.layout = &fsmc_ecc1_layout;
 		nand->ecc.correct = nand_correct_data;
 		break;

@@ -1,18 +1,7 @@
 /*
  *  Copyright (C) 2012 Altera Corporation <www.altera.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef	_RESET_MANAGER_H_
@@ -21,17 +10,33 @@
 void reset_cpu(ulong addr);
 void reset_deassert_peripherals_handoff(void);
 
+void socfpga_bridges_reset(int enable);
+
+void socfpga_emac_reset(int enable);
+void socfpga_watchdog_reset(void);
+void socfpga_spim_enable(void);
+
 struct socfpga_reset_manager {
-	u32	padding1;
+	u32	status;
 	u32	ctrl;
-	u32	padding2;
-	u32	padding3;
+	u32	counts;
+	u32	padding1;
 	u32	mpu_mod_reset;
 	u32	per_mod_reset;
 	u32	per2_mod_reset;
 	u32	brg_mod_reset;
 };
 
+#if defined(CONFIG_SOCFPGA_VIRTUAL_TARGET)
+#define RSTMGR_CTRL_SWWARMRSTREQ_LSB 2
+#else
 #define RSTMGR_CTRL_SWWARMRSTREQ_LSB 1
+#endif
+
+#define RSTMGR_PERMODRST_EMAC0_LSB	0
+#define RSTMGR_PERMODRST_EMAC1_LSB	1
+#define RSTMGR_PERMODRST_L4WD0_LSB	6
+#define RSTMGR_PERMODRST_SPIM0_LSB	18
+#define RSTMGR_PERMODRST_SPIM1_LSB	19
 
 #endif /* _RESET_MANAGER_H_ */

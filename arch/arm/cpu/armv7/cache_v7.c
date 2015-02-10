@@ -3,23 +3,7 @@
  * Texas Instruments, <www.ti.com>
  * Aneesh V <aneesh@ti.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <linux/types.h>
 #include <common.h>
@@ -37,7 +21,8 @@
  * to get size details from Current Cache Size ID Register(CCSIDR)
  */
 static void set_csselr(u32 level, u32 type)
-{	u32 csselr = level << 1 | type;
+{
+	u32 csselr = level << 1 | type;
 
 	/* Write to Cache Size Selection Register(CSSELR) */
 	asm volatile ("mcr p15, 2, %0, c0, c0, 0" : : "r" (csselr));
@@ -65,7 +50,8 @@ static void v7_inval_dcache_level_setway(u32 level, u32 num_sets,
 					 u32 num_ways, u32 way_shift,
 					 u32 log2_line_len)
 {
-	int way, set, setway;
+	int way, set;
+	u32 setway;
 
 	/*
 	 * For optimal assembly code:
@@ -89,7 +75,8 @@ static void v7_clean_inval_dcache_level_setway(u32 level, u32 num_sets,
 					       u32 num_ways, u32 way_shift,
 					       u32 log2_line_len)
 {
-	int way, set, setway;
+	int way, set;
+	u32 setway;
 
 	/*
 	 * For optimal assembly code:
@@ -150,7 +137,6 @@ static void v7_maint_dcache_level_setway(u32 level, u32 operation)
 static void v7_maint_dcache_all(u32 operation)
 {
 	u32 level, cache_type, level_start_bit = 0;
-
 	u32 clidr = get_clidr();
 
 	for (level = 0; level < 7; level++) {
@@ -163,8 +149,7 @@ static void v7_maint_dcache_all(u32 operation)
 	}
 }
 
-static void v7_dcache_clean_inval_range(u32 start,
-					u32 stop, u32 line_len)
+static void v7_dcache_clean_inval_range(u32 start, u32 stop, u32 line_len)
 {
 	u32 mva;
 
@@ -272,7 +257,6 @@ void flush_dcache_all(void)
  */
 void invalidate_dcache_range(unsigned long start, unsigned long stop)
 {
-
 	v7_dcache_maint_range(start, stop, ARMV7_DCACHE_INVAL_RANGE);
 
 	v7_outer_cache_inval_range(start, stop);
@@ -340,6 +324,9 @@ void mmu_page_table_flush(unsigned long start, unsigned long stop)
 {
 }
 
+void arm_init_domains(void)
+{
+}
 #endif /* #ifndef CONFIG_SYS_DCACHE_OFF */
 
 #ifndef CONFIG_SYS_ICACHE_OFF
@@ -367,41 +354,10 @@ void invalidate_icache_all(void)
 }
 #endif
 
-/*
- * Stub implementations for outer cache operations
- */
-void __v7_outer_cache_enable(void)
-{
-}
-void v7_outer_cache_enable(void)
-	__attribute__((weak, alias("__v7_outer_cache_enable")));
-
-void __v7_outer_cache_disable(void)
-{
-}
-void v7_outer_cache_disable(void)
-	__attribute__((weak, alias("__v7_outer_cache_disable")));
-
-void __v7_outer_cache_flush_all(void)
-{
-}
-void v7_outer_cache_flush_all(void)
-	__attribute__((weak, alias("__v7_outer_cache_flush_all")));
-
-void __v7_outer_cache_inval_all(void)
-{
-}
-void v7_outer_cache_inval_all(void)
-	__attribute__((weak, alias("__v7_outer_cache_inval_all")));
-
-void __v7_outer_cache_flush_range(u32 start, u32 end)
-{
-}
-void v7_outer_cache_flush_range(u32 start, u32 end)
-	__attribute__((weak, alias("__v7_outer_cache_flush_range")));
-
-void __v7_outer_cache_inval_range(u32 start, u32 end)
-{
-}
-void v7_outer_cache_inval_range(u32 start, u32 end)
-	__attribute__((weak, alias("__v7_outer_cache_inval_range")));
+/*  Stub implementations for outer cache operations */
+__weak void v7_outer_cache_enable(void) {}
+__weak void v7_outer_cache_disable(void) {}
+__weak void v7_outer_cache_flush_all(void) {}
+__weak void v7_outer_cache_inval_all(void) {}
+__weak void v7_outer_cache_flush_range(u32 start, u32 end) {}
+__weak void v7_outer_cache_inval_range(u32 start, u32 end) {}

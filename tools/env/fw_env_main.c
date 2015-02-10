@@ -2,41 +2,29 @@
  * (C) Copyright 2000-2008
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
  * Command line user interface to firmware (=U-Boot) environment.
  *
  * Implements:
- *	fw_printenv [[ -n name ] | [ name ... ]]
+ *	fw_printenv [ -a key ] [[ -n name ] | [ name ... ]]
  *              - prints the value of a single environment variable
  *                "name", the ``name=value'' pairs of one or more
  *                environment variables "name", or the whole
  *                environment if no names are specified.
- *	fw_setenv name [ value ... ]
+ *	fw_setenv [ -a key ] name [ value ... ]
  *		- If a name without any values is given, the variable
  *		  with this name is deleted from the environment;
  *		  otherwise, all "value" arguments are concatenated,
  *		  separated by single blank characters, and the
  *		  resulting string is assigned to the environment
  *		  variable "name"
+ *
+ * If '-a key' is specified, the env block is encrypted with AES 128 CBC.
+ * The 'key' argument is in the format of 32 hexadecimal numbers (16 bytes
+ * of AES key), eg. '-a aabbccddeeff00112233445566778899'.
  */
 
 #include <fcntl.h>
@@ -62,8 +50,8 @@ void usage(void)
 
 	fprintf(stderr, "fw_printenv/fw_setenv, "
 		"a command line interface to U-Boot environment\n\n"
-		"usage:\tfw_printenv [-n] [variable name]\n"
-		"\tfw_setenv [variable name] [variable value]\n"
+		"usage:\tfw_printenv [-a key] [-n] [variable name]\n"
+		"\tfw_setenv [-a key] [variable name] [variable value]\n"
 		"\tfw_setenv -s [ file ]\n"
 		"\tfw_setenv -s - < [ file ]\n\n"
 		"The file passed as argument contains only pairs "
@@ -110,9 +98,12 @@ int main(int argc, char *argv[])
 		cmdname = p + 1;
 	}
 
-	while ((c = getopt_long (argc, argv, "ns:h",
+	while ((c = getopt_long (argc, argv, "a:ns:h",
 		long_options, NULL)) != EOF) {
 		switch (c) {
+		case 'a':
+			/* AES key, handled later */
+			break;
 		case 'n':
 			/* handled in fw_printenv */
 			break;

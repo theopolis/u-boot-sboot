@@ -9,15 +9,7 @@
  *      Richard Woodruff <r-woodruff2@ti.com>
  *      Syed Mohammed Khasim <khasim@ti.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR /PURPOSE.  See the
- * GNU General Public License for more details.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -25,6 +17,8 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/cpu.h>
 #include <asm/arch/clock.h>
+#include <power/tps65910.h>
+#include <linux/compiler.h>
 
 struct ctrl_stat *cstat = (struct ctrl_stat *)CTRL_BASE;
 
@@ -58,11 +52,11 @@ u32 get_cpu_type(void)
 
 /**
  * get_board_rev() - setup to pass kernel board revision information
- * returns:(bit[0-3] sub version, higher bit[7-4] is higher version)
+ * returns: 0 for the ATAG REVISION tag value.
  */
-u32 get_board_rev(void)
+u32 __weak get_board_rev(void)
 {
-	return BOARD_REV_ID;
+	return 0;
 }
 
 /**
@@ -86,45 +80,105 @@ u32 get_sysboot_value(void)
 }
 
 #ifdef CONFIG_DISPLAY_CPUINFO
+static char *cpu_revs[] = {
+		"1.0",
+		"2.0",
+		"2.1"};
+
+
+static char *dev_types[] = {
+		"TST",
+		"EMU",
+		"HS",
+		"GP"};
+
 /**
  * Print CPU information
  */
 int print_cpuinfo(void)
 {
-	char *cpu_s, *sec_s;
-	int arm_freq, ddr_freq;
+	char *cpu_s, *sec_s, *rev_s;
 
 	switch (get_cpu_type()) {
 	case AM335X:
 		cpu_s = "AM335X";
 		break;
+	case TI81XX:
+		cpu_s = "TI81XX";
+		break;
 	default:
-		cpu_s = "Unknown cpu type";
+		cpu_s = "Unknown CPU type";
 		break;
 	}
 
-	switch (get_device_type()) {
-	case TST_DEVICE:
-		sec_s = "TST";
-		break;
-	case EMU_DEVICE:
-		sec_s = "EMU";
-		break;
-	case HS_DEVICE:
-		sec_s = "HS";
-		break;
-	case GP_DEVICE:
-		sec_s = "GP";
-		break;
-	default:
+	if (get_cpu_rev() < ARRAY_SIZE(cpu_revs))
+		rev_s = cpu_revs[get_cpu_rev()];
+	else
+		rev_s = "?";
+
+	if (get_device_type() < ARRAY_SIZE(dev_types))
+		sec_s = dev_types[get_device_type()];
+	else
 		sec_s = "?";
-	}
 
-	printf("AM%s-%s rev %d\n",
-			cpu_s, sec_s, get_cpu_rev());
-
-	/* TODO: Print ARM and DDR frequencies  */
+	printf("%s-%s rev %s\n", cpu_s, sec_s, rev_s);
 
 	return 0;
 }
 #endif	/* CONFIG_DISPLAY_CPUINFO */
+
+#ifdef CONFIG_AM33XX
+int am335x_get_efuse_mpu_max_freq(struct ctrl_dev *cdev)
+{
+	int sil_rev;
+
+	sil_rev = readl(&cdev->deviceid) >> 28;
+
+	if (sil_rev == 1)
+		/* PG 2.0, efuse may not be set. */
+		return MPUPLL_M_800;
+	else if (sil_rev >= 2) {
+		/* Check what the efuse says our max speed is. */
+		int efuse_arm_mpu_max_freq;
+		efuse_arm_mpu_max_freq = readl(&cdev->efuse_sma);
+		switch ((efuse_arm_mpu_max_freq & DEVICE_ID_MASK)) {
+		case AM335X_ZCZ_1000:
+			return MPUPLL_M_1000;
+		case AM335X_ZCZ_800:
+			return MPUPLL_M_800;
+		case AM335X_ZCZ_720:
+			return MPUPLL_M_720;
+		case AM335X_ZCZ_600:
+		case AM335X_ZCE_600:
+			return MPUPLL_M_600;
+		case AM335X_ZCZ_300:
+		case AM335X_ZCE_300:
+			return MPUPLL_M_300;
+		}
+	}
+
+	/* PG 1.0 or otherwise unknown, use the PG1.0 max */
+	return MPUPLL_M_720;
+}
+
+int am335x_get_tps65910_mpu_vdd(int sil_rev, int frequency)
+{
+	/* For PG2.1 and later, we have one set of values. */
+	if (sil_rev >= 2) {
+		switch (frequency) {
+		case MPUPLL_M_1000:
+			return TPS65910_OP_REG_SEL_1_3_2_5;
+		case MPUPLL_M_800:
+			return TPS65910_OP_REG_SEL_1_2_6;
+		case MPUPLL_M_720:
+			return TPS65910_OP_REG_SEL_1_2_0;
+		case MPUPLL_M_600:
+		case MPUPLL_M_300:
+			return TPS65910_OP_REG_SEL_1_1_3;
+		}
+	}
+
+	/* Default to PG1.0/PG2.0 values. */
+	return TPS65910_OP_REG_SEL_1_1_3;
+}
+#endif

@@ -4,20 +4,7 @@
  * (C) Copyright 2012
  * Graeme Russ, <graeme.russ@gmail.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _ASM_X86_MSR_H
@@ -85,7 +72,8 @@ static inline unsigned long long native_read_tscp(unsigned int *aux)
 #define EAX_EDX_RET(val, low, high)	"=A" (val)
 #endif
 
-static inline unsigned long long native_read_msr(unsigned int msr)
+static inline __attribute__((no_instrument_function))
+	unsigned long long native_read_msr(unsigned int msr)
 {
 	DECLARE_ARGS(val, low, high);
 
@@ -187,6 +175,25 @@ static inline int wrmsr_safe_regs(u32 regs[8])
 	return native_wrmsr_safe_regs(regs);
 }
 
+typedef struct msr_t {
+	uint32_t lo;
+	uint32_t hi;
+} msr_t;
+
+static inline struct msr_t msr_read(unsigned msr_num)
+{
+	struct msr_t msr;
+
+	rdmsr(msr_num, msr.lo, msr.hi);
+
+	return msr;
+}
+
+static inline void msr_write(unsigned msr_num, msr_t msr)
+{
+	wrmsr(msr_num, msr.lo, msr.hi);
+}
+
 #define rdtscl(low)						\
 	((low) = (u32)__native_read_tsc())
 
@@ -222,17 +229,6 @@ do {                                                            \
 struct msr *msrs_alloc(void);
 void msrs_free(struct msr *msrs);
 
-#ifdef CONFIG_SMP
-int rdmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 *l, u32 *h);
-int wrmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 l, u32 h);
-void rdmsr_on_cpus(const struct cpumask *mask, u32 msr_no, struct msr *msrs);
-void wrmsr_on_cpus(const struct cpumask *mask, u32 msr_no, struct msr *msrs);
-int rdmsr_safe_on_cpu(unsigned int cpu, u32 msr_no, u32 *l, u32 *h);
-int wrmsr_safe_on_cpu(unsigned int cpu, u32 msr_no, u32 l, u32 h);
-int rdmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
-int wrmsr_safe_regs_on_cpu(unsigned int cpu, u32 regs[8]);
-
-#endif  /* CONFIG_SMP */
 #endif /* __KERNEL__ */
 #endif /* __ASSEMBLY__ */
 #endif /* _ASM_X86_MSR_H */

@@ -2,90 +2,72 @@
  *  (C) Copyright 2010,2011
  *  NVIDIA Corporation <www.nvidia.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <dm.h>
 #include <ns16550.h>
 #include <linux/compiler.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
+#ifdef CONFIG_LCD
 #include <asm/arch/display.h>
-#include <asm/arch/emc.h>
+#endif
 #include <asm/arch/funcmux.h>
 #include <asm/arch/pinmux.h>
 #include <asm/arch/pmu.h>
+#ifdef CONFIG_PWM_TEGRA
 #include <asm/arch/pwm.h>
+#endif
 #include <asm/arch/tegra.h>
-#include <asm/arch/usb.h>
 #include <asm/arch-tegra/board.h>
 #include <asm/arch-tegra/clk_rst.h>
 #include <asm/arch-tegra/pmc.h>
 #include <asm/arch-tegra/sys_proto.h>
 #include <asm/arch-tegra/uart.h>
 #include <asm/arch-tegra/warmboot.h>
-#include <spi.h>
+#ifdef CONFIG_TEGRA_CLOCK_SCALING
+#include <asm/arch/emc.h>
+#endif
+#ifdef CONFIG_USB_EHCI_TEGRA
+#include <asm/arch-tegra/usb.h>
+#include <usb.h>
+#endif
+#ifdef CONFIG_TEGRA_MMC
+#include <asm/arch-tegra/tegra_mmc.h>
+#include <asm/arch-tegra/mmc.h>
+#endif
+#include <asm/arch-tegra/xusb-padctl.h>
 #include <i2c.h>
+#include <spi.h>
 #include "emc.h"
 
 DECLARE_GLOBAL_DATA_PTR;
+
+#ifdef CONFIG_SPL_BUILD
+/* TODO(sjg@chromium.org): Remove once SPL supports device tree */
+U_BOOT_DEVICE(tegra_gpios) = {
+	"gpio_tegra"
+};
+#endif
 
 const struct tegra_sysinfo sysinfo = {
 	CONFIG_TEGRA_BOARD_STRING
 };
 
-#ifndef CONFIG_SPL_BUILD
-/*
- * Routine: timer_init
- * Description: init the timestamp and lastinc value
- */
-int timer_init(void)
-{
-	return 0;
-}
-#endif
+__weak void pinmux_init(void) {}
+__weak void pin_mux_usb(void) {}
+__weak void pin_mux_spi(void) {}
+__weak void gpio_early_init_uart(void) {}
+__weak void pin_mux_display(void) {}
 
-void __pin_mux_usb(void)
-{
-}
-
-void pin_mux_usb(void) __attribute__((weak, alias("__pin_mux_usb")));
-
-void __pin_mux_spi(void)
-{
-}
-
-void pin_mux_spi(void) __attribute__((weak, alias("__pin_mux_spi")));
-
-void __gpio_early_init_uart(void)
-{
-}
-
-void gpio_early_init_uart(void)
-__attribute__((weak, alias("__gpio_early_init_uart")));
-
-void __pin_mux_nand(void)
+#if defined(CONFIG_TEGRA_NAND)
+__weak void pin_mux_nand(void)
 {
 	funcmux_select(PERIPH_ID_NDFLASH, FUNCMUX_DEFAULT);
 }
-
-void pin_mux_nand(void) __attribute__((weak, alias("__pin_mux_nand")));
+#endif
 
 /*
  * Routine: power_det_init
@@ -114,18 +96,16 @@ int board_init(void)
 	clock_init();
 	clock_verify();
 
-#ifdef CONFIG_SPI_UART_SWITCH
-	gpio_config_uart();
-#endif
 #ifdef CONFIG_TEGRA_SPI
 	pin_mux_spi();
-	spi_init();
 #endif
+
 #ifdef CONFIG_PWM_TEGRA
 	if (pwm_init(gd->fdt_blob))
 		debug("%s: Failed to init pwm\n", __func__);
 #endif
 #ifdef CONFIG_LCD
+	pin_mux_display();
 	tegra_lcd_check_next_stage(gd->fdt_blob, 0);
 #endif
 	/* boot param addr */
@@ -133,11 +113,7 @@ int board_init(void)
 
 	power_det_init();
 
-#ifdef CONFIG_TEGRA_I2C
-#ifndef CONFIG_SYS_I2C_INIT_BOARD
-#error "You must define CONFIG_SYS_I2C_INIT_BOARD to use i2c on Nvidia boards"
-#endif
-	i2c_init_board();
+#ifdef CONFIG_SYS_I2C_TEGRA
 # ifdef CONFIG_TEGRA_PMU
 	if (pmu_set_nominal())
 		debug("Failed to select nominal voltages\n");
@@ -147,12 +123,13 @@ int board_init(void)
 		debug("Memory controller init failed: %d\n", err);
 #  endif
 # endif /* CONFIG_TEGRA_PMU */
-#endif /* CONFIG_TEGRA_I2C */
+#endif /* CONFIG_SYS_I2C_TEGRA */
 
 #ifdef CONFIG_USB_EHCI_TEGRA
 	pin_mux_usb();
-	board_usb_init(gd->fdt_blob);
+	usb_process_devicetree(gd->fdt_blob);
 #endif
+
 #ifdef CONFIG_LCD
 	tegra_lcd_check_next_stage(gd->fdt_blob, 0);
 #endif
@@ -160,6 +137,8 @@ int board_init(void)
 #ifdef CONFIG_TEGRA_NAND
 	pin_mux_nand();
 #endif
+
+	tegra_xusb_padctl_init(gd->fdt_blob);
 
 #ifdef CONFIG_TEGRA_LP0
 	/* save Sdram params to PMC 2, 4, and 24 for WB0 */
@@ -181,6 +160,7 @@ void gpio_early_init(void) __attribute__((weak, alias("__gpio_early_init")));
 
 int board_early_init_f(void)
 {
+	pinmux_init();
 	board_init_uart_f();
 
 	/* Initialize periph GPIOs */
@@ -202,3 +182,51 @@ int board_late_init(void)
 #endif
 	return 0;
 }
+
+#if defined(CONFIG_TEGRA_MMC)
+__weak void pin_mux_mmc(void)
+{
+}
+
+/* this is a weak define that we are overriding */
+int board_mmc_init(bd_t *bd)
+{
+	debug("%s called\n", __func__);
+
+	/* Enable muxes, etc. for SDMMC controllers */
+	pin_mux_mmc();
+
+	debug("%s: init MMC\n", __func__);
+	tegra_mmc_init();
+
+	return 0;
+}
+
+void pad_init_mmc(struct mmc_host *host)
+{
+#if defined(CONFIG_TEGRA30)
+	enum periph_id id = host->mmc_id;
+	u32 val;
+
+	debug("%s: sdmmc address = %08x, id = %d\n", __func__,
+		(unsigned int)host->reg, id);
+
+	/* Set the pad drive strength for SDMMC1 or 3 only */
+	if (id != PERIPH_ID_SDMMC1 && id != PERIPH_ID_SDMMC3) {
+		debug("%s: settings are only valid for SDMMC1/SDMMC3!\n",
+			__func__);
+		return;
+	}
+
+	val = readl(&host->reg->sdmemcmppadctl);
+	val &= 0xFFFFFFF0;
+	val |= MEMCOMP_PADCTRL_VREF;
+	writel(val, &host->reg->sdmemcmppadctl);
+
+	val = readl(&host->reg->autocalcfg);
+	val &= 0xFFFF0000;
+	val |= AUTO_CAL_PU_OFFSET | AUTO_CAL_PD_OFFSET | AUTO_CAL_ENABLED;
+	writel(val, &host->reg->autocalcfg);
+#endif	/* T30 */
+}
+#endif	/* MMC */

@@ -1,23 +1,7 @@
 /*
  * Copyright (C) 2005-2006 Atmel Corporation
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #ifndef __DRIVERS_MACB_H__
 #define __DRIVERS_MACB_H__
@@ -26,6 +10,7 @@
 #define MACB_NCR				0x0000
 #define MACB_NCFGR				0x0004
 #define MACB_NSR				0x0008
+#define GEM_UR					0x000c
 #define MACB_TSR				0x0014
 #define MACB_RBQP				0x0018
 #define MACB_TBQP				0x001c
@@ -71,6 +56,10 @@
 #define MACB_TPQ				0x00bc
 #define MACB_USRIO				0x00c0
 #define MACB_WOL				0x00c4
+#define MACB_MID				0x00fc
+
+/* GEM specific register offsets */
+#define GEM_DCFG1				0x0280
 
 /* Bitfields in NCR */
 #define MACB_LB_OFFSET				0
@@ -138,6 +127,13 @@
 #define MACB_IRXFCS_OFFSET			19
 #define MACB_IRXFCS_SIZE			1
 
+#define GEM_GBE_OFFSET				10
+#define GEM_GBE_SIZE				1
+#define GEM_CLK_OFFSET				18
+#define GEM_CLK_SIZE				3
+#define GEM_DBW_OFFSET				21
+#define GEM_DBW_SIZE				2
+
 /* Bitfields in NSR */
 #define MACB_NSR_LINK_OFFSET			0
 #define MACB_NSR_LINK_SIZE			1
@@ -145,6 +141,10 @@
 #define MACB_MDIO_SIZE				1
 #define MACB_IDLE_OFFSET			2
 #define MACB_IDLE_SIZE				1
+
+/* Bitfields in UR */
+#define GEM_RGMII_OFFSET			0
+#define GEM_RGMII_SIZE				1
 
 /* Bitfields in TSR */
 #define MACB_UBR_OFFSET				0
@@ -240,11 +240,32 @@
 #define MACB_WOL_MTI_OFFSET			19
 #define MACB_WOL_MTI_SIZE			1
 
+/* Bitfields in MID */
+#define MACB_IDNUM_OFFSET			16
+#define MACB_IDNUM_SIZE				16
+
+/* Bitfields in DCFG1 */
+#define GEM_DBWDEF_OFFSET			25
+#define GEM_DBWDEF_SIZE				3
+
+/* constants for data bus width */
+#define GEM_DBW32				0
+#define GEM_DBW64				1
+#define GEM_DBW128				2
+
 /* Constants for CLK */
 #define MACB_CLK_DIV8				0
 #define MACB_CLK_DIV16				1
 #define MACB_CLK_DIV32				2
 #define MACB_CLK_DIV64				3
+
+/* GEM specific constants for CLK */
+#define GEM_CLK_DIV8				0
+#define GEM_CLK_DIV16				1
+#define GEM_CLK_DIV32				2
+#define GEM_CLK_DIV48				3
+#define GEM_CLK_DIV64				4
+#define GEM_CLK_DIV96				5
 
 /* Constants for MAN register */
 #define MACB_MAN_SOF				1
@@ -255,21 +276,38 @@
 /* Bit manipulation macros */
 #define MACB_BIT(name)					\
 	(1 << MACB_##name##_OFFSET)
-#define MACB_BF(name,value)				\
+#define MACB_BF(name, value)				\
 	(((value) & ((1 << MACB_##name##_SIZE) - 1))	\
 	 << MACB_##name##_OFFSET)
-#define MACB_BFEXT(name,value)\
+#define MACB_BFEXT(name, value)\
 	(((value) >> MACB_##name##_OFFSET)		\
 	 & ((1 << MACB_##name##_SIZE) - 1))
-#define MACB_BFINS(name,value,old)			\
+#define MACB_BFINS(name, value, old)			\
 	(((old) & ~(((1 << MACB_##name##_SIZE) - 1)	\
 		    << MACB_##name##_OFFSET))		\
-	 | MACB_BF(name,value))
+	 | MACB_BF(name, value))
+
+#define GEM_BIT(name)					\
+	(1 << GEM_##name##_OFFSET)
+#define GEM_BF(name, value)				\
+	(((value) & ((1 << GEM_##name##_SIZE) - 1))	\
+	 << GEM_##name##_OFFSET)
+#define GEM_BFEXT(name, value)\
+	(((value) >> GEM_##name##_OFFSET)		\
+	 & ((1 << GEM_##name##_SIZE) - 1))
+#define GEM_BFINS(name, value, old)			\
+	(((old) & ~(((1 << GEM_##name##_SIZE) - 1)	\
+		    << GEM_##name##_OFFSET))		\
+	 | GEM_BF(name, value))
 
 /* Register access macros */
-#define macb_readl(port,reg)				\
+#define macb_readl(port, reg)				\
 	readl((port)->regs + MACB_##reg)
-#define macb_writel(port,reg,value)			\
+#define macb_writel(port, reg, value)			\
 	writel((value), (port)->regs + MACB_##reg)
+#define gem_readl(port, reg)				\
+	readl((port)->regs + GEM_##reg)
+#define gem_writel(port, reg, value)			\
+	writel((value), (port)->regs + GEM_##reg)
 
 #endif /* __DRIVERS_MACB_H__ */

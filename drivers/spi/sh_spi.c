@@ -103,12 +103,10 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 	if (!spi_cs_is_valid(bus, cs))
 		return NULL;
 
-	ss = malloc(sizeof(struct spi_slave));
+	ss = spi_alloc_slave(struct sh_spi, bus, cs);
 	if (!ss)
 		return NULL;
 
-	ss->slave.bus = bus;
-	ss->slave.cs = cs;
 	ss->regs = (struct sh_spi_regs *)CONFIG_SH_SPI_BASE;
 
 	/* SPI sycle stop */
@@ -153,7 +151,6 @@ static int sh_spi_send(struct sh_spi *ss, const unsigned char *tx_data,
 {
 	int i, cur_len, ret = 0;
 	int remain = (int)len;
-	unsigned long tmp;
 
 	if (len >= SH_SPI_FIFO_SIZE)
 		sh_spi_set_bit(SH_SPI_SSA, &ss->regs->cr1);
@@ -185,9 +182,7 @@ static int sh_spi_send(struct sh_spi *ss, const unsigned char *tx_data,
 	}
 
 	if (flags & SPI_XFER_END) {
-		tmp = sh_spi_read(&ss->regs->cr1);
-		tmp = tmp & ~(SH_SPI_SSD | SH_SPI_SSDB);
-		sh_spi_write(tmp, &ss->regs->cr1);
+		sh_spi_clear_bit(SH_SPI_SSD | SH_SPI_SSDB, &ss->regs->cr1);
 		sh_spi_set_bit(SH_SPI_SSA, &ss->regs->cr1);
 		udelay(100);
 		write_fifo_empty_wait(ss);
@@ -200,16 +195,13 @@ static int sh_spi_receive(struct sh_spi *ss, unsigned char *rx_data,
 			  unsigned int len, unsigned long flags)
 {
 	int i;
-	unsigned long tmp;
 
 	if (len > SH_SPI_MAX_BYTE)
 		sh_spi_write(SH_SPI_MAX_BYTE, &ss->regs->cr3);
 	else
 		sh_spi_write(len, &ss->regs->cr3);
 
-	tmp = sh_spi_read(&ss->regs->cr1);
-	tmp = tmp & ~(SH_SPI_SSD | SH_SPI_SSDB);
-	sh_spi_write(tmp, &ss->regs->cr1);
+	sh_spi_clear_bit(SH_SPI_SSD | SH_SPI_SSDB, &ss->regs->cr1);
 	sh_spi_set_bit(SH_SPI_SSA, &ss->regs->cr1);
 
 	for (i = 0; i < len; i++) {

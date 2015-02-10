@@ -5,27 +5,13 @@
  * They are kept in a separate file so we can include system headers.
  *
  * Copyright (c) 2011 The Chromium OS Authors.
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __OS_H__
 #define __OS_H__
+
+#include <linux/types.h>
 
 struct sandbox_state;
 
@@ -38,6 +24,16 @@ struct sandbox_state;
  * \return number of bytes read, or -1 on error
  */
 ssize_t os_read(int fd, void *buf, size_t count);
+
+/**
+ * Access to the OS read() system call with non-blocking access
+ *
+ * \param fd	File descriptor as returned by os_open()
+ * \param buf	Buffer to place data
+ * \param count	Number of bytes to read
+ * \return number of bytes read, or -1 on error
+ */
+ssize_t os_read_no_block(int fd, void *buf, size_t count);
 
 /**
  * Access to the OS write() system call
@@ -88,6 +84,14 @@ int os_open(const char *pathname, int flags);
 int os_close(int fd);
 
 /**
+ * Access to the OS unlink() system call
+ *
+ * \param pathname Path of file to delete
+ * \return 0 for success, other for error
+ */
+int os_unlink(const char *pathname);
+
+/**
  * Access to the OS exit() system call
  *
  * This exits with the supplied return code, which should be 0 to indicate
@@ -99,8 +103,12 @@ void os_exit(int exit_code) __attribute__((noreturn));
 
 /**
  * Put tty into raw mode to mimic serial console better
+ *
+ * @param fd		File descriptor of stdin (normally 0)
+ * @param allow_sigs	Allow Ctrl-C, Ctrl-Z to generate signals rather than
+ *			be handled by U-Boot
  */
-void os_tty_raw(int fd);
+void os_tty_raw(int fd, bool allow_sigs);
 
 /**
  * Acquires some memory from the underlying os.
@@ -109,6 +117,35 @@ void os_tty_raw(int fd);
  * \return Pointer to length bytes or NULL on error
  */
 void *os_malloc(size_t length);
+
+/**
+ * Free memory previous allocated with os_malloc()/os_realloc()
+ *
+ * This returns the memory to the OS.
+ *
+ * \param ptr		Pointer to memory block to free
+ */
+void os_free(void *ptr);
+
+/**
+ * Reallocate previously-allocated memory to increase/decrease space
+ *
+ * This works in a similar way to the C library realloc() function. If
+ * length is 0, then ptr is freed. Otherwise the space used by ptr is
+ * expanded or reduced depending on whether length is larger or smaller
+ * than before.
+ *
+ * If ptr is NULL, then this is similar to calling os_malloc().
+ *
+ * This function may need to move the memory block to make room for any
+ * extra space, in which case the new pointer is returned.
+ *
+ * \param ptr		Pointer to memory block to reallocate
+ * \param length	New length for memory block
+ * \return pointer to new memory block, or NULL on failure or if length
+ *	is 0.
+ */
+void *os_realloc(void *ptr, size_t length);
 
 /**
  * Access to the usleep function of the os
@@ -122,7 +159,7 @@ void os_usleep(unsigned long usec);
  *
  * \return A monotonic increasing time scaled in nano seconds
  */
-u64 os_get_nsec(void);
+uint64_t os_get_nsec(void);
 
 /**
  * Parse arguments and update sandbox state.
@@ -135,5 +172,109 @@ u64 os_get_nsec(void);
  *	-1 on error: program should terminate.
  */
 int os_parse_args(struct sandbox_state *state, int argc, char *argv[]);
+
+/*
+ * Types of directory entry that we support. See also os_dirent_typename in
+ * the C file.
+ */
+enum os_dirent_t {
+	OS_FILET_REG,		/* Regular file */
+	OS_FILET_LNK,		/* Symbolic link */
+	OS_FILET_DIR,		/* Directory */
+	OS_FILET_UNKNOWN,	/* Something else */
+
+	OS_FILET_COUNT,
+};
+
+/** A directory entry node, containing information about a single dirent */
+struct os_dirent_node {
+	struct os_dirent_node *next;	/* Pointer to next node, or NULL */
+	ulong size;			/* Size of file in bytes */
+	enum os_dirent_t type;		/* Type of entry */
+	char name[0];			/* Name of entry */
+};
+
+/**
+ * Get a directionry listing
+ *
+ * This allocates and returns a linked list containing the directory listing.
+ *
+ * @param dirname	Directory to examine
+ * @param headp		Returns pointer to head of linked list, or NULL if none
+ * @return 0 if ok, -ve on error
+ */
+int os_dirent_ls(const char *dirname, struct os_dirent_node **headp);
+
+/**
+ * Get the name of a directory entry type
+ *
+ * @param type		Type to cehck
+ * @return string containing the name of that type, or "???" if none/invalid
+ */
+const char *os_dirent_get_typename(enum os_dirent_t type);
+
+/**
+ * Get the size of a file
+ *
+ * @param fname		Filename to check
+ * @param size		size of file is returned if no error
+ * @return 0 on success or -1 if an error ocurred
+ */
+int os_get_filesize(const char *fname, loff_t *size);
+
+/**
+ * Write a character to the controlling OS terminal
+ *
+ * This bypasses the U-Boot console support and writes directly to the OS
+ * stdout file descriptor.
+ *
+ * @param ch	Character to write
+ */
+void os_putc(int ch);
+
+/**
+ * Write a string to the controlling OS terminal
+ *
+ * This bypasses the U-Boot console support and writes directly to the OS
+ * stdout file descriptor.
+ *
+ * @param str	String to write (note that \n is not appended)
+ */
+void os_puts(const char *str);
+
+/**
+ * Write the sandbox RAM buffer to a existing file
+ *
+ * @param fname		Filename to write memory to (simple binary format)
+ * @return 0 if OK, -ve on error
+ */
+int os_write_ram_buf(const char *fname);
+
+/**
+ * Read the sandbox RAM buffer from an existing file
+ *
+ * @param fname		Filename containing memory (simple binary format)
+ * @return 0 if OK, -ve on error
+ */
+int os_read_ram_buf(const char *fname);
+
+/**
+ * Jump to a new executable image
+ *
+ * This uses exec() to run a new executable image, after putting it in a
+ * temporary file. The same arguments and environment are passed to this
+ * new image, with the addition of:
+ *
+ *	-j <filename>	Specifies the filename the image was written to. The
+ *			calling image may want to delete this at some point.
+ *	-m <filename>	Specifies the file containing the sandbox memory
+ *			(ram_buf) from this image, so that the new image can
+ *			have access to this. It also means that the original
+ *			memory filename passed to U-Boot will be left intact.
+ *
+ * @param dest		Buffer containing executable image
+ * @param size		Size of buffer
+ */
+int os_jump_to_image(const void *dest, int size);
 
 #endif

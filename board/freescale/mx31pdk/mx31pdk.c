@@ -4,23 +4,7 @@
  *
  * (c) 2007 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 
@@ -35,6 +19,28 @@
 #include <errno.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+#ifdef CONFIG_SPL_BUILD
+void board_init_f(ulong bootflag)
+{
+	/*
+	 * copy ourselves from where we are running to where we were
+	 * linked at. Use ulong pointers as all addresses involved
+	 * are 4-byte-aligned.
+	 */
+	ulong *start_ptr, *end_ptr, *link_ptr, *run_ptr, *dst;
+	asm volatile ("ldr %0, =_start" : "=r"(start_ptr));
+	asm volatile ("ldr %0, =_end" : "=r"(end_ptr));
+	asm volatile ("ldr %0, =board_init_f" : "=r"(link_ptr));
+	asm volatile ("adr %0, board_init_f" : "=r"(run_ptr));
+	for (dst = start_ptr; dst < end_ptr; dst++)
+		*dst = *(dst+(run_ptr-link_ptr));
+	/*
+	 * branch to nand_boot's link-time address.
+	 */
+	asm volatile("ldr pc, =nand_boot");
+}
+#endif
 
 int dram_init(void)
 {
@@ -79,7 +85,7 @@ int board_late_init(void)
 	struct pmic *p;
 	int ret;
 
-	ret = pmic_init(I2C_PMIC);
+	ret = pmic_init(CONFIG_FSL_PMIC_BUS);
 	if (ret)
 		return ret;
 

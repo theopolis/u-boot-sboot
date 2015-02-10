@@ -2,28 +2,14 @@
  * (C) Copyright 2000
  * Paolo Scaffardi, AIRVENT SAM s.p.a - RIMINI(ITALY), arsenio@tin.it
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <stdarg.h>
+#include <iomux.h>
 #include <malloc.h>
+#include <os.h>
 #include <serial.h>
 #include <stdio_dev.h>
 #include <exports.h>
@@ -124,7 +110,7 @@ static int console_setfile(int file, struct stdio_dev * dev)
 	case stderr:
 		/* Start new device */
 		if (dev->start) {
-			error = dev->start();
+			error = dev->start(dev);
 			/* If it's not started dont use it */
 			if (error < 0)
 				break;
@@ -139,13 +125,13 @@ static int console_setfile(int file, struct stdio_dev * dev)
 		 */
 		switch (file) {
 		case stdin:
-			gd->jt[XF_getc] = dev->getc;
-			gd->jt[XF_tstc] = dev->tstc;
+			gd->jt->getc = getc;
+			gd->jt->tstc = tstc;
 			break;
 		case stdout:
-			gd->jt[XF_putc] = dev->putc;
-			gd->jt[XF_puts] = dev->puts;
-			gd->jt[XF_printf] = printf;
+			gd->jt->putc  = putc;
+			gd->jt->puts  = puts;
+			gd->jt->printf = printf;
 			break;
 		}
 		break;
@@ -174,7 +160,7 @@ static int console_getc(int file)
 	unsigned char ret;
 
 	/* This is never called with testcdev == NULL */
-	ret = tstcdev->getc();
+	ret = tstcdev->getc(tstcdev);
 	tstcdev = NULL;
 	return ret;
 }
@@ -188,7 +174,7 @@ static int console_tstc(int file)
 	for (i = 0; i < cd_count[file]; i++) {
 		dev = console_devices[file][i];
 		if (dev->tstc != NULL) {
-			ret = dev->tstc();
+			ret = dev->tstc(dev);
 			if (ret > 0) {
 				tstcdev = dev;
 				disable_ctrlc(0);
@@ -209,9 +195,23 @@ static void console_putc(int file, const char c)
 	for (i = 0; i < cd_count[file]; i++) {
 		dev = console_devices[file][i];
 		if (dev->putc != NULL)
-			dev->putc(c);
+			dev->putc(dev, c);
 	}
 }
+
+#ifdef CONFIG_PRE_CONSOLE_BUFFER
+static void console_putc_noserial(int file, const char c)
+{
+	int i;
+	struct stdio_dev *dev;
+
+	for (i = 0; i < cd_count[file]; i++) {
+		dev = console_devices[file][i];
+		if (dev->putc != NULL && strcmp(dev->name, "serial") != 0)
+			dev->putc(dev, c);
+	}
+}
+#endif
 
 static void console_puts(int file, const char *s)
 {
@@ -221,7 +221,7 @@ static void console_puts(int file, const char *s)
 	for (i = 0; i < cd_count[file]; i++) {
 		dev = console_devices[file][i];
 		if (dev->puts != NULL)
-			dev->puts(s);
+			dev->puts(dev, s);
 	}
 }
 
@@ -237,22 +237,30 @@ static inline void console_doenv(int file, struct stdio_dev *dev)
 #else
 static inline int console_getc(int file)
 {
-	return stdio_devices[file]->getc();
+	return stdio_devices[file]->getc(stdio_devices[file]);
 }
 
 static inline int console_tstc(int file)
 {
-	return stdio_devices[file]->tstc();
+	return stdio_devices[file]->tstc(stdio_devices[file]);
 }
 
 static inline void console_putc(int file, const char c)
 {
-	stdio_devices[file]->putc(c);
+	stdio_devices[file]->putc(stdio_devices[file], c);
 }
+
+#ifdef CONFIG_PRE_CONSOLE_BUFFER
+static inline void console_putc_noserial(int file, const char c)
+{
+	if (strcmp(stdio_devices[file]->name, "serial") != 0)
+		stdio_devices[file]->putc(stdio_devices[file], c);
+}
+#endif
 
 static inline void console_puts(int file, const char *s)
 {
-	stdio_devices[file]->puts(s);
+	stdio_devices[file]->puts(stdio_devices[file], s);
 }
 
 static inline void console_printdevs(int file)
@@ -396,6 +404,9 @@ int tstc(void)
 	return serial_tstc();
 }
 
+#define PRE_CONSOLE_FLUSHPOINT1_SERIAL			0
+#define PRE_CONSOLE_FLUSHPOINT2_EVERYTHING_BUT_SERIAL	1
+
 #ifdef CONFIG_PRE_CONSOLE_BUFFER
 #define CIRC_BUF_IDX(idx) ((idx) % (unsigned long)CONFIG_PRE_CON_BUF_SZ)
 
@@ -412,7 +423,7 @@ static void pre_console_puts(const char *s)
 		pre_console_putc(*s++);
 }
 
-static void print_pre_console_buffer(void)
+static void print_pre_console_buffer(int flushpoint)
 {
 	unsigned long i = 0;
 	char *buffer = (char *)CONFIG_PRE_CON_BUF_ADDR;
@@ -421,16 +432,30 @@ static void print_pre_console_buffer(void)
 		i = gd->precon_buf_idx - CONFIG_PRE_CON_BUF_SZ;
 
 	while (i < gd->precon_buf_idx)
-		putc(buffer[CIRC_BUF_IDX(i++)]);
+		switch (flushpoint) {
+		case PRE_CONSOLE_FLUSHPOINT1_SERIAL:
+			putc(buffer[CIRC_BUF_IDX(i++)]);
+			break;
+		case PRE_CONSOLE_FLUSHPOINT2_EVERYTHING_BUT_SERIAL:
+			console_putc_noserial(stdout,
+					      buffer[CIRC_BUF_IDX(i++)]);
+			break;
+		}
 }
 #else
 static inline void pre_console_putc(const char c) {}
 static inline void pre_console_puts(const char *s) {}
-static inline void print_pre_console_buffer(void) {}
+static inline void print_pre_console_buffer(int flushpoint) {}
 #endif
 
 void putc(const char c)
 {
+#ifdef CONFIG_SANDBOX
+	if (!gd || !(gd->flags & GD_FLG_SERIAL_READY)) {
+		os_putc(c);
+		return;
+	}
+#endif
 #ifdef CONFIG_SILENT_CONSOLE
 	if (gd->flags & GD_FLG_SILENT)
 		return;
@@ -449,12 +474,20 @@ void putc(const char c)
 		fputc(stdout, c);
 	} else {
 		/* Send directly to the handler */
+		pre_console_putc(c);
 		serial_putc(c);
 	}
 }
 
 void puts(const char *s)
 {
+#ifdef CONFIG_SANDBOX
+	if (!gd || !(gd->flags & GD_FLG_SERIAL_READY)) {
+		os_puts(s);
+		return;
+	}
+#endif
+
 #ifdef CONFIG_SILENT_CONSOLE
 	if (gd->flags & GD_FLG_SILENT)
 		return;
@@ -473,6 +506,7 @@ void puts(const char *s)
 		fputs(stdout, s);
 	} else {
 		/* Send directly to the handler */
+		pre_console_puts(s);
 		serial_puts(s);
 	}
 }
@@ -483,7 +517,7 @@ int printf(const char *fmt, ...)
 	uint i;
 	char printbuffer[CONFIG_SYS_PBSIZE];
 
-#ifndef CONFIG_PRE_CONSOLE_BUFFER
+#if !defined(CONFIG_SANDBOX) && !defined(CONFIG_PRE_CONSOLE_BUFFER)
 	if (!gd->have_console)
 		return 0;
 #endif
@@ -506,7 +540,7 @@ int vprintf(const char *fmt, va_list args)
 	uint i;
 	char printbuffer[CONFIG_SYS_PBSIZE];
 
-#ifndef CONFIG_PRE_CONSOLE_BUFFER
+#if defined(CONFIG_PRE_CONSOLE_BUFFER) && !defined(CONFIG_SANDBOX)
 	if (!gd->have_console)
 		return 0;
 #endif
@@ -526,6 +560,7 @@ static int ctrlc_disabled = 0;	/* see disable_ctrl() */
 static int ctrlc_was_pressed = 0;
 int ctrlc(void)
 {
+#ifndef CONFIG_SANDBOX
 	if (!ctrlc_disabled && gd->have_console) {
 		if (tstc()) {
 			switch (getc()) {
@@ -537,9 +572,37 @@ int ctrlc(void)
 			}
 		}
 	}
+#endif
+
 	return 0;
 }
+/* Reads user's confirmation.
+   Returns 1 if user's input is "y", "Y", "yes" or "YES"
+*/
+int confirm_yesno(void)
+{
+	int i;
+	char str_input[5];
 
+	/* Flush input */
+	while (tstc())
+		getc();
+	i = 0;
+	while (i < sizeof(str_input)) {
+		str_input[i] = getc();
+		putc(str_input[i]);
+		if (str_input[i] == '\r')
+			break;
+		i++;
+	}
+	putc('\n');
+	if (strncmp(str_input, "y\r", 2) == 0 ||
+	    strncmp(str_input, "Y\r", 2) == 0 ||
+	    strncmp(str_input, "yes\r", 4) == 0 ||
+	    strncmp(str_input, "YES\r", 4) == 0)
+		return 1;
+	return 0;
+}
 /* pass 1 to disable ctrlc() checking, 0 to enable.
  * returns previous state
  */
@@ -594,7 +657,7 @@ inline void dbg(const char *fmt, ...)
 
 }
 #else
-inline void dbg(const char *fmt, ...)
+static inline void dbg(const char *fmt, ...)
 {
 }
 #endif
@@ -651,7 +714,7 @@ int console_init_f(void)
 		gd->flags |= GD_FLG_SILENT;
 #endif
 
-	print_pre_console_buffer();
+	print_pre_console_buffer(PRE_CONSOLE_FLUSHPOINT1_SERIAL);
 
 	return 0;
 }
@@ -695,11 +758,11 @@ int console_init_r(void)
 #endif
 
 	/* set default handlers at first */
-	gd->jt[XF_getc] = serial_getc;
-	gd->jt[XF_tstc] = serial_tstc;
-	gd->jt[XF_putc] = serial_putc;
-	gd->jt[XF_puts] = serial_puts;
-	gd->jt[XF_printf] = serial_printf;
+	gd->jt->getc  = serial_getc;
+	gd->jt->tstc  = serial_tstc;
+	gd->jt->putc  = serial_putc;
+	gd->jt->puts  = serial_puts;
+	gd->jt->printf = serial_printf;
 
 	/* stdin stdout and stderr are in environment */
 	/* scan for it */
@@ -766,6 +829,7 @@ done:
 	if ((stdio_devices[stdin] == NULL) && (stdio_devices[stdout] == NULL))
 		return 0;
 #endif
+	print_pre_console_buffer(PRE_CONSOLE_FLUSHPOINT2_EVERYTHING_BUT_SERIAL);
 	return 0;
 }
 
@@ -841,7 +905,7 @@ int console_init_r(void)
 	if ((stdio_devices[stdin] == NULL) && (stdio_devices[stdout] == NULL))
 		return 0;
 #endif
-
+	print_pre_console_buffer(PRE_CONSOLE_FLUSHPOINT2_EVERYTHING_BUT_SERIAL);
 	return 0;
 }
 

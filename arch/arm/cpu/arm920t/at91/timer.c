@@ -11,23 +11,7 @@
  * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
  * Alex Zuepke <azu@sysgo.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -63,8 +47,8 @@ int timer_init(void)
 	writel(TIMER_LOAD_VAL, &tc->tc[0].rc);
 
 	writel(AT91_TC_CCR_SWTRG | AT91_TC_CCR_CLKEN, &tc->tc[0].ccr);
-	gd->lastinc = 0;
-	gd->tbl = 0;
+	gd->arch.lastinc = 0;
+	gd->arch.tbl = 0;
 
 	return 0;
 }
@@ -89,16 +73,16 @@ ulong get_timer_raw(void)
 
 	now = readl(&tc->tc[0].cv) & 0x0000ffff;
 
-	if (now >= gd->lastinc) {
+	if (now >= gd->arch.lastinc) {
 		/* normal mode */
-		gd->tbl += now - gd->lastinc;
+		gd->arch.tbl += now - gd->arch.lastinc;
 	} else {
 		/* we have an overflow ... */
-		gd->tbl += now + TIMER_LOAD_VAL - gd->lastinc;
+		gd->arch.tbl += now + TIMER_LOAD_VAL - gd->arch.lastinc;
 	}
-	gd->lastinc = now;
+	gd->arch.lastinc = now;
 
-	return gd->tbl;
+	return gd->arch.tbl;
 }
 
 ulong get_timer_masked(void)

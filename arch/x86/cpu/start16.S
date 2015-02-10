@@ -1,5 +1,5 @@
 /*
- *  U-boot - x86 Startup Code
+ *  U-Boot - x86 Startup Code
  *
  * (C) Copyright 2008-2011
  * Graeme Russ, <graeme.russ@gmail.com>
@@ -7,23 +7,7 @@
  * (C) Copyright 2002,2003
  * Daniel Engström, Omicron Ceti AB, <daniel@omicron.se>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/global_data.h>
@@ -37,18 +21,16 @@
 .code16
 .globl start16
 start16:
+	/* Save BIST */
+	movl	%eax, %ecx
+
 	/* Set the Cold Boot / Hard Reset flag */
 	movl	$GD_FLG_COLD_BOOT, %ebx
 
-	/*
-	 * First we let the BSP do some early initialization
-	 * this code have to map the flash to its final position
-	 */
-	jmp	board_init16
-.globl board_init16_ret
-board_init16_ret:
+	xorl	%eax, %eax
+	movl	%eax, %cr3	/* Invalidate TLB */
 
-	/* Turn of cache (this might require a 486-class CPU) */
+	/* Turn off cache (this might require a 486-class CPU) */
 	movl	%cr0, %eax
 	orl	$(X86_CR0_NW | X86_CR0_CD), %eax
 	movl	%eax, %cr0
@@ -66,9 +48,11 @@ o32 cs	lgdt	gdt_ptr
 	/* Flush the prefetch queue */
 	jmp	ff
 ff:
-	/* Finally jump to the 32bit initialization code */
+
+	/* Finally restore BIST and jump to the 32-bit initialization code */
 	movw	$code32start, %ax
 	movw	%ax, %bp
+	movl	%ecx, %eax
 o32 cs	ljmp	*(%bp)
 
 	/* 48-bit far pointer */
@@ -80,17 +64,17 @@ idt_ptr:
 	.word	0		/* limit */
 	.long	0		/* base */
 
-/*
- * The following Global Descriptor Table is just enough to get us into
- * 'Flat Protected Mode' - It will be discarded as soon as the final
- * GDT is setup in a safe location in RAM
- */
+	/*
+	 * The following Global Descriptor Table is just enough to get us into
+	 * 'Flat Protected Mode' - It will be discarded as soon as the final
+	 * GDT is setup in a safe location in RAM
+	 */
 gdt_ptr:
-	.word	0x20		/* limit (32 bytes = 4 GDT entries) */
+	.word	0x1f		/* limit (31 bytes = 4 GDT entries - 1) */
 	.long	BOOT_SEG + gdt	/* base */
 
-/* Some CPUs are picky about GDT alignment... */
-.align 16
+	/* Some CPUs are picky about GDT alignment... */
+	.align	16
 gdt:
 	/*
 	 * The GDT table ...

@@ -2,23 +2,7 @@
  * Copyright (C) 2012 Samsung Electronics
  * R. Chandrasekar < rcsekar@samsung.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __SOUND_H__
@@ -28,6 +12,7 @@
 enum en_sound_codec {
 	CODEC_WM_8994,
 	CODEC_WM_8995,
+	CODEC_MAX_98095,
 	CODEC_MAX
 };
 
@@ -43,6 +28,15 @@ struct sound_codec_info {
 	int i2c_dev_addr;
 	enum en_sound_codec codec_type;
 };
+
+/*
+ * Generates square wave sound data for 1 second
+ *
+ * @param data          data buffer pointer
+ * @param size          size of the buffer
+ * @param freq          frequency of the wave
+ */
+void sound_create_square_wave(unsigned short *data, int size, uint32_t freq);
 
 /*
  * Initialises audio sub system

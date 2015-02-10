@@ -58,15 +58,9 @@ static const u_int m8xx_size_to_gray[M8XX_SIZES_NO] =
 
 /* -------------------------------------------------------------------- */
 
-#if	defined(CONFIG_LWMON) || defined(CONFIG_NSCU)
-#define	CONFIG_SYS_PCMCIA_TIMING	(	PCMCIA_SHT(9)	\
-				|	PCMCIA_SST(3)	\
-				|	PCMCIA_SL(12))
-#else
 #define	CONFIG_SYS_PCMCIA_TIMING	(	PCMCIA_SHT(2)	\
 				|	PCMCIA_SST(4)	\
 				|	PCMCIA_SL(9))
-#endif
 
 /* -------------------------------------------------------------------- */
 
@@ -210,16 +204,6 @@ static u_int m8xx_get_graycode(u_int size)
 }
 
 #if	0
-
-#if	defined(CONFIG_RPXCLASSIC) || defined(CONFIG_RPXLITE)
-
-/* The RPX boards seems to have it's bus monitor timeout set to 6*8 clocks.
- * SYPCR is write once only, therefore must the slowest memory be faster
- * than the bus monitor or we will get a machine check due to the bus timeout.
- */
-#undef	PCMCIA_BMT_LIMIT
-#define	PCMCIA_BMT_LIMIT (6*8)
-#endif
 
 static u_int m8xx_get_speed(u_int ns, u_int is_io)
 {

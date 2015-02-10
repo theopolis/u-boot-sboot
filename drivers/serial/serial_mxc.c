@@ -1,53 +1,18 @@
 /*
  * (c) 2007 Sascha Hauer <s.hauer@pengutronix.de>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <dm.h>
+#include <errno.h>
 #include <watchdog.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/clock.h>
+#include <dm/platform_data/serial_mxc.h>
 #include <serial.h>
 #include <linux/compiler.h>
-
-#define __REG(x)     (*((volatile u32 *)(x)))
-
-#ifndef CONFIG_MXC_UART_BASE
-#error "define CONFIG_MXC_UART_BASE to use the MXC UART driver"
-#endif
-
-#define UART_PHYS	CONFIG_MXC_UART_BASE
-
-/* Register definitions */
-#define URXD  0x0  /* Receiver Register */
-#define UTXD  0x40 /* Transmitter Register */
-#define UCR1  0x80 /* Control Register 1 */
-#define UCR2  0x84 /* Control Register 2 */
-#define UCR3  0x88 /* Control Register 3 */
-#define UCR4  0x8c /* Control Register 4 */
-#define UFCR  0x90 /* FIFO Control Register */
-#define USR1  0x94 /* Status Register 1 */
-#define USR2  0x98 /* Status Register 2 */
-#define UESC  0x9c /* Escape Character Register */
-#define UTIM  0xa0 /* Escape Timer Register */
-#define UBIR  0xa4 /* BRM Incremental Register */
-#define UBMR  0xa8 /* BRM Modulator Register */
-#define UBRC  0xac /* Baud Rate Count Register */
-#define UTS   0xb4 /* UART Test Register (mx31) */
 
 /* UART Control Register Bit Fields.*/
 #define  URXD_CHARRDY    (1<<15)
@@ -90,7 +55,7 @@
 #define  UCR3_DSR        (1<<10) /* Data set ready */
 #define  UCR3_DCD        (1<<9)  /* Data carrier detect */
 #define  UCR3_RI         (1<<8)  /* Ring indicator */
-#define  UCR3_TIMEOUTEN  (1<<7)  /* Timeout interrupt enable */
+#define  UCR3_ADNIMP     (1<<7)  /* Autobaud Detection Not Improved */
 #define  UCR3_RXDSEN	 (1<<6)  /* Receive status interrupt enable */
 #define  UCR3_AIRINTEN   (1<<5)  /* Async IR wake interrupt enable */
 #define  UCR3_AWAKEN	 (1<<4)  /* Async wake interrupt enable */
@@ -140,6 +105,33 @@
 #define  UTS_TXFULL	 (1<<4)	 /* TxFIFO full */
 #define  UTS_RXFULL	 (1<<3)	 /* RxFIFO full */
 #define  UTS_SOFTRST	 (1<<0)	 /* Software reset */
+
+#ifndef CONFIG_DM_SERIAL
+
+#ifndef CONFIG_MXC_UART_BASE
+#error "define CONFIG_MXC_UART_BASE to use the MXC UART driver"
+#endif
+
+#define UART_PHYS	CONFIG_MXC_UART_BASE
+
+#define __REG(x)     (*((volatile u32 *)(x)))
+
+/* Register definitions */
+#define URXD  0x0  /* Receiver Register */
+#define UTXD  0x40 /* Transmitter Register */
+#define UCR1  0x80 /* Control Register 1 */
+#define UCR2  0x84 /* Control Register 2 */
+#define UCR3  0x88 /* Control Register 3 */
+#define UCR4  0x8c /* Control Register 4 */
+#define UFCR  0x90 /* FIFO Control Register */
+#define USR1  0x94 /* Status Register 1 */
+#define USR2  0x98 /* Status Register 2 */
+#define UESC  0x9c /* Escape Character Register */
+#define UTIM  0xa0 /* Escape Timer Register */
+#define UBIR  0xa4 /* BRM Incremental Register */
+#define UBMR  0xa8 /* BRM Modulator Register */
+#define UBRC  0xac /* Baud Rate Count Register */
+#define UTS   0xb4 /* UART Test Register (mx31) */
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -199,7 +191,7 @@ static int mxc_serial_init(void)
 
 	while (!(__REG(UART_PHYS + UCR2) & UCR2_SRST));
 
-	__REG(UART_PHYS + UCR3) = 0x0704;
+	__REG(UART_PHYS + UCR3) = 0x0704 | UCR3_ADNIMP;
 	__REG(UART_PHYS + UCR4) = 0x8000;
 	__REG(UART_PHYS + UESC) = 0x002b;
 	__REG(UART_PHYS + UTIM) = 0x0;
@@ -235,3 +227,118 @@ __weak struct serial_device *default_serial_console(void)
 {
 	return &mxc_serial_drv;
 }
+#endif
+
+#ifdef CONFIG_DM_SERIAL
+
+struct mxc_uart {
+	u32 rxd;
+	u32 spare0[15];
+
+	u32 txd;
+	u32 spare1[15];
+
+	u32 cr1;
+	u32 cr2;
+	u32 cr3;
+	u32 cr4;
+
+	u32 fcr;
+	u32 sr1;
+	u32 sr2;
+	u32 esc;
+
+	u32 tim;
+	u32 bir;
+	u32 bmr;
+	u32 brc;
+
+	u32 onems;
+	u32 ts;
+};
+
+int mxc_serial_setbrg(struct udevice *dev, int baudrate)
+{
+	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_uart *const uart = plat->reg;
+	u32 clk = imx_get_uartclk();
+
+	writel(4 << 7, &uart->fcr); /* divide input clock by 2 */
+	writel(0xf, &uart->bir);
+	writel(clk / (2 * baudrate), &uart->bmr);
+
+	writel(UCR2_WS | UCR2_IRTS | UCR2_RXEN | UCR2_TXEN | UCR2_SRST,
+	       &uart->cr2);
+	writel(UCR1_UARTEN, &uart->cr1);
+
+	return 0;
+}
+
+static int mxc_serial_probe(struct udevice *dev)
+{
+	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_uart *const uart = plat->reg;
+
+	writel(0, &uart->cr1);
+	writel(0, &uart->cr2);
+	while (!(readl(&uart->cr2) & UCR2_SRST));
+	writel(0x704 | UCR3_ADNIMP, &uart->cr3);
+	writel(0x8000, &uart->cr4);
+	writel(0x2b, &uart->esc);
+	writel(0, &uart->tim);
+	writel(0, &uart->ts);
+
+	return 0;
+}
+
+static int mxc_serial_getc(struct udevice *dev)
+{
+	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_uart *const uart = plat->reg;
+
+	if (readl(&uart->ts) & UTS_RXEMPTY)
+		return -EAGAIN;
+
+	return readl(&uart->rxd) & URXD_RX_DATA;
+}
+
+static int mxc_serial_putc(struct udevice *dev, const char ch)
+{
+	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_uart *const uart = plat->reg;
+
+	if (!(readl(&uart->ts) & UTS_TXEMPTY))
+		return -EAGAIN;
+
+	writel(ch, &uart->txd);
+
+	return 0;
+}
+
+static int mxc_serial_pending(struct udevice *dev, bool input)
+{
+	struct mxc_serial_platdata *plat = dev->platdata;
+	struct mxc_uart *const uart = plat->reg;
+	uint32_t sr2 = readl(&uart->sr2);
+
+	if (input)
+		return sr2 & USR2_RDR ? 1 : 0;
+	else
+		return sr2 & USR2_TXDC ? 0 : 1;
+}
+
+static const struct dm_serial_ops mxc_serial_ops = {
+	.putc = mxc_serial_putc,
+	.pending = mxc_serial_pending,
+	.getc = mxc_serial_getc,
+	.setbrg = mxc_serial_setbrg,
+};
+
+U_BOOT_DRIVER(serial_mxc) = {
+	.name	= "serial_mxc",
+	.id	= UCLASS_SERIAL,
+	.probe = mxc_serial_probe,
+	.ops	= &mxc_serial_ops,
+	.flags = DM_FLAG_PRE_RELOC,
+};
+#endif

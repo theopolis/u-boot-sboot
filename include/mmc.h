@@ -4,23 +4,7 @@
  *
  * Based (loosely) on the Linux code
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _MMC_H_
@@ -28,28 +12,34 @@
 
 #include <linux/list.h>
 #include <linux/compiler.h>
+#include <part.h>
 
 #define SD_VERSION_SD	0x20000
-#define SD_VERSION_2	(SD_VERSION_SD | 0x20)
-#define SD_VERSION_1_0	(SD_VERSION_SD | 0x10)
-#define SD_VERSION_1_10	(SD_VERSION_SD | 0x1a)
+#define SD_VERSION_3	(SD_VERSION_SD | 0x300)
+#define SD_VERSION_2	(SD_VERSION_SD | 0x200)
+#define SD_VERSION_1_0	(SD_VERSION_SD | 0x100)
+#define SD_VERSION_1_10	(SD_VERSION_SD | 0x10a)
 #define MMC_VERSION_MMC		0x10000
 #define MMC_VERSION_UNKNOWN	(MMC_VERSION_MMC)
-#define MMC_VERSION_1_2		(MMC_VERSION_MMC | 0x12)
-#define MMC_VERSION_1_4		(MMC_VERSION_MMC | 0x14)
-#define MMC_VERSION_2_2		(MMC_VERSION_MMC | 0x22)
-#define MMC_VERSION_3		(MMC_VERSION_MMC | 0x30)
-#define MMC_VERSION_4		(MMC_VERSION_MMC | 0x40)
+#define MMC_VERSION_1_2		(MMC_VERSION_MMC | 0x102)
+#define MMC_VERSION_1_4		(MMC_VERSION_MMC | 0x104)
+#define MMC_VERSION_2_2		(MMC_VERSION_MMC | 0x202)
+#define MMC_VERSION_3		(MMC_VERSION_MMC | 0x300)
+#define MMC_VERSION_4		(MMC_VERSION_MMC | 0x400)
+#define MMC_VERSION_4_1		(MMC_VERSION_MMC | 0x401)
+#define MMC_VERSION_4_2		(MMC_VERSION_MMC | 0x402)
+#define MMC_VERSION_4_3		(MMC_VERSION_MMC | 0x403)
+#define MMC_VERSION_4_41	(MMC_VERSION_MMC | 0x429)
+#define MMC_VERSION_4_5		(MMC_VERSION_MMC | 0x405)
+#define MMC_VERSION_5_0		(MMC_VERSION_MMC | 0x500)
 
-#define MMC_MODE_HS		0x001
-#define MMC_MODE_HS_52MHz	0x010
-#define MMC_MODE_4BIT		0x100
-#define MMC_MODE_8BIT		0x200
-#define MMC_MODE_SPI		0x400
-#define MMC_MODE_HC		0x800
-
-#define MMC_MODE_MASK_WIDTH_BITS (MMC_MODE_4BIT | MMC_MODE_8BIT)
-#define MMC_MODE_WIDTH_BITS_SHIFT 8
+#define MMC_MODE_HS		(1 << 0)
+#define MMC_MODE_HS_52MHz	(1 << 1)
+#define MMC_MODE_4BIT		(1 << 2)
+#define MMC_MODE_8BIT		(1 << 3)
+#define MMC_MODE_SPI		(1 << 4)
+#define MMC_MODE_HC		(1 << 5)
+#define MMC_MODE_DDR_52MHz	(1 << 6)
 
 #define SD_DATA_4BIT	0x00040000
 
@@ -62,6 +52,8 @@
 #define UNUSABLE_ERR		-17 /* Unusable Card */
 #define COMM_ERR		-18 /* Communications Error */
 #define TIMEOUT			-19
+#define IN_PROGRESS		-20 /* operation is in progress */
+#define SWITCH_ERR		-21 /* Card reports failure to switch mode */
 
 #define MMC_CMD_GO_IDLE_STATE		0
 #define MMC_CMD_SEND_OP_COND		1
@@ -78,6 +70,7 @@
 #define MMC_CMD_SET_BLOCKLEN		16
 #define MMC_CMD_READ_SINGLE_BLOCK	17
 #define MMC_CMD_READ_MULTIPLE_BLOCK	18
+#define MMC_CMD_SET_BLOCK_COUNT         23
 #define MMC_CMD_WRITE_SINGLE_BLOCK	24
 #define MMC_CMD_WRITE_MULTIPLE_BLOCK	25
 #define MMC_CMD_ERASE_GROUP_START	35
@@ -86,6 +79,11 @@
 #define MMC_CMD_APP_CMD			55
 #define MMC_CMD_SPI_READ_OCR		58
 #define MMC_CMD_SPI_CRC_ON_OFF		59
+#define MMC_CMD_RES_MAN			62
+
+#define MMC_CMD62_ARG1			0xefac62ec
+#define MMC_CMD62_ARG2			0xcbaea7
+
 
 #define SD_CMD_SEND_RELATIVE_ADDR	3
 #define SD_CMD_SWITCH_FUNC		6
@@ -101,9 +99,6 @@
 #define SD_HIGHSPEED_BUSY	0x00020000
 #define SD_HIGHSPEED_SUPPORTED	0x00020000
 
-#define MMC_HS_TIMING		0x00000100
-#define MMC_HS_52MHZ		0x2
-
 #define OCR_BUSY		0x80000000
 #define OCR_HCS			0x40000000
 #define OCR_VOLTAGE_MASK	0x007FFF80
@@ -112,6 +107,7 @@
 #define SECURE_ERASE		0x80000000
 
 #define MMC_STATUS_MASK		(~0x0206BF7F)
+#define MMC_STATUS_SWITCH_ERROR	(1 << 7)
 #define MMC_STATUS_RDY_FOR_DATA (1 << 8)
 #define MMC_STATUS_CURR_STATE	(0xf << 9)
 #define MMC_STATUS_ERROR	(1 << 19)
@@ -151,14 +147,26 @@
 /*
  * EXT_CSD fields
  */
+#define EXT_CSD_ENH_START_ADDR		136	/* R/W */
+#define EXT_CSD_ENH_SIZE_MULT		140	/* R/W */
+#define EXT_CSD_GP_SIZE_MULT		143	/* R/W */
+#define EXT_CSD_PARTITION_SETTING	155	/* R/W */
+#define EXT_CSD_PARTITIONS_ATTRIBUTE	156	/* R/W */
+#define EXT_CSD_MAX_ENH_SIZE_MULT	157	/* R */
 #define EXT_CSD_PARTITIONING_SUPPORT	160	/* RO */
+#define EXT_CSD_RST_N_FUNCTION		162	/* R/W */
+#define EXT_CSD_WR_REL_PARAM		166	/* R */
+#define EXT_CSD_WR_REL_SET		167	/* R/W */
+#define EXT_CSD_RPMB_MULT		168	/* RO */
 #define EXT_CSD_ERASE_GROUP_DEF		175	/* R/W */
+#define EXT_CSD_BOOT_BUS_WIDTH		177
 #define EXT_CSD_PART_CONF		179	/* R/W */
 #define EXT_CSD_BUS_WIDTH		183	/* R/W */
 #define EXT_CSD_HS_TIMING		185	/* R/W */
 #define EXT_CSD_REV			192	/* RO */
 #define EXT_CSD_CARD_TYPE		196	/* RO */
 #define EXT_CSD_SEC_CNT			212	/* RO, 4 bytes */
+#define EXT_CSD_HC_WP_GRP_SIZE		221	/* RO */
 #define EXT_CSD_HC_ERASE_GRP_SIZE	224	/* RO */
 #define EXT_CSD_BOOT_MULT		226	/* RO */
 
@@ -172,10 +180,39 @@
 
 #define EXT_CSD_CARD_TYPE_26	(1 << 0)	/* Card can run at 26MHz */
 #define EXT_CSD_CARD_TYPE_52	(1 << 1)	/* Card can run at 52MHz */
+#define EXT_CSD_CARD_TYPE_DDR_1_8V	(1 << 2)
+#define EXT_CSD_CARD_TYPE_DDR_1_2V	(1 << 3)
+#define EXT_CSD_CARD_TYPE_DDR_52	(EXT_CSD_CARD_TYPE_DDR_1_8V \
+					| EXT_CSD_CARD_TYPE_DDR_1_2V)
 
 #define EXT_CSD_BUS_WIDTH_1	0	/* Card is in 1 bit mode */
 #define EXT_CSD_BUS_WIDTH_4	1	/* Card is in 4 bit mode */
 #define EXT_CSD_BUS_WIDTH_8	2	/* Card is in 8 bit mode */
+#define EXT_CSD_DDR_BUS_WIDTH_4	5	/* Card is in 4 bit DDR mode */
+#define EXT_CSD_DDR_BUS_WIDTH_8	6	/* Card is in 8 bit DDR mode */
+
+#define EXT_CSD_BOOT_ACK_ENABLE			(1 << 6)
+#define EXT_CSD_BOOT_PARTITION_ENABLE		(1 << 3)
+#define EXT_CSD_PARTITION_ACCESS_ENABLE		(1 << 0)
+#define EXT_CSD_PARTITION_ACCESS_DISABLE	(0 << 0)
+
+#define EXT_CSD_BOOT_ACK(x)		(x << 6)
+#define EXT_CSD_BOOT_PART_NUM(x)	(x << 3)
+#define EXT_CSD_PARTITION_ACCESS(x)	(x << 0)
+
+#define EXT_CSD_BOOT_BUS_WIDTH_MODE(x)	(x << 3)
+#define EXT_CSD_BOOT_BUS_WIDTH_RESET(x)	(x << 2)
+#define EXT_CSD_BOOT_BUS_WIDTH_WIDTH(x)	(x)
+
+#define EXT_CSD_PARTITION_SETTING_COMPLETED	(1 << 0)
+
+#define EXT_CSD_ENH_USR		(1 << 0)	/* user data area is enhanced */
+#define EXT_CSD_ENH_GP(x)	(1 << ((x)+1))	/* GP part (x+1) is enhanced */
+
+#define EXT_CSD_HS_CTRL_REL	(1 << 0)	/* host controlled WR_REL_SET */
+
+#define EXT_CSD_WR_DATA_REL_USR		(1 << 0)	/* user data area WR_REL */
+#define EXT_CSD_WR_DATA_REL_GP(x)	(1 << ((x)+1))	/* GP part (x+1) WR_REL */
 
 #define R1_ILLEGAL_COMMAND		(1 << 22)
 #define R1_APP_CMD			(1 << 5)
@@ -200,6 +237,17 @@
 #define MMCPART_NOAVAILABLE	(0xff)
 #define PART_ACCESS_MASK	(0x7)
 #define PART_SUPPORT		(0x1)
+#define ENHNCD_SUPPORT		(0x2)
+#define PART_ENH_ATTRIB		(0x1f)
+
+/* Maximum block size for MMC */
+#define MMC_MAX_BLOCK_LEN	512
+
+/* The number of MMC physical partitions.  These consist of:
+ * boot partitions (2), general purpose partitions (4) in MMC v4.4.
+ */
+#define MMC_NUM_BOOT_PARTITION	2
+#define MMC_PART_RPMB           3       /* RPMB partition number */
 
 struct mmc_cid {
 	unsigned long psn;
@@ -227,42 +275,96 @@ struct mmc_data {
 	uint blocksize;
 };
 
-struct mmc {
-	struct list_head link;
-	char name[32];
-	void *priv;
-	uint voltages;
-	uint version;
-	uint has_init;
-	uint f_min;
-	uint f_max;
-	int high_capacity;
-	uint bus_width;
-	uint clock;
-	uint card_caps;
-	uint host_caps;
-	uint ocr;
-	uint scr[2];
-	uint csd[4];
-	uint cid[4];
-	ushort rca;
-	char part_config;
-	char part_num;
-	uint tran_speed;
-	uint read_bl_len;
-	uint write_bl_len;
-	uint erase_grp_size;
-	u64 capacity;
-	block_dev_desc_t block_dev;
+/* forward decl. */
+struct mmc;
+
+struct mmc_ops {
 	int (*send_cmd)(struct mmc *mmc,
 			struct mmc_cmd *cmd, struct mmc_data *data);
 	void (*set_ios)(struct mmc *mmc);
 	int (*init)(struct mmc *mmc);
 	int (*getcd)(struct mmc *mmc);
+	int (*getwp)(struct mmc *mmc);
+};
+
+struct mmc_config {
+	const char *name;
+	const struct mmc_ops *ops;
+	uint host_caps;
+	uint voltages;
+	uint f_min;
+	uint f_max;
 	uint b_max;
+	unsigned char part_type;
+};
+
+/* TODO struct mmc should be in mmc_private but it's hard to fix right now */
+struct mmc {
+	struct list_head link;
+	const struct mmc_config *cfg;	/* provided configuration */
+	uint version;
+	void *priv;
+	uint has_init;
+	int high_capacity;
+	uint bus_width;
+	uint clock;
+	uint card_caps;
+	uint ocr;
+	uint dsr;
+	uint dsr_imp;
+	uint scr[2];
+	uint csd[4];
+	uint cid[4];
+	ushort rca;
+	u8 part_support;
+	u8 part_attr;
+	u8 wr_rel_set;
+	char part_config;
+	char part_num;
+	uint tran_speed;
+	uint read_bl_len;
+	uint write_bl_len;
+	uint erase_grp_size;	/* in 512-byte sectors */
+	uint hc_wp_grp_size;	/* in 512-byte sectors */
+	u64 capacity;
+	u64 capacity_user;
+	u64 capacity_boot;
+	u64 capacity_rpmb;
+	u64 capacity_gp[4];
+	u64 enh_user_start;
+	u64 enh_user_size;
+	block_dev_desc_t block_dev;
+	char op_cond_pending;	/* 1 if we are waiting on an op_cond command */
+	char init_in_progress;	/* 1 if we have done mmc_start_init() */
+	char preinit;		/* start init as early as possible */
+	uint op_cond_response;	/* the response byte from the last op_cond */
+	int ddr_mode;
+};
+
+struct mmc_hwpart_conf {
+	struct {
+		uint enh_start;	/* in 512-byte sectors */
+		uint enh_size;	/* in 512-byte sectors, if 0 no enh area */
+		unsigned wr_rel_change : 1;
+		unsigned wr_rel_set : 1;
+	} user;
+	struct {
+		uint size;	/* in 512-byte sectors */
+		unsigned enhanced : 1;
+		unsigned wr_rel_change : 1;
+		unsigned wr_rel_set : 1;
+	} gp_part[4];
+};
+
+enum mmc_hwpart_conf_mode {
+	MMC_HWPART_CONF_CHECK,
+	MMC_HWPART_CONF_SET,
+	MMC_HWPART_CONF_COMPLETE,
 };
 
 int mmc_register(struct mmc *mmc);
+struct mmc *mmc_create(const struct mmc_config *cfg, void *priv);
+void mmc_destroy(struct mmc *mmc);
 int mmc_initialize(bd_t *bis);
 int mmc_init(struct mmc *mmc);
 int mmc_read(struct mmc *mmc, u64 src, uchar *dst, int size);
@@ -271,16 +373,74 @@ struct mmc *find_mmc_device(int dev_num);
 int mmc_set_dev(int dev_num);
 void print_mmc_devices(char separator);
 int get_mmc_num(void);
-int board_mmc_getcd(struct mmc *mmc);
 int mmc_switch_part(int dev_num, unsigned int part_num);
+int mmc_hwpart_config(struct mmc *mmc, const struct mmc_hwpart_conf *conf,
+		      enum mmc_hwpart_conf_mode mode);
 int mmc_getcd(struct mmc *mmc);
-void spl_mmc_load(void) __noreturn;
+int board_mmc_getcd(struct mmc *mmc);
+int mmc_getwp(struct mmc *mmc);
+int board_mmc_getwp(struct mmc *mmc);
+int mmc_set_dsr(struct mmc *mmc, u16 val);
+/* Function to change the size of boot partition and rpmb partitions */
+int mmc_boot_partition_size_change(struct mmc *mmc, unsigned long bootsize,
+					unsigned long rpmbsize);
+/* Function to modify the PARTITION_CONFIG field of EXT_CSD */
+int mmc_set_part_conf(struct mmc *mmc, u8 ack, u8 part_num, u8 access);
+/* Function to modify the BOOT_BUS_WIDTH field of EXT_CSD */
+int mmc_set_boot_bus_width(struct mmc *mmc, u8 width, u8 reset, u8 mode);
+/* Function to modify the RST_n_FUNCTION field of EXT_CSD */
+int mmc_set_rst_n_function(struct mmc *mmc, u8 enable);
+/* Functions to read / write the RPMB partition */
+int mmc_rpmb_set_key(struct mmc *mmc, void *key);
+int mmc_rpmb_get_counter(struct mmc *mmc, unsigned long *counter);
+int mmc_rpmb_read(struct mmc *mmc, void *addr, unsigned short blk,
+		  unsigned short cnt, unsigned char *key);
+int mmc_rpmb_write(struct mmc *mmc, void *addr, unsigned short blk,
+		   unsigned short cnt, unsigned char *key);
+/**
+ * Start device initialization and return immediately; it does not block on
+ * polling OCR (operation condition register) status.  Then you should call
+ * mmc_init, which would block on polling OCR status and complete the device
+ * initializatin.
+ *
+ * @param mmc	Pointer to a MMC device struct
+ * @return 0 on success, IN_PROGRESS on waiting for OCR status, <0 on error.
+ */
+int mmc_start_init(struct mmc *mmc);
+
+/**
+ * Set preinit flag of mmc device.
+ *
+ * This will cause the device to be pre-inited during mmc_initialize(),
+ * which may save boot time if the device is not accessed until later.
+ * Some eMMC devices take 200-300ms to init, but unfortunately they
+ * must be sent a series of commands to even get them to start preparing
+ * for operation.
+ *
+ * @param mmc		Pointer to a MMC device struct
+ * @param preinit	preinit flag value
+ */
+void mmc_set_preinit(struct mmc *mmc, int preinit);
 
 #ifdef CONFIG_GENERIC_MMC
-#define mmc_host_is_spi(mmc)	((mmc)->host_caps & MMC_MODE_SPI)
+#ifdef CONFIG_MMC_SPI
+#define mmc_host_is_spi(mmc)	((mmc)->cfg->host_caps & MMC_MODE_SPI)
+#else
+#define mmc_host_is_spi(mmc)	0
+#endif
 struct mmc *mmc_spi_init(uint bus, uint cs, uint speed, uint mode);
 #else
 int mmc_legacy_init(int verbose);
+#endif
+
+void board_mmc_power_init(void);
+int board_mmc_init(bd_t *bis);
+int cpu_mmc_init(bd_t *bis);
+int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr);
+
+/* Set block count limit because of 16 bit register limit on some hardware*/
+#ifndef CONFIG_SYS_MMC_MAX_BLK_COUNT
+#define CONFIG_SYS_MMC_MAX_BLK_COUNT 65535
 #endif
 
 #endif /* _MMC_H_ */

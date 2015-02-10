@@ -7,23 +7,7 @@
  * (C) Copyright 2000-2004
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
- * MA 02110-1301 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/io.h>
@@ -309,7 +293,7 @@ int read_flash(long nOffset, int *pnValue)
 	nValue = *(volatile unsigned short *)addr;
 	SSYNC();
 	*pnValue = nValue;
-	return TRUE;
+	return true;
 }
 
 int poll_toggle_bit(long lOffset)
@@ -398,7 +382,7 @@ int erase_block_flash(int nBlock, unsigned long address)
 	long ulSectorOff = 0x0;
 
 	if ((nBlock < 0) || (nBlock > AFP_NumSectors))
-		return FALSE;
+		return false;
 
 	ulSectorOff = (address - CONFIG_SYS_FLASH_BASE);
 

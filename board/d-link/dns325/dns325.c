@@ -1,36 +1,20 @@
 /*
  * Copyright (C) 2011
- * Stefan Herbrechtsmeier <stefan@code.herbrechtsmeier.net>
+ * Stefan Herbrechtsmeier <stefan@herbrechtsmeier.net>
  *
  * Based on Kirkwood support:
  * (C) Copyright 2009
  * Marvell Semiconductor <www.marvell.com>
  * Written-by: Prafulla Wadaskar <prafulla@marvell.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <miiphy.h>
 #include <netdev.h>
 #include <asm/arch/cpu.h>
-#include <asm/arch/kirkwood.h>
+#include <asm/arch/soc.h>
 #include <asm/arch/mpp.h>
 #include <asm/arch/gpio.h>
 #include "dns325.h"
@@ -40,8 +24,8 @@ DECLARE_GLOBAL_DATA_PTR;
 int board_early_init_f(void)
 {
 	/* Gpio configuration */
-	kw_config_gpio(DNS325_OE_VAL_LOW, DNS325_OE_VAL_HIGH,
-			DNS325_OE_LOW, DNS325_OE_HIGH);
+	mvebu_config_gpio(DNS325_OE_VAL_LOW, DNS325_OE_VAL_HIGH,
+			  DNS325_OE_LOW, DNS325_OE_HIGH);
 
 	/* Multi-Purpose Pins Functionality configuration */
 	static const u32 kwmpp_config[] = {
@@ -108,7 +92,7 @@ int board_early_init_f(void)
 int board_init(void)
 {
 	/* Boot parameters address */
-	gd->bd->bi_boot_params = kw_sdram_bar(0) + 0x100;
+	gd->bd->bi_boot_params = mvebu_sdram_bar(0) + 0x100;
 
 	return 0;
 }

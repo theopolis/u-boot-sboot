@@ -2,23 +2,7 @@
  * (C) Copyright 2001
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -35,19 +19,10 @@
 #define PRINTF(fmt,args...)
 #endif
 
-/* Rather than repeat this expression each time, add a define for it */
-#if (defined(CONFIG_CMD_IDE) || \
-     defined(CONFIG_CMD_SATA) || \
-     defined(CONFIG_CMD_SCSI) || \
-     defined(CONFIG_CMD_USB) || \
-     defined(CONFIG_MMC) || \
-     defined(CONFIG_SYSTEMACE) )
-#define HAVE_BLOCK_DEVICE
-#endif
-
 struct block_drvr {
 	char *name;
 	block_dev_desc_t* (*get_dev)(int dev);
+	int (*select_hwpart)(int dev_num, int hwpart);
 };
 
 static const struct block_drvr block_drvr[] = {
@@ -64,10 +39,17 @@ static const struct block_drvr block_drvr[] = {
 	{ .name = "usb", .get_dev = usb_stor_get_dev, },
 #endif
 #if defined(CONFIG_MMC)
-	{ .name = "mmc", .get_dev = mmc_get_dev, },
+	{
+		.name = "mmc",
+		.get_dev = mmc_get_dev,
+		.select_hwpart = mmc_select_hwpart,
+	},
 #endif
 #if defined(CONFIG_SYSTEMACE)
 	{ .name = "ace", .get_dev = systemace_get_dev, },
+#endif
+#if defined(CONFIG_SANDBOX)
+	{ .name = "host", .get_dev = host_get_dev, },
 #endif
 	{ },
 };
@@ -75,11 +57,13 @@ static const struct block_drvr block_drvr[] = {
 DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef HAVE_BLOCK_DEVICE
-block_dev_desc_t *get_dev(const char *ifname, int dev)
+static block_dev_desc_t *get_dev_hwpart(const char *ifname, int dev, int hwpart)
 {
 	const struct block_drvr *drvr = block_drvr;
 	block_dev_desc_t* (*reloc_get_dev)(int dev);
+	int (*select_hwpart)(int dev_num, int hwpart);
 	char *name;
+	int ret;
 
 	if (!ifname)
 		return NULL;
@@ -91,17 +75,41 @@ block_dev_desc_t *get_dev(const char *ifname, int dev)
 	while (drvr->name) {
 		name = drvr->name;
 		reloc_get_dev = drvr->get_dev;
+		select_hwpart = drvr->select_hwpart;
 #ifdef CONFIG_NEEDS_MANUAL_RELOC
 		name += gd->reloc_off;
 		reloc_get_dev += gd->reloc_off;
+		if (select_hwpart)
+			select_hwpart += gd->reloc_off;
 #endif
-		if (strncmp(ifname, name, strlen(name)) == 0)
-			return reloc_get_dev(dev);
+		if (strncmp(ifname, name, strlen(name)) == 0) {
+			block_dev_desc_t *dev_desc = reloc_get_dev(dev);
+			if (!dev_desc)
+				return NULL;
+			if (hwpart == 0 && !select_hwpart)
+				return dev_desc;
+			if (!select_hwpart)
+				return NULL;
+			ret = select_hwpart(dev_desc->dev, hwpart);
+			if (ret < 0)
+				return NULL;
+			return dev_desc;
+		}
 		drvr++;
 	}
 	return NULL;
 }
+
+block_dev_desc_t *get_dev(const char *ifname, int dev)
+{
+	return get_dev_hwpart(ifname, dev, 0);
+}
 #else
+block_dev_desc_t *get_dev_hwpart(const char *ifname, int dev, int hwpart)
+{
+	return NULL;
+}
+
 block_dev_desc_t *get_dev(const char *ifname, int dev)
 {
 	return NULL;
@@ -125,7 +133,7 @@ typedef lbaint_t lba512_t;
  * Overflowless variant of (block_count * mul_by / div_by)
  * when div_by > mul_by
  */
-static lba512_t lba512_muldiv (lba512_t block_count, lba512_t mul_by, lba512_t div_by)
+static lba512_t lba512_muldiv(lba512_t block_count, lba512_t mul_by, lba512_t div_by)
 {
 	lba512_t bc_quot, bc_rem;
 
@@ -207,7 +215,8 @@ void dev_print (block_dev_desc_t *dev_desc)
 
 		lba512 = (lba * (dev_desc->blksz/512));
 		/* round to 1 digit */
-		mb = lba512_muldiv(lba512, 10, 2048);	/* 2048 = (1024 * 1024) / 512 MB */
+		/* 2048 = (1024 * 1024) / 512 MB */
+		mb = lba512_muldiv(lba512, 10, 2048);
 
 		mb_quot	= mb / 10;
 		mb_rem	= mb - (10 * mb_quot);
@@ -240,7 +249,7 @@ void dev_print (block_dev_desc_t *dev_desc)
 
 #ifdef HAVE_BLOCK_DEVICE
 
-void init_part (block_dev_desc_t * dev_desc)
+void init_part(block_dev_desc_t *dev_desc)
 {
 #ifdef CONFIG_ISO_PARTITION
 	if (test_part_iso(dev_desc) == 0) {
@@ -287,7 +296,7 @@ void init_part (block_dev_desc_t * dev_desc)
 	defined(CONFIG_AMIGA_PARTITION) || \
 	defined(CONFIG_EFI_PARTITION)
 
-static void print_part_header (const char *type, block_dev_desc_t * dev_desc)
+static void print_part_header(const char *type, block_dev_desc_t *dev_desc)
 {
 	puts ("\nPartition Map for ");
 	switch (dev_desc->if_type) {
@@ -312,6 +321,9 @@ static void print_part_header (const char *type, block_dev_desc_t * dev_desc)
 	case IF_TYPE_MMC:
 		puts ("MMC");
 		break;
+	case IF_TYPE_HOST:
+		puts("HOST");
+		break;
 	default:
 		puts ("UNKNOWN");
 		break;
@@ -322,7 +334,7 @@ static void print_part_header (const char *type, block_dev_desc_t * dev_desc)
 
 #endif /* any CONFIG_..._PARTITION */
 
-void print_part (block_dev_desc_t * dev_desc)
+void print_part(block_dev_desc_t * dev_desc)
 {
 
 		switch (dev_desc->part_type) {
@@ -370,8 +382,8 @@ void print_part (block_dev_desc_t * dev_desc)
 
 #endif /* HAVE_BLOCK_DEVICE */
 
-int get_partition_info(block_dev_desc_t *dev_desc, int part
-					, disk_partition_t *info)
+int get_partition_info(block_dev_desc_t *dev_desc, int part,
+		       disk_partition_t *info)
 {
 #ifdef HAVE_BLOCK_DEVICE
 
@@ -433,25 +445,52 @@ int get_partition_info(block_dev_desc_t *dev_desc, int part
 	return -1;
 }
 
-int get_device(const char *ifname, const char *dev_str,
+int get_device(const char *ifname, const char *dev_hwpart_str,
 	       block_dev_desc_t **dev_desc)
 {
 	char *ep;
-	int dev;
+	char *dup_str = NULL;
+	const char *dev_str, *hwpart_str;
+	int dev, hwpart;
+
+	hwpart_str = strchr(dev_hwpart_str, '.');
+	if (hwpart_str) {
+		dup_str = strdup(dev_hwpart_str);
+		dup_str[hwpart_str - dev_hwpart_str] = 0;
+		dev_str = dup_str;
+		hwpart_str++;
+	} else {
+		dev_str = dev_hwpart_str;
+		hwpart = 0;
+	}
 
 	dev = simple_strtoul(dev_str, &ep, 16);
 	if (*ep) {
 		printf("** Bad device specification %s %s **\n",
 		       ifname, dev_str);
-		return -1;
+		dev = -1;
+		goto cleanup;
 	}
 
-	*dev_desc = get_dev(ifname, dev);
+	if (hwpart_str) {
+		hwpart = simple_strtoul(hwpart_str, &ep, 16);
+		if (*ep) {
+			printf("** Bad HW partition specification %s %s **\n",
+			    ifname, hwpart_str);
+			dev = -1;
+			goto cleanup;
+		}
+	}
+
+	*dev_desc = get_dev_hwpart(ifname, dev, hwpart);
 	if (!(*dev_desc) || ((*dev_desc)->type == DEV_TYPE_UNKNOWN)) {
-		printf("** Bad device %s %s **\n", ifname, dev_str);
-		return -1;
+		printf("** Bad device %s %s **\n", ifname, dev_hwpart_str);
+		dev = -1;
+		goto cleanup;
 	}
 
+cleanup:
+	free(dup_str);
 	return dev;
 }
 
@@ -471,6 +510,25 @@ int get_device_and_partition(const char *ifname, const char *dev_part_str,
 	int p;
 	int part;
 	disk_partition_t tmpinfo;
+
+	/*
+	 * Special-case a pseudo block device "hostfs", to allow access to the
+	 * host's own filesystem.
+	 */
+	if (0 == strcmp(ifname, "hostfs")) {
+		*dev_desc = NULL;
+		info->start = 0;
+		info->size = 0;
+		info->blksz = 0;
+		info->bootable = 0;
+		strcpy((char *)info->type, BOOT_PART_TYPE);
+		strcpy((char *)info->name, "Sandbox host");
+#ifdef CONFIG_PARTITION_UUIDS
+		info->uuid[0] = 0;
+#endif
+
+		return 0;
+	}
 
 	/* If no dev_part_str, use bootdevice environment variable */
 	if (!dev_part_str || !strlen(dev_part_str) ||
@@ -540,6 +598,8 @@ int get_device_and_partition(const char *ifname, const char *dev_part_str,
 			       dev_str);
 			goto cleanup;
 		}
+
+		(*dev_desc)->log2blksz = LOG2((*dev_desc)->blksz);
 
 		info->start = 0;
 		info->size = (*dev_desc)->lba;
@@ -623,6 +683,8 @@ int get_device_and_partition(const char *ifname, const char *dev_part_str,
 		ret  = -1;
 		goto cleanup;
 	}
+
+	(*dev_desc)->log2blksz = LOG2((*dev_desc)->blksz);
 
 	ret = part;
 	goto cleanup;

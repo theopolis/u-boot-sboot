@@ -2,23 +2,7 @@
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef	_IDE_H
@@ -39,14 +23,17 @@ extern ulong ide_bus_offset[];
 #define LED_IDE2	0x02
 #define	DEVICE_LED(d)	((d & 2) | ((d & 2) == 0)) /* depends on bit positions! */
 
+void ide_led(uchar led, uchar status);
 #endif /* CONFIG_IDE_LED */
 
 #ifdef CONFIG_SYS_64BIT_LBA
 typedef uint64_t lbaint_t;
 #define LBAF "%llx"
+#define LBAFU "%llu"
 #else
 typedef ulong lbaint_t;
 #define LBAF "%lx"
+#define LBAFU "%lu"
 #endif
 
 /*
@@ -54,8 +41,9 @@ typedef ulong lbaint_t;
  */
 
 void ide_init(void);
-ulong ide_read(int device, ulong blknr, lbaint_t blkcnt, void *buffer);
-ulong ide_write(int device, ulong blknr, lbaint_t blkcnt, const void *buffer);
+ulong ide_read(int device, lbaint_t blknr, lbaint_t blkcnt, void *buffer);
+ulong ide_write(int device, lbaint_t blknr, lbaint_t blkcnt,
+		const void *buffer);
 
 #ifdef CONFIG_IDE_PREINIT
 int ide_preinit(void);
@@ -73,16 +61,27 @@ int ide_device_present(int dev);
 unsigned char ide_read_register(int dev, unsigned int port);
 void ide_write_register(int dev, unsigned int port, unsigned char val);
 void ide_read_data(int dev, ulong *sect_buf, int words);
-void ide_write_data(int dev, ulong *sect_buf, int words);
+void ide_write_data(int dev, const ulong *sect_buf, int words);
 #endif
 
 /*
  * I/O function overrides
  */
+unsigned char ide_inb(int dev, int port);
+void ide_outb(int dev, int port, unsigned char val);
 void ide_input_swap_data(int dev, ulong *sect_buf, int words);
 void ide_input_data(int dev, ulong *sect_buf, int words);
 void ide_output_data(int dev, const ulong *sect_buf, int words);
 void ide_input_data_shorts(int dev, ushort *sect_buf, int shorts);
 void ide_output_data_shorts(int dev, ushort *sect_buf, int shorts);
+
+void ide_led(uchar led, uchar status);
+
+/**
+ * board_start_ide() - Start up the board IDE interfac
+ *
+ * @return 0 if ok
+ */
+int board_start_ide(void);
 
 #endif /* _IDE_H */

@@ -16,39 +16,51 @@
  * (C) Copyright 2004
  * Philippe Robin, ARM Ltd. <philippe.robin@arm.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <asm/proc-armv/ptrace.h>
+#include <asm/u-boot-arm.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_USE_IRQ
 int interrupt_init (void)
 {
+	unsigned long cpsr;
+
 	/*
 	 * setup up stacks if necessary
 	 */
 	IRQ_STACK_START = gd->irq_sp - 4;
 	IRQ_STACK_START_IN = gd->irq_sp + 8;
 	FIQ_STACK_START = IRQ_STACK_START - CONFIG_STACKSIZE_IRQ;
+
+
+	__asm__ __volatile__("mrs %0, cpsr\n"
+			     : "=r" (cpsr)
+			     :
+			     : "memory");
+
+	__asm__ __volatile__("msr cpsr_c, %0\n"
+			     "mov sp, %1\n"
+			     :
+			     : "r" (IRQ_MODE | I_BIT | F_BIT | (cpsr & ~FIQ_MODE)),
+			       "r" (IRQ_STACK_START)
+			     : "memory");
+
+	__asm__ __volatile__("msr cpsr_c, %0\n"
+			     "mov sp, %1\n"
+			     :
+			     : "r" (FIQ_MODE | I_BIT | F_BIT | (cpsr & ~IRQ_MODE)),
+			       "r" (FIQ_STACK_START)
+			     : "memory");
+
+	__asm__ __volatile__("msr cpsr_c, %0"
+			     :
+			     : "r" (cpsr)
+			     : "memory");
 
 	return arch_interrupt_init();
 }
@@ -119,7 +131,7 @@ void show_regs (struct pt_regs *regs)
 	"UK12_26",	"UK13_26",	"UK14_26",	"UK15_26",
 	"USER_32",	"FIQ_32",	"IRQ_32",	"SVC_32",
 	"UK4_32",	"UK5_32",	"UK6_32",	"ABT_32",
-	"UK8_32",	"UK9_32",	"UK10_32",	"UND_32",
+	"UK8_32",	"UK9_32",	"HYP_32",	"UND_32",
 	"UK12_32",	"UK13_32",	"UK14_32",	"SYS_32",
 	};
 
@@ -169,7 +181,7 @@ void do_prefetch_abort (struct pt_regs *pt_regs)
 
 void do_data_abort (struct pt_regs *pt_regs)
 {
-	printf ("data abort\n\n    MAYBE you should read doc/README.arm-unaligned-accesses\n\n");
+	printf ("data abort\n");
 	show_regs (pt_regs);
 	bad_mode ();
 }

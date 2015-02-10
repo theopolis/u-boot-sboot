@@ -1,23 +1,7 @@
 /*
  * Copyright 2009-2011 Freescale Semiconductor, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _FSL_LIODN_H_
@@ -43,6 +27,13 @@ struct srio_liodn_id_table {
 		+ CONFIG_SYS_MPC85xx_GUTS_OFFSET + CONFIG_SYS_CCSRBAR, \
 	  .reg_offset[1] = offsetof(ccsr_gur_t, rio##port##maintliodnr) \
 		+ CONFIG_SYS_MPC85xx_GUTS_OFFSET + CONFIG_SYS_CCSRBAR, \
+	}
+
+#define SET_SRIO_LIODN_BASE(port, id_a) \
+	{ .id = { id_a }, .num_ids = 1, .portid = port, \
+	  .reg_offset[0] = offsetof(struct ccsr_rio, liodn) \
+		+ (port - 1) * 0x200 \
+		+ CONFIG_SYS_FSL_SRIO_ADDR, \
 	}
 
 struct liodn_id_table {
@@ -100,13 +91,21 @@ extern void fdt_fixup_liodn(void *blob);
 		CONFIG_SYS_MPC85xx_PCIE##pciNum##_OFFSET)
 
 /* reg nodes for DMA start @ 0x300 */
-#define SET_DMA_LIODN(dmaNum, liodn) \
-	SET_GUTS_LIODN("fsl,eloplus-dma", liodn, dma##dmaNum##liodnr,\
+#define SET_DMA_LIODN(dmaNum, compat, liodn) \
+	SET_GUTS_LIODN(compat, liodn, dma##dmaNum##liodnr,\
 		CONFIG_SYS_MPC85xx_DMA##dmaNum##_OFFSET + 0x300)
 
 #define SET_SDHC_LIODN(sdhcNum, liodn) \
 	SET_GUTS_LIODN("fsl,esdhc", liodn, sdmmc##sdhcNum##liodnr,\
 		CONFIG_SYS_MPC85xx_ESDHC_OFFSET)
+
+#define SET_QE_LIODN(liodn) \
+	SET_GUTS_LIODN("fsl,qe", liodn, qeliodnr,\
+		CONFIG_SYS_MPC85xx_QE_OFFSET)
+
+#define SET_TDM_LIODN(liodn) \
+	SET_GUTS_LIODN("fsl,tdm1.0", liodn, tdmliodnr,\
+		CONFIG_SYS_MPC85xx_TDM_OFFSET)
 
 #define SET_QMAN_LIODN(liodn) \
 	SET_LIODN_ENTRY_1("fsl,qman", liodn, offsetof(ccsr_qman_t, liodnr) + \

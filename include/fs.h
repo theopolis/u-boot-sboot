@@ -21,6 +21,7 @@
 #define FS_TYPE_ANY	0
 #define FS_TYPE_FAT	1
 #define FS_TYPE_EXT	2
+#define FS_TYPE_SANDBOX	3
 
 /*
  * Tell the fs layer which block device an partition to use for future
@@ -43,23 +44,75 @@ int fs_set_blk_dev(const char *ifname, const char *dev_part_str, int fstype);
 int fs_ls(const char *dirname);
 
 /*
- * Read file "filename" from the partition previously set by fs_set_blk_dev(),
- * to address "addr", starting at byte offset "offset", and reading "len"
- * bytes. "offset" may be 0 to read from the start of the file. "len" may be
- * 0 to read the entire file. Note that not all filesystem types support
- * either/both offset!=0 or len!=0.
+ * Determine whether a file exists
  *
- * Returns number of bytes read on success. Returns <= 0 on error.
+ * Returns 1 if the file exists, 0 if it doesn't exist.
  */
-int fs_read(const char *filename, ulong addr, int offset, int len);
+int fs_exists(const char *filename);
+
+/*
+ * fs_size - Determine a file's size
+ *
+ * @filename: Name of the file
+ * @size: Size of file
+ * @return 0 if ok with valid *size, negative on error
+ */
+int fs_size(const char *filename, loff_t *size);
+
+/*
+ * fs_read - Read file from the partition previously set by fs_set_blk_dev()
+ * Note that not all filesystem types support either/both offset!=0 or len!=0.
+ *
+ * @filename: Name of file to read from
+ * @addr: The address to read into
+ * @offset: The offset in file to read from
+ * @len: The number of bytes to read. Maybe 0 to read entire file
+ * @actread: Returns the actual number of bytes read
+ * @return 0 if ok with valid *actread, -1 on error conditions
+ */
+int fs_read(const char *filename, ulong addr, loff_t offset, loff_t len,
+	    loff_t *actread);
+
+/*
+ * fs_write - Write file to the partition previously set by fs_set_blk_dev()
+ * Note that not all filesystem types support offset!=0.
+ *
+ * @filename: Name of file to read from
+ * @addr: The address to read into
+ * @offset: The offset in file to read from. Maybe 0 to write to start of file
+ * @len: The number of bytes to write
+ * @actwrite: Returns the actual number of bytes written
+ * @return 0 if ok with valid *actwrite, -1 on error conditions
+ */
+int fs_write(const char *filename, ulong addr, loff_t offset, loff_t len,
+	     loff_t *actwrite);
 
 /*
  * Common implementation for various filesystem commands, optionally limited
  * to a specific filesystem type via the fstype parameter.
  */
+int do_size(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
+		int fstype);
 int do_load(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
-		int fstype, int cmdline_base);
+		int fstype);
 int do_ls(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		int fstype);
+int file_exists(const char *dev_type, const char *dev_part, const char *file,
+		int fstype);
+int do_save(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
+		int fstype);
+
+/*
+ * Determine the UUID of the specified filesystem and print it. Optionally it is
+ * possible to store the UUID directly in env.
+ */
+int do_fs_uuid(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
+		int fstype);
+
+/*
+ * Determine the type of the specified filesystem and print it. Optionally it is
+ * possible to store the type directly in env.
+ */
+int do_fs_type(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
 
 #endif /* _FS_H */

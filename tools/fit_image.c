@@ -11,40 +11,63 @@
  *
  * All rights reserved.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
+#include "imagetool.h"
+#include "fit_common.h"
 #include "mkimage.h"
 #include <image.h>
 #include <u-boot/crc.h>
 
 static image_header_t header;
 
-static int fit_verify_header (unsigned char *ptr, int image_size,
-			struct mkimage_params *params)
+static int fit_add_file_data(struct image_tool_params *params, size_t size_inc,
+			     const char *tmpfile)
 {
-	return fdt_check_header ((void *)ptr);
-}
+	int tfd, destfd = 0;
+	void *dest_blob = NULL;
+	off_t destfd_size = 0;
+	struct stat sbuf;
+	void *ptr;
+	int ret = 0;
 
-static int fit_check_image_types (uint8_t type)
-{
-	if (type == IH_TYPE_FLATDT)
-		return EXIT_SUCCESS;
-	else
-		return EXIT_FAILURE;
+	tfd = mmap_fdt(params->cmdname, tmpfile, size_inc, &ptr, &sbuf, true);
+	if (tfd < 0)
+		return -EIO;
+
+	if (params->keydest) {
+		struct stat dest_sbuf;
+
+		destfd = mmap_fdt(params->cmdname, params->keydest, size_inc,
+				  &dest_blob, &dest_sbuf, false);
+		if (destfd < 0) {
+			ret = -EIO;
+			goto err_keydest;
+		}
+		destfd_size = dest_sbuf.st_size;
+	}
+
+	/* for first image creation, add a timestamp at offset 0 i.e., root  */
+	if (params->datafile)
+		ret = fit_set_timestamp(ptr, 0, sbuf.st_mtime);
+
+	if (!ret) {
+		ret = fit_add_verification_data(params->keydir, dest_blob, ptr,
+						params->comment,
+						params->require_keys);
+	}
+
+	if (dest_blob) {
+		munmap(dest_blob, destfd_size);
+		close(destfd);
+	}
+
+err_keydest:
+	munmap(ptr, sbuf.st_size);
+	close(tfd);
+
+	return ret;
 }
 
 /**
@@ -59,13 +82,12 @@ static int fit_check_image_types (uint8_t type)
  * returns:
  *     only on success, otherwise calls exit (EXIT_FAILURE);
  */
-static int fit_handle_file (struct mkimage_params *params)
+static int fit_handle_file(struct image_tool_params *params)
 {
 	char tmpfile[MKIMAGE_MAX_TMPFILE_LEN];
 	char cmd[MKIMAGE_MAX_DTC_CMDLINE_LEN];
-	int tfd;
-	struct stat sbuf;
-	unsigned char *ptr;
+	size_t size_inc;
+	int ret;
 
 	/* Flattened Image Tree (FIT) format  handling */
 	debug ("FIT format handling\n");
@@ -80,69 +102,43 @@ static int fit_handle_file (struct mkimage_params *params)
 	}
 	sprintf (tmpfile, "%s%s", params->imagefile, MKIMAGE_TMPFILE_SUFFIX);
 
-	/* dtc -I dts -O dtb -p 500 datafile > tmpfile */
-	sprintf (cmd, "%s %s %s > %s",
-		MKIMAGE_DTC, params->dtc, params->datafile, tmpfile);
-	debug ("Trying to execute \"%s\"\n", cmd);
+	/* We either compile the source file, or use the existing FIT image */
+	if (params->datafile) {
+		/* dtc -I dts -O dtb -p 500 datafile > tmpfile */
+		snprintf(cmd, sizeof(cmd), "%s %s %s > %s",
+			 MKIMAGE_DTC, params->dtc, params->datafile, tmpfile);
+		debug("Trying to execute \"%s\"\n", cmd);
+	} else {
+		snprintf(cmd, sizeof(cmd), "cp %s %s",
+			 params->imagefile, tmpfile);
+	}
 	if (system (cmd) == -1) {
 		fprintf (stderr, "%s: system(%s) failed: %s\n",
 				params->cmdname, cmd, strerror(errno));
-		unlink (tmpfile);
-		return (EXIT_FAILURE);
+		goto err_system;
 	}
 
-	/* load FIT blob into memory */
-	tfd = open (tmpfile, O_RDWR|O_BINARY);
-
-	if (tfd < 0) {
-		fprintf (stderr, "%s: Can't open %s: %s\n",
-				params->cmdname, tmpfile, strerror(errno));
-		unlink (tmpfile);
-		return (EXIT_FAILURE);
+	/*
+	 * Set hashes for images in the blob. Unfortunately we may need more
+	 * space in either FDT, so keep trying until we succeed.
+	 *
+	 * Note: this is pretty inefficient for signing, since we must
+	 * calculate the signature every time. It would be better to calculate
+	 * all the data and then store it in a separate step. However, this
+	 * would be considerably more complex to implement. Generally a few
+	 * steps of this loop is enough to sign with several keys.
+	 */
+	for (size_inc = 0; size_inc < 64 * 1024; size_inc += 1024) {
+		ret = fit_add_file_data(params, size_inc, tmpfile);
+		if (!ret || ret != -ENOSPC)
+			break;
 	}
 
-	if (fstat (tfd, &sbuf) < 0) {
-		fprintf (stderr, "%s: Can't stat %s: %s\n",
-				params->cmdname, tmpfile, strerror(errno));
-		unlink (tmpfile);
-		return (EXIT_FAILURE);
+	if (ret) {
+		fprintf(stderr, "%s Can't add hashes to FIT blob\n",
+			params->cmdname);
+		goto err_system;
 	}
-
-	ptr = mmap (0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED,
-				tfd, 0);
-	if (ptr == MAP_FAILED) {
-		fprintf (stderr, "%s: Can't read %s: %s\n",
-				params->cmdname, tmpfile, strerror(errno));
-		unlink (tmpfile);
-		return (EXIT_FAILURE);
-	}
-
-	/* check if ptr has a valid blob */
-	if (fdt_check_header (ptr)) {
-		fprintf (stderr, "%s: Invalid FIT blob\n", params->cmdname);
-		unlink (tmpfile);
-		return (EXIT_FAILURE);
-	}
-
-	/* set hashes for images in the blob */
-	if (fit_set_hashes (ptr)) {
-		fprintf (stderr, "%s Can't add hashes to FIT blob",
-				params->cmdname);
-		unlink (tmpfile);
-		return (EXIT_FAILURE);
-	}
-
-	/* add a timestamp at offset 0 i.e., root  */
-	if (fit_set_timestamp (ptr, 0, sbuf.st_mtime)) {
-		fprintf (stderr, "%s: Can't add image timestamp\n",
-				params->cmdname);
-		unlink (tmpfile);
-		return (EXIT_FAILURE);
-	}
-	debug ("Added timestamp successfully\n");
-
-	munmap ((void *)ptr, sbuf.st_size);
-	close (tfd);
 
 	if (rename (tmpfile, params->imagefile) == -1) {
 		fprintf (stderr, "%s: Can't rename %s to %s: %s\n",
@@ -150,31 +146,124 @@ static int fit_handle_file (struct mkimage_params *params)
 				strerror (errno));
 		unlink (tmpfile);
 		unlink (params->imagefile);
-		return (EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
-	return (EXIT_SUCCESS);
+	return EXIT_SUCCESS;
+
+err_system:
+	unlink(tmpfile);
+	return -1;
 }
 
-static int fit_check_params (struct mkimage_params *params)
+/**
+ * fit_image_extract - extract a FIT component image
+ * @fit: pointer to the FIT format image header
+ * @image_noffset: offset of the component image node
+ * @file_name: name of the file to store the FIT sub-image
+ *
+ * returns:
+ *     zero in case of success or a negative value if fail.
+ */
+static int fit_image_extract(
+	const void *fit,
+	int image_noffset,
+	const char *file_name)
+{
+	const void *file_data;
+	size_t file_size = 0;
+
+	/* get the "data" property of component at offset "image_noffset" */
+	fit_image_get_data(fit, image_noffset, &file_data, &file_size);
+
+	/* save the "file_data" into the file specified by "file_name" */
+	return imagetool_save_subimage(file_name, (ulong) file_data, file_size);
+}
+
+/**
+ * fit_extract_contents - retrieve a sub-image component from the FIT image
+ * @ptr: pointer to the FIT format image header
+ * @params: command line parameters
+ *
+ * returns:
+ *     zero in case of success or a negative value if fail.
+ */
+static int fit_extract_contents(void *ptr, struct image_tool_params *params)
+{
+	int images_noffset;
+	int noffset;
+	int ndepth;
+	const void *fit = ptr;
+	int count = 0;
+	const char *p;
+
+	/* Indent string is defined in header image.h */
+	p = IMAGE_INDENT_STRING;
+
+	if (!fit_check_format(fit)) {
+		printf("Bad FIT image format\n");
+		return -1;
+	}
+
+	/* Find images parent node offset */
+	images_noffset = fdt_path_offset(fit, FIT_IMAGES_PATH);
+	if (images_noffset < 0) {
+		printf("Can't find images parent node '%s' (%s)\n",
+		       FIT_IMAGES_PATH, fdt_strerror(images_noffset));
+		return -1;
+	}
+
+	/* Avoid any overrun */
+	count = fit_get_subimage_count(fit, images_noffset);
+	if ((params->pflag < 0) || (count <= params->pflag)) {
+		printf("No such component at '%d'\n", params->pflag);
+		return -1;
+	}
+
+	/* Process its subnodes, extract the desired component from image */
+	for (ndepth = 0, count = 0,
+		noffset = fdt_next_node(fit, images_noffset, &ndepth);
+		(noffset >= 0) && (ndepth > 0);
+		noffset = fdt_next_node(fit, noffset, &ndepth)) {
+		if (ndepth == 1) {
+			/*
+			 * Direct child node of the images parent node,
+			 * i.e. component image node.
+			 */
+			if (params->pflag == count) {
+				printf("Extracted:\n%s Image %u (%s)\n", p,
+				       count, fit_get_name(fit, noffset, NULL));
+
+				fit_image_print(fit, noffset, p);
+
+				return fit_image_extract(fit, noffset,
+						params->outfile);
+			}
+
+			count++;
+		}
+	}
+
+	return 0;
+}
+
+static int fit_check_params(struct image_tool_params *params)
 {
 	return	((params->dflag && (params->fflag || params->lflag)) ||
 		(params->fflag && (params->dflag || params->lflag)) ||
 		(params->lflag && (params->dflag || params->fflag)));
 }
 
-static struct image_type_params fitimage_params = {
-	.name = "FIT Image support",
-	.header_size = sizeof(image_header_t),
-	.hdr = (void*)&header,
-	.verify_header = fit_verify_header,
-	.print_header = fit_print_contents,
-	.check_image_type = fit_check_image_types,
-	.fflag_handle = fit_handle_file,
-	.set_header = NULL,	/* FIT images use DTB header */
-	.check_params = fit_check_params,
-};
-
-void init_fit_image_type (void)
-{
-	mkimage_register (&fitimage_params);
-}
+U_BOOT_IMAGE_TYPE(
+	fitimage,
+	"FIT Image support",
+	sizeof(image_header_t),
+	(void *)&header,
+	fit_check_params,
+	fit_verify_header,
+	fit_print_contents,
+	NULL,
+	fit_extract_contents,
+	fit_check_image_types,
+	fit_handle_file,
+	NULL /* FIT images use DTB header */
+);

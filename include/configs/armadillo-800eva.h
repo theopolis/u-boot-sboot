@@ -3,32 +3,14 @@
  *
  * Copyright (C) 2012 Renesas Solutions Corp.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ARMADILLO_800EVA_H
 #define __ARMADILLO_800EVA_H
 
 #undef DEBUG
-#define CONFIG_ARMV7
 #define CONFIG_R8A7740
-#define CONFIG_RMOBILE
 #define CONFIG_RMOBILE_BOARD_STRING "Armadillo-800EVA Board\n"
 #define CONFIG_SH_GPIO_PFC
 
@@ -64,6 +46,7 @@
 #define CONFIG_USE_ARCH_MEMCPY
 #define CONFIG_TMU_TIMER
 #define CONFIG_SYS_DCACHE_OFF
+#define CONFIG_SYS_GENERIC_BOARD
 
 /* STACK */
 #define CONFIG_SYS_INIT_SP_ADDR		0xE8083000
@@ -76,7 +59,6 @@
 #define ARMADILLO_800EVA_SDRAM_SIZE	(512 * 1024 * 1024)
 
 #define CONFIG_SYS_LONGHELP
-#define CONFIG_SYS_PROMPT		"=> "
 #define CONFIG_SYS_CBSIZE		256
 #define CONFIG_SYS_PBSIZE		256
 #define CONFIG_SYS_MAXARGS		16
@@ -111,7 +93,6 @@
 #define CONFIG_SYS_MONITOR_BASE		0x00000000
 #define CONFIG_SYS_MONITOR_LEN		(256 * 1024)
 #define CONFIG_SYS_MALLOC_LEN		(1 * 1024 * 1024)
-#define CONFIG_SYS_GBL_DATA_SIZE	(256)
 #define CONFIG_SYS_BOOTMAPSZ		(8 * 1024 * 1024)
 #define CONFIG_SYS_TEXT_BASE	0xE80C0000
 
@@ -154,7 +135,8 @@
 
 /* Board Clock */
 #define CONFIG_SYS_CLK_FREQ	50000000
+#define CONFIG_SH_TMU_CLK_FREQ CONFIG_SYS_CLK_FREQ
+#define CONFIG_SH_SCIF_CLK_FREQ CONFIG_SYS_CLK_FREQ
 #define CONFIG_SYS_TMU_CLK_DIV	4
-#define CONFIG_SYS_HZ		1000
 
 #endif	/* __ARMADILLO_800EVA_H */

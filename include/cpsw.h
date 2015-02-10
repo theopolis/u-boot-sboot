@@ -19,7 +19,7 @@
 struct cpsw_slave_data {
 	u32		slave_reg_ofs;
 	u32		sliver_reg_ofs;
-	int		phy_id;
+	int		phy_addr;
 	int		phy_if;
 };
 
@@ -39,10 +39,12 @@ struct cpsw_platform_data {
 	int	ale_entries;	/* ale table size			*/
 	u32	host_port_reg_ofs;	/* cpdma host port registers	*/
 	u32	hw_stats_reg_ofs;	/* cpsw hw stats counters	*/
+	u32	bd_ram_ofs;		/* Buffer Descriptor RAM offset */
 	u32	mac_control;
 	struct cpsw_slave_data	*slave_data;
 	void	(*control)(int enabled);
 	u32	host_port_num;
+	u32	active_slave;
 	u8	version;
 };
 

@@ -6,23 +6,7 @@
  * Original Driver:
  * Copyright (C) 2004-2006 Atmel Corporation
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -50,6 +34,12 @@
 
 static int initialized = 0;
 
+/* Read Atmel MCI IP version */
+static unsigned int atmel_mci_get_version(struct atmel_mci *mci)
+{
+	return readl(&mci->version) & 0x00000fff;
+}
+
 /*
  * Print command and status:
  *
@@ -65,33 +55,64 @@ static void dump_cmd(u32 cmdr, u32 arg, u32 status, const char* msg)
 /* Setup for MCI Clock and Block Size */
 static void mci_set_mode(struct mmc *mmc, u32 hz, u32 blklen)
 {
-	atmel_mci_t *mci = (atmel_mci_t *)mmc->priv;
+	atmel_mci_t *mci = mmc->priv;
 	u32 bus_hz = get_mci_clk_rate();
 	u32 clkdiv = 255;
+	unsigned int version = atmel_mci_get_version(mci);
+	u32 clkodd = 0;
+	u32 mr;
 
 	debug("mci: bus_hz is %u, setting clock %u Hz, block size %u\n",
 		bus_hz, hz, blklen);
 	if (hz > 0) {
-		/* find lowest clkdiv yielding a rate <= than requested */
-		for (clkdiv=0; clkdiv<255; clkdiv++) {
-			if ((bus_hz / (clkdiv+1) / 2) <= hz)
-				break;
+		if (version >= 0x500) {
+			clkdiv = DIV_ROUND_UP(bus_hz, hz) - 2;
+			if (clkdiv > 511)
+				clkdiv = 511;
+
+			clkodd = clkdiv & 1;
+			clkdiv >>= 1;
+
+			printf("mci: setting clock %u Hz, block size %u\n",
+			       bus_hz / (clkdiv * 2 + clkodd + 2), blklen);
+		} else {
+			/* find clkdiv yielding a rate <= than requested */
+			for (clkdiv = 0; clkdiv < 255; clkdiv++) {
+				if ((bus_hz / (clkdiv + 1) / 2) <= hz)
+					break;
+			}
+			printf("mci: setting clock %u Hz, block size %u\n",
+			       (bus_hz / (clkdiv + 1)) / 2, blklen);
+
 		}
 	}
-	printf("mci: setting clock %u Hz, block size %u\n",
-		(bus_hz / (clkdiv+1)) / 2, blklen);
 
 	blklen &= 0xfffc;
-	/* On some platforms RDPROOF and WRPROOF are ignored */
-	writel((MMCI_BF(CLKDIV, clkdiv)
-		 | MMCI_BF(BLKLEN, blklen)
-		 | MMCI_BIT(RDPROOF)
-		 | MMCI_BIT(WRPROOF)), &mci->mr);
+
+	mr = MMCI_BF(CLKDIV, clkdiv);
+
+	/* MCI IP version >= 0x200 has R/WPROOF */
+	if (version >= 0x200)
+		mr |= MMCI_BIT(RDPROOF) | MMCI_BIT(WRPROOF);
+
 	/*
-	 * On some new platforms BLKLEN in mci->mr is ignored.
-	 * Should use the BLKLEN in the block register.
+	 * MCI IP version >= 0x500 use bit 16 as clkodd.
+	 * MCI IP version < 0x500 use upper 16 bits for blklen.
 	 */
-	writel(MMCI_BF(BLKLEN, blklen), &mci->blkr);
+	if (version >= 0x500)
+		mr |= MMCI_BF(CLKODD, clkodd);
+	else
+		mr |= MMCI_BF(BLKLEN, blklen);
+
+	writel(mr, &mci->mr);
+
+	/* MCI IP version >= 0x200 has blkr */
+	if (version >= 0x200)
+		writel(MMCI_BF(BLKLEN, blklen), &mci->blkr);
+
+	if (mmc->card_caps & mmc->cfg->host_caps & MMC_MODE_HS)
+		writel(MMCI_BIT(HSMODE), &mci->cfg);
+
 	initialized = 1;
 }
 
@@ -175,7 +196,7 @@ io_fail:
 static int
 mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 {
-	atmel_mci_t *mci = (atmel_mci_t *)mmc->priv;
+	atmel_mci_t *mci = mmc->priv;
 	u32 cmdr;
 	u32 error_flags = 0;
 	u32 status;
@@ -205,7 +226,10 @@ mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 	/* Wait for the command to complete */
 	while (!((status = readl(&mci->sr)) & MMCI_BIT(CMDRDY)));
 
-	if (status & error_flags) {
+	if ((status & error_flags) & MMCI_BIT(RTOE)) {
+		dump_cmd(cmdr, cmd->cmdarg, status, "Command Time Out");
+		return TIMEOUT;
+	} else if (status & error_flags) {
 		dump_cmd(cmdr, cmd->cmdarg, status, "Command Failed");
 		return COMM_ERR;
 	}
@@ -250,9 +274,10 @@ mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 #ifdef DEBUG
 			if (data->flags & MMC_DATA_READ)
 			{
+				u32 cnt = word_count * 4;
 				printf("Read Data:\n");
-				print_buffer(0, data->dest, 1,
-					word_count*4, 0);
+				print_buffer(0, data->dest + cnt * block_count,
+					     1, cnt, 0);
 			}
 #endif
 #ifdef DEBUG
@@ -296,8 +321,10 @@ mci_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd, struct mmc_data *data)
 /* Entered into mmc structure during driver init */
 static void mci_set_ios(struct mmc *mmc)
 {
-	atmel_mci_t *mci = (atmel_mci_t *)mmc->priv;
-	int busw = (mmc->bus_width == 4) ? 1 : 0;
+	atmel_mci_t *mci = mmc->priv;
+	int bus_width = mmc->bus_width;
+	unsigned int version = atmel_mci_get_version(mci);
+	int busw;
 
 	/* Set the clock speed */
 	mci_set_mode(mmc, mmc->clock, MMC_DEFAULT_BLKLEN);
@@ -305,15 +332,32 @@ static void mci_set_ios(struct mmc *mmc)
 	/*
 	 * set the bus width and select slot for this interface
 	 * there is no capability for multiple slots on the same interface yet
-	 * Bitfield SCDBUS needs to be expanded to 2 bits for 8-bit buses
 	 */
-	writel(MMCI_BF(SCDBUS, busw) | MMCI_BF(SCDSEL, MCI_BUS), &mci->sdcr);
+	if ((version & 0xf00) >= 0x300) {
+		switch (bus_width) {
+		case 8:
+			busw = 3;
+			break;
+		case 4:
+			busw = 2;
+			break;
+		default:
+			busw = 0;
+			break;
+		}
+
+		writel(busw << 6 | MMCI_BF(SCDSEL, MCI_BUS), &mci->sdcr);
+	} else {
+		busw = (bus_width == 4) ? 1 : 0;
+
+		writel(busw << 7 | MMCI_BF(SCDSEL, MCI_BUS), &mci->sdcr);
+	}
 }
 
 /* Entered into mmc structure during driver init */
 static int mci_init(struct mmc *mmc)
 {
-	atmel_mci_t *mci = (atmel_mci_t *)mmc->priv;
+	atmel_mci_t *mci = mmc->priv;
 
 	/* Initialize controller */
 	writel(MMCI_BIT(SWRST), &mci->cr);	/* soft reset */
@@ -332,6 +376,12 @@ static int mci_init(struct mmc *mmc)
 	return 0;
 }
 
+static const struct mmc_ops atmel_mci_ops = {
+	.send_cmd	= mci_send_cmd,
+	.set_ios	= mci_set_ios,
+	.init		= mci_init,
+};
+
 /*
  * This is the only exported function
  *
@@ -339,30 +389,47 @@ static int mci_init(struct mmc *mmc)
  */
 int atmel_mci_init(void *regs)
 {
-	struct mmc *mmc = malloc(sizeof(struct mmc));
+	struct mmc *mmc;
+	struct mmc_config *cfg;
+	struct atmel_mci *mci;
+	unsigned int version;
 
-	if (!mmc)
+	cfg = malloc(sizeof(*cfg));
+	if (cfg == NULL)
 		return -1;
-	strcpy(mmc->name, "mci");
-	mmc->priv = regs;
-	mmc->send_cmd = mci_send_cmd;
-	mmc->set_ios = mci_set_ios;
-	mmc->init = mci_init;
-	mmc->getcd = NULL;
+	memset(cfg, 0, sizeof(*cfg));
+
+	mci = (struct atmel_mci *)regs;
+
+	cfg->name = "mci";
+	cfg->ops = &atmel_mci_ops;
 
 	/* need to be able to pass these in on a board by board basis */
-	mmc->voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
-	mmc->host_caps = MMC_MODE_4BIT;
+	cfg->voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
+	version = atmel_mci_get_version(mci);
+	if ((version & 0xf00) >= 0x300) {
+		cfg->host_caps = MMC_MODE_8BIT;
+		cfg->host_caps |= MMC_MODE_HS | MMC_MODE_HS_52MHz;
+	}
+
+	cfg->host_caps |= MMC_MODE_4BIT;
+
 	/*
 	 * min and max frequencies determined by
 	 * max and min of clock divider
 	 */
-	mmc->f_min = get_mci_clk_rate() / (2*256);
-	mmc->f_max = get_mci_clk_rate() / (2*1);
+	cfg->f_min = get_mci_clk_rate() / (2*256);
+	cfg->f_max = get_mci_clk_rate() / (2*1);
 
-	mmc->b_max = 0;
+	cfg->b_max = CONFIG_SYS_MMC_MAX_BLK_COUNT;
 
-	mmc_register(mmc);
+	mmc = mmc_create(cfg, regs);
+
+	if (mmc == NULL) {
+		free(cfg);
+		return -1;
+	}
+	/* NOTE: possibly leaking the cfg structure */
 
 	return 0;
 }

@@ -4,20 +4,7 @@
  * Dave Liu <daveliu@freescale.com>
  * based on source code of Shlomi Gridish
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __QE_H__
@@ -295,5 +282,12 @@ int qe_set_mii_clk_src(int ucc_num);
 int qe_upload_firmware(const struct qe_firmware *firmware);
 struct qe_firmware_info *qe_get_firmware_info(void);
 void ft_qe_setup(void *blob);
+void qe_init(uint qe_base);
+void qe_reset(void);
+
+#ifdef CONFIG_U_QE
+void u_qe_init(void);
+int u_qe_upload_firmware(const struct qe_firmware *firmware);
+#endif
 
 #endif /* __QE_H__ */

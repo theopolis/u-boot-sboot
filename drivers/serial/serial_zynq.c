@@ -2,30 +2,19 @@
  * Copyright (C) 2012 Michal Simek <monstr@monstr.eu>
  * Copyright (C) 2011-2012 Xilinx, Inc. All rights reserved.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <fdtdec.h>
 #include <watchdog.h>
 #include <asm/io.h>
 #include <linux/compiler.h>
 #include <serial.h>
+#include <asm/arch/clk.h>
+#include <asm/arch/hardware.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 #define ZYNQ_UART_SR_TXFULL	0x00000010 /* TX FIFO full */
 #define ZYNQ_UART_SR_RXEMPTY	0x00000002 /* RX FIFO empty */
@@ -37,44 +26,20 @@
 
 #define ZYNQ_UART_MR_PARITY_NONE	0x00000020  /* No parity mode */
 
-/* Some clock/baud constants */
-#define ZYNQ_UART_BDIV	15 /* Default/reset BDIV value */
-#define ZYNQ_UART_BASECLK	3125000L /* master / (bdiv + 1) */
-
 struct uart_zynq {
-	u32 control; /* Control Register [8:0] */
-	u32 mode; /* Mode Register [10:0] */
+	u32 control; /* 0x0 - Control Register [8:0] */
+	u32 mode; /* 0x4 - Mode Register [10:0] */
 	u32 reserved1[4];
-	u32 baud_rate_gen; /* Baud Rate Generator [15:0] */
+	u32 baud_rate_gen; /* 0x18 - Baud Rate Generator [15:0] */
 	u32 reserved2[4];
-	u32 channel_sts; /* Channel Status [11:0] */
-	u32 tx_rx_fifo; /* FIFO [15:0] or [7:0] */
-	u32 baud_rate_divider; /* Baud Rate Divider [7:0] */
+	u32 channel_sts; /* 0x2c - Channel Status [11:0] */
+	u32 tx_rx_fifo; /* 0x30 - FIFO [15:0] or [7:0] */
+	u32 baud_rate_divider; /* 0x34 - Baud Rate Divider [7:0] */
 };
 
 static struct uart_zynq *uart_zynq_ports[2] = {
-#ifdef CONFIG_ZYNQ_SERIAL_BASEADDR0
-	[0] = (struct uart_zynq *)CONFIG_ZYNQ_SERIAL_BASEADDR0,
-#endif
-#ifdef CONFIG_ZYNQ_SERIAL_BASEADDR1
-	[1] = (struct uart_zynq *)CONFIG_ZYNQ_SERIAL_BASEADDR1,
-#endif
-};
-
-struct uart_zynq_params {
-	u32 baudrate;
-	u32 clock;
-};
-
-static struct uart_zynq_params uart_zynq_ports_param[2] = {
-#if defined(CONFIG_ZYNQ_SERIAL_BAUDRATE0) && defined(CONFIG_ZYNQ_SERIAL_CLOCK0)
-	[0].baudrate = CONFIG_ZYNQ_SERIAL_BAUDRATE0,
-	[0].clock = CONFIG_ZYNQ_SERIAL_CLOCK0,
-#endif
-#if defined(CONFIG_ZYNQ_SERIAL_BAUDRATE1) && defined(CONFIG_ZYNQ_SERIAL_CLOCK1)
-	[1].baudrate = CONFIG_ZYNQ_SERIAL_BAUDRATE1,
-	[1].clock = CONFIG_ZYNQ_SERIAL_CLOCK1,
-#endif
+	[0] = (struct uart_zynq *)ZYNQ_SERIAL_BASEADDR0,
+	[1] = (struct uart_zynq *)ZYNQ_SERIAL_BASEADDR1,
 };
 
 /* Set up the baud rate in gd struct */
@@ -83,8 +48,8 @@ static void uart_zynq_serial_setbrg(const int port)
 	/* Calculation results. */
 	unsigned int calc_bauderror, bdiv, bgen;
 	unsigned long calc_baud = 0;
-	unsigned long baud = uart_zynq_ports_param[port].baudrate;
-	unsigned long clock = uart_zynq_ports_param[port].clock;
+	unsigned long baud = gd->baudrate;
+	unsigned long clock = get_uart_clk(port);
 	struct uart_zynq *regs = uart_zynq_ports[port];
 
 	/*                master clock
@@ -172,17 +137,17 @@ static int uart_zynq_serial_getc(const int port)
 
 /* Multi serial device functions */
 #define DECLARE_PSSERIAL_FUNCTIONS(port) \
-	int uart_zynq##port##_init(void) \
+	static int uart_zynq##port##_init(void) \
 				{ return uart_zynq_serial_init(port); } \
-	void uart_zynq##port##_setbrg(void) \
+	static void uart_zynq##port##_setbrg(void) \
 				{ return uart_zynq_serial_setbrg(port); } \
-	int uart_zynq##port##_getc(void) \
+	static int uart_zynq##port##_getc(void) \
 				{ return uart_zynq_serial_getc(port); } \
-	int uart_zynq##port##_tstc(void) \
+	static int uart_zynq##port##_tstc(void) \
 				{ return uart_zynq_serial_tstc(port); } \
-	void uart_zynq##port##_putc(const char c) \
+	static void uart_zynq##port##_putc(const char c) \
 				{ uart_zynq_serial_putc(c, port); } \
-	void uart_zynq##port##_puts(const char *s) \
+	static void uart_zynq##port##_puts(const char *s) \
 				{ uart_zynq_serial_puts(s, port); }
 
 /* Serial device descriptor */
@@ -198,28 +163,52 @@ static int uart_zynq_serial_getc(const int port)
 }
 
 DECLARE_PSSERIAL_FUNCTIONS(0);
-struct serial_device uart_zynq_serial0_device =
+static struct serial_device uart_zynq_serial0_device =
 	INIT_PSSERIAL_STRUCTURE(0, "ttyPS0");
 DECLARE_PSSERIAL_FUNCTIONS(1);
-struct serial_device uart_zynq_serial1_device =
+static struct serial_device uart_zynq_serial1_device =
 	INIT_PSSERIAL_STRUCTURE(1, "ttyPS1");
 
+#ifdef CONFIG_OF_CONTROL
 __weak struct serial_device *default_serial_console(void)
 {
-	if (uart_zynq_ports[0])
+	const void *blob = gd->fdt_blob;
+	int node;
+	unsigned int base_addr;
+
+	node = fdt_path_offset(blob, "serial0");
+	if (node < 0)
+		return NULL;
+
+	base_addr = fdtdec_get_addr(blob, node, "reg");
+	if (base_addr == FDT_ADDR_T_NONE)
+		return NULL;
+
+	if (base_addr == ZYNQ_SERIAL_BASEADDR0)
 		return &uart_zynq_serial0_device;
-	if (uart_zynq_ports[1])
+
+	if (base_addr == ZYNQ_SERIAL_BASEADDR1)
 		return &uart_zynq_serial1_device;
 
 	return NULL;
 }
-
-void zynq_serial_initalize(void)
+#else
+__weak struct serial_device *default_serial_console(void)
 {
-#ifdef CONFIG_ZYNQ_SERIAL_BASEADDR0
+#if defined(CONFIG_ZYNQ_SERIAL_UART0)
+	if (uart_zynq_ports[0])
+		return &uart_zynq_serial0_device;
+#endif
+#if defined(CONFIG_ZYNQ_SERIAL_UART1)
+	if (uart_zynq_ports[1])
+		return &uart_zynq_serial1_device;
+#endif
+	return NULL;
+}
+#endif
+
+void zynq_serial_initialize(void)
+{
 	serial_register(&uart_zynq_serial0_device);
-#endif
-#ifdef CONFIG_ZYNQ_SERIAL_BASEADDR1
 	serial_register(&uart_zynq_serial1_device);
-#endif
 }

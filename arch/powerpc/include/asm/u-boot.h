@@ -2,21 +2,7 @@
  * (C) Copyright 2000 - 2002
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  ********************************************************************
  * NOTE: This header file defines an interface to U-Boot. Including
  * this (unmodified) header file in another file is considered normal
@@ -34,6 +20,11 @@
  * include/asm-ppc/u-boot.h
  */
 
+#ifdef CONFIG_SYS_GENERIC_BOARD
+/* Use the generic board which requires a unified bd_info */
+#include <asm-generic/u-boot.h>
+#else
+
 #ifndef __ASSEMBLY__
 
 typedef struct bd_info {
@@ -44,7 +35,7 @@ typedef struct bd_info {
 	unsigned long	bi_flashoffset; /* reserved area for startup monitor */
 	unsigned long	bi_sramstart;	/* start of SRAM memory */
 	unsigned long	bi_sramsize;	/* size	 of SRAM memory */
-#if defined(CONFIG_5xx) || defined(CONFIG_8xx) || defined(CONFIG_8260) \
+#if defined(CONFIG_5xx) || defined(CONFIG_8xx) || defined(CONFIG_MPC8260) \
 	|| defined(CONFIG_E500) || defined(CONFIG_MPC86xx)
 	unsigned long	bi_immr_base;	/* base of IMMR register */
 #endif
@@ -53,14 +44,6 @@ typedef struct bd_info {
 #endif
 #if defined(CONFIG_MPC83xx)
 	unsigned long	bi_immrbar;
-#endif
-#if defined(CONFIG_MPC8220)
-	unsigned long	bi_mbar_base;	/* base of internal registers */
-	unsigned long   bi_inpfreq;     /* Input Freq, In MHz */
-	unsigned long   bi_pcifreq;     /* PCI Freq, in MHz */
-	unsigned long   bi_pevfreq;     /* PEV Freq, in MHz */
-	unsigned long   bi_flbfreq;     /* Flexbus Freq, in MHz */
-	unsigned long   bi_vcofreq;     /* VCO Freq, in MHz */
 #endif
 	unsigned long	bi_bootflags;	/* boot / reboot flag (Unused) */
 	unsigned long	bi_ip_addr;	/* IP Address */
@@ -81,10 +64,8 @@ typedef struct bd_info {
 	unsigned long	bi_ipbfreq;	/* IPB Bus Freq, in MHz */
 	unsigned long	bi_pcifreq;	/* PCI Bus Freq, in MHz */
 #endif
-	unsigned int	bi_baudrate;	/* Console Baudrate */
 #if defined(CONFIG_405)   || \
     defined(CONFIG_405GP) || \
-    defined(CONFIG_405CR) || \
     defined(CONFIG_405EP) || \
     defined(CONFIG_405EZ) || \
     defined(CONFIG_405EX) || \
@@ -95,9 +76,6 @@ typedef struct bd_info {
 	unsigned int	bi_plb_busfreq;	/* PLB Bus speed, in Hz */
 	unsigned int	bi_pci_busfreq;	/* PCI Bus speed, in Hz */
 	unsigned char	bi_pci_enetaddr[6];	/* PCI Ethernet MAC address */
-#endif
-#if defined(CONFIG_HYMOD)
-	hymod_conf_t	bi_hymod_conf;	/* hymod configuration information */
 #endif
 
 #ifdef CONFIG_HAS_ETH1
@@ -124,9 +102,6 @@ typedef struct bd_info {
 	unsigned int	bi_opbfreq;		/* OPB clock in Hz */
 	int		bi_iic_fast[2];		/* Use fast i2c mode */
 #endif
-#if defined(CONFIG_NX823)
-	unsigned char	bi_sernum[8];
-#endif
 #if defined(CONFIG_4xx)
 #if defined(CONFIG_440GX) || \
     defined(CONFIG_460EX) || defined(CONFIG_460GT)
@@ -143,6 +118,8 @@ typedef struct bd_info {
 } bd_t;
 
 #endif /* __ASSEMBLY__ */
+
+#endif /* !CONFIG_SYS_GENERIC_BOARD */
 
 /* For image.h:image_check_target_arch() */
 #define IH_ARCH_DEFAULT IH_ARCH_PPC

@@ -11,25 +11,11 @@
  *	Syed Mohammed Khasim <khasim@ti.com>
  *
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
+#include <dm.h>
+#include <ns16550.h>
 #ifdef CONFIG_STATUS_LED
 #include <status_led.h>
 #endif
@@ -72,6 +58,7 @@
 #define BBTOYS_LCD			0x03000B00
 #define BCT_BRETTL3			0x01000F00
 #define BCT_BRETTL4			0x02000F00
+#define LSR_COM6L_ADPT			0x01001300
 #define BEAGLE_NO_EEPROM		0xffffffff
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -84,6 +71,17 @@ static struct {
 	char env_var[16];
 	char env_setting[64];
 } expansion_config;
+
+static const struct ns16550_platdata beagle_serial = {
+	OMAP34XX_UART3,
+	2,
+	V_NS16550_CLK
+};
+
+U_BOOT_DEVICE(beagle_uart) = {
+	"serial_omap",
+	&beagle_serial
+};
 
 /*
  * Routine: board_init
@@ -107,32 +105,33 @@ int board_init(void)
 /*
  * Routine: get_board_revision
  * Description: Detect if we are running on a Beagle revision Ax/Bx,
- *		C1/2/3, C4 or xM. This can be done by reading
+ *		C1/2/3, C4, xM Ax/Bx or xM Cx. This can be done by reading
  *		the level of GPIO173, GPIO172 and GPIO171. This should
  *		result in
  *		GPIO173, GPIO172, GPIO171: 1 1 1 => Ax/Bx
  *		GPIO173, GPIO172, GPIO171: 1 1 0 => C1/2/3
  *		GPIO173, GPIO172, GPIO171: 1 0 1 => C4
- *		GPIO173, GPIO172, GPIO171: 0 0 0 => xM
+ *		GPIO173, GPIO172, GPIO171: 0 1 0 => xM Cx
+ *		GPIO173, GPIO172, GPIO171: 0 0 0 => xM Ax/Bx
  */
 static int get_board_revision(void)
 {
-	int revision;
+	static int revision = -1;
 
-	if (!gpio_request(171, "") &&
-	    !gpio_request(172, "") &&
-	    !gpio_request(173, "")) {
+	if (revision == -1) {
+		if (!gpio_request(171, "rev0") &&
+		    !gpio_request(172, "rev1") &&
+		    !gpio_request(173, "rev2")) {
+			gpio_direction_input(171);
+			gpio_direction_input(172);
+			gpio_direction_input(173);
 
-		gpio_direction_input(171);
-		gpio_direction_input(172);
-		gpio_direction_input(173);
-
-		revision = gpio_get_value(173) << 2 |
-			   gpio_get_value(172) << 1 |
-			   gpio_get_value(171);
-	} else {
-		printf("Error: unable to acquire board revision GPIOs\n");
-		revision = -1;
+			revision = gpio_get_value(173) << 2 |
+				gpio_get_value(172) << 1 |
+				gpio_get_value(171);
+		} else {
+			printf("Error: unable to acquire board revision GPIOs\n");
+		}
 	}
 
 	return revision;
@@ -180,8 +179,7 @@ void get_board_mem_timings(struct board_sdrc_timings *timings)
 			timings->rfr_ctrl = SDP_3430_SDRC_RFR_CTRL_200MHz;
 			break;
 		}
-	case REVISION_XM_A:
-	case REVISION_XM_B:
+	case REVISION_XM_AB:
 	case REVISION_XM_C:
 		if (pop_mfr == 0) {
 			/* 256MB DDR */
@@ -227,6 +225,14 @@ static unsigned int get_expansion_id(void)
 	i2c_read(EXPANSION_EEPROM_I2C_ADDRESS, 0, 1, (u8 *)&expansion_config,
 		 sizeof(expansion_config));
 
+	/* retry reading configuration data with 16bit addressing */
+	if ((expansion_config.device_vendor == 0xFFFFFF00) ||
+	    (expansion_config.device_vendor == 0xFFFFFFFF)) {
+		printf("EEPROM is blank or 8bit addressing failed: retrying with 16bit:\n");
+		i2c_read(EXPANSION_EEPROM_I2C_ADDRESS, 0, 2, (u8 *)&expansion_config,
+			 sizeof(expansion_config));
+	}
+
 	i2c_set_bus_num(TWL4030_I2C_BUS);
 
 	return expansion_config.device_vendor;
@@ -246,8 +252,7 @@ static void beagle_display_init(void)
 	case REVISION_C4:
 		omap3_dss_panel_config(&dvid_cfg);
 		break;
-	case REVISION_XM_A:
-	case REVISION_XM_B:
+	case REVISION_XM_AB:
 	case REVISION_XM_C:
 	default:
 		omap3_dss_panel_config(&dvid_cfg_xm);
@@ -266,12 +271,11 @@ static void beagle_dvi_pup(void)
 	case REVISION_AXBX:
 	case REVISION_CX:
 	case REVISION_C4:
-	case REVISION_XM_A:
-		gpio_request(170, "");
+		gpio_request(170, "dvi");
 		gpio_direction_output(170, 0);
 		gpio_set_value(170, 1);
 		break;
-	case REVISION_XM_B:
+	case REVISION_XM_AB:
 	case REVISION_XM_C:
 	default:
 		#define GPIODATADIR1 (TWL4030_BASEADD_GPIO+3)
@@ -325,9 +329,13 @@ int misc_init_r(void)
 	struct gpio *gpio5_base = (struct gpio *)OMAP34XX_GPIO5_BASE;
 	struct gpio *gpio6_base = (struct gpio *)OMAP34XX_GPIO6_BASE;
 	struct control_prog_io *prog_io_base = (struct control_prog_io *)OMAP34XX_CTRL_BASE;
+	bool generate_fake_mac = false;
+	u32 value;
 
 	/* Enable i2c2 pullup resisters */
-	writel(~(PRG_I2C2_PULLUPRESX), &prog_io_base->io1);
+	value = readl(&prog_io_base->io1);
+	value &= ~(PRG_I2C2_PULLUPRESX);
+	writel(value, &prog_io_base->io1);
 
 	switch (get_board_revision()) {
 	case REVISION_AXBX:
@@ -349,25 +357,16 @@ int misc_init_r(void)
 					TWL4030_PM_RECEIVER_VAUX2_DEV_GRP,
 					TWL4030_PM_RECEIVER_DEV_GRP_P1);
 		break;
-	case REVISION_XM_A:
-		printf("Beagle xM Rev A\n");
-		setenv("beaglerev", "xMA");
+	case REVISION_XM_AB:
+		printf("Beagle xM Rev A/B\n");
+		setenv("beaglerev", "xMAB");
 		MUX_BEAGLE_XM();
 		/* Set VAUX2 to 1.8V for EHCI PHY */
 		twl4030_pmrecv_vsel_cfg(TWL4030_PM_RECEIVER_VAUX2_DEDICATED,
 					TWL4030_PM_RECEIVER_VAUX2_VSEL_18,
 					TWL4030_PM_RECEIVER_VAUX2_DEV_GRP,
 					TWL4030_PM_RECEIVER_DEV_GRP_P1);
-		break;
-	case REVISION_XM_B:
-		printf("Beagle xM Rev B\n");
-		setenv("beaglerev", "xMB");
-		MUX_BEAGLE_XM();
-		/* Set VAUX2 to 1.8V for EHCI PHY */
-		twl4030_pmrecv_vsel_cfg(TWL4030_PM_RECEIVER_VAUX2_DEDICATED,
-					TWL4030_PM_RECEIVER_VAUX2_VSEL_18,
-					TWL4030_PM_RECEIVER_VAUX2_DEV_GRP,
-					TWL4030_PM_RECEIVER_DEV_GRP_P1);
+		generate_fake_mac = true;
 		break;
 	case REVISION_XM_C:
 		printf("Beagle xM Rev C\n");
@@ -378,6 +377,7 @@ int misc_init_r(void)
 					TWL4030_PM_RECEIVER_VAUX2_VSEL_18,
 					TWL4030_PM_RECEIVER_VAUX2_DEV_GRP,
 					TWL4030_PM_RECEIVER_DEV_GRP_P1);
+		generate_fake_mac = true;
 		break;
 	default:
 		printf("Beagle unknown 0x%02x\n", get_board_revision());
@@ -387,6 +387,7 @@ int misc_init_r(void)
 					TWL4030_PM_RECEIVER_VAUX2_VSEL_18,
 					TWL4030_PM_RECEIVER_VAUX2_DEV_GRP,
 					TWL4030_PM_RECEIVER_DEV_GRP_P1);
+		generate_fake_mac = true;
 	}
 
 	switch (get_expansion_id()) {
@@ -454,6 +455,11 @@ int misc_init_r(void)
 	case BCT_BRETTL4:
 		printf("Recognized bct electronic GmbH brettl4 board\n");
 		break;
+	case LSR_COM6L_ADPT:
+		printf("Recognized LSR COM6L Adapter Board\n");
+		MUX_BBTOYS_WIFI()
+		setenv("buddy", "lsr-com6l-adpt");
+		break;
 	case BEAGLE_NO_EEPROM:
 		printf("No EEPROM on expansion board\n");
 		setenv("buddy", "none");
@@ -469,8 +475,7 @@ int misc_init_r(void)
 
 	twl4030_power_init();
 	switch (get_board_revision()) {
-	case REVISION_XM_A:
-	case REVISION_XM_B:
+	case REVISION_XM_AB:
 		twl4030_led_init(TWL4030_LED_LEDEN_LEDBON);
 		break;
 	default:
@@ -501,6 +506,13 @@ int misc_init_r(void)
 	musb_register(&musb_plat, &musb_board_data, (void *)MUSB_BASE);
 #endif
 
+	if (generate_fake_mac) {
+		u32 id[4];
+
+		get_dieid(id);
+		usb_fake_mac_from_die_id(id);
+	}
+
 	return 0;
 }
 
@@ -518,8 +530,14 @@ void set_muxconf_regs(void)
 #if defined(CONFIG_GENERIC_MMC) && !defined(CONFIG_SPL_BUILD)
 int board_mmc_init(bd_t *bis)
 {
-	omap_mmc_init(0, 0, 0);
-	return 0;
+	return omap_mmc_init(0, 0, 0, -1, -1);
+}
+#endif
+
+#if defined(CONFIG_GENERIC_MMC)
+void board_mmc_power_init(void)
+{
+	twl4030_power_mmc_init(0);
 }
 #endif
 
@@ -537,9 +555,10 @@ static struct omap_usbhs_board_data usbhs_bdata = {
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED
 };
 
-int ehci_hcd_init(int index, struct ehci_hccr **hccr, struct ehci_hcor **hcor)
+int ehci_hcd_init(int index, enum usb_init_type init,
+		struct ehci_hccr **hccr, struct ehci_hcor **hcor)
 {
-	return omap_ehci_hcd_init(&usbhs_bdata, hccr, hcor);
+	return omap_ehci_hcd_init(index, &usbhs_bdata, hccr, hcor);
 }
 
 int ehci_hcd_stop(int index)

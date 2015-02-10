@@ -2,149 +2,23 @@
  * (C) Copyright 2010-2012
  * NVIDIA Corporation <www.nvidia.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __TEGRA_COMMON_POST_H
 #define __TEGRA_COMMON_POST_H
 
-#ifdef CONFIG_BOOTCOMMAND
-
-#define BOOTCMDS_COMMON ""
-
+#ifndef CONFIG_SPL_BUILD
+#define BOOT_TARGET_DEVICES(func) \
+	func(MMC, mmc, 1) \
+	func(MMC, mmc, 0) \
+	func(USB, usb, 0) \
+	func(PXE, pxe, na) \
+	func(DHCP, dhcp, na)
+#include <config_distro_bootcmd.h>
 #else
-
-#ifdef CONFIG_CMD_MMC
-#define BOOTCMDS_MMC \
-	"mmc_boot=" \
-		"setenv devtype mmc; " \
-		"if mmc dev ${devnum}; then " \
-			"run scan_boot; " \
-		"fi\0" \
-	"bootcmd_mmc0=setenv devnum 0; run mmc_boot;\0" \
-	"bootcmd_mmc1=setenv devnum 1; run mmc_boot;\0"
-#define BOOT_TARGETS_MMC "mmc1 mmc0"
-#else
-#define BOOTCMDS_MMC ""
-#define BOOT_TARGETS_MMC ""
+#define BOOTENV
 #endif
-
-#ifdef CONFIG_CMD_USB
-#define BOOTCMD_INIT_USB "run usb_init; "
-#define BOOTCMDS_USB \
-	"usb_init=" \
-		"if ${usb_need_init}; then " \
-			"set usb_need_init false; " \
-			"usb start 0; " \
-		"fi\0" \
-	\
-	"usb_boot=" \
-		"setenv devtype usb; " \
-		BOOTCMD_INIT_USB \
-		"if usb dev ${devnum}; then " \
-			"run scan_boot; " \
-		"fi\0" \
-	\
-	"bootcmd_usb0=setenv devnum 0; run usb_boot;\0"
-#define BOOT_TARGETS_USB "usb0"
-#else
-#define BOOTCMD_INIT_USB ""
-#define BOOTCMDS_USB ""
-#define BOOT_TARGETS_USB ""
-#endif
-
-#ifdef CONFIG_CMD_DHCP
-#define BOOTCMDS_DHCP \
-	"bootcmd_dhcp=" \
-		BOOTCMD_INIT_USB \
-		"if dhcp ${scriptaddr} boot.scr.uimg; then "\
-			"source ${scriptaddr}; " \
-		"fi\0"
-#define BOOT_TARGETS_DHCP "dhcp"
-#else
-#define BOOTCMDS_DHCP ""
-#define BOOT_TARGETS_DHCP ""
-#endif
-
-#define BOOTCMDS_COMMON \
-	"rootpart=1\0" \
-	\
-	"script_boot="                                                    \
-		"if load ${devtype} ${devnum}:${rootpart} "               \
-				"${scriptaddr} ${prefix}${script}; then " \
-			"echo ${script} found! Executing ...;"            \
-			"source ${scriptaddr};"                           \
-		"fi;\0"                                                   \
-	\
-	"scan_boot="                                                      \
-		"echo Scanning ${devtype} ${devnum}...; "                 \
-		"for prefix in ${boot_prefixes}; do "                     \
-			"for script in ${boot_scripts}; do "              \
-				"run script_boot; "                       \
-			"done; "                                          \
-		"done;\0"                                                 \
-	\
-	"boot_targets=" \
-		BOOT_TARGETS_MMC " " \
-		BOOT_TARGETS_USB " " \
-		BOOT_TARGETS_DHCP " " \
-		"\0" \
-	\
-	"boot_prefixes=/ /boot/\0" \
-	\
-	"boot_scripts=boot.scr.uimg boot.scr\0" \
-	\
-	BOOTCMDS_MMC \
-	BOOTCMDS_USB \
-	BOOTCMDS_DHCP
-
-#define CONFIG_BOOTCOMMAND \
-	"for target in ${boot_targets}; do run bootcmd_${target}; done"
-
-#endif
-
-/*
- * Memory layout for where various images get loaded by boot scripts:
- *
- * scriptaddr can be pretty much anywhere that doesn't conflict with something
- *   else. Put it above BOOTMAPSZ to eliminate conflicts.
- *
- * kernel_addr_r must be within the first 128M of RAM in order for the
- *   kernel's CONFIG_AUTO_ZRELADDR option to work. Since the kernel will
- *   decompress itself to 0x8000 after the start of RAM, kernel_addr_r
- *   should not overlap that area, or the kernel will have to copy itself
- *   somewhere else before decompression. Similarly, the address of any other
- *   data passed to the kernel shouldn't overlap the start of RAM. Pushing
- *   this up to 16M allows for a sizable kernel to be decompressed below the
- *   compressed load address.
- *
- * fdt_addr_r simply shouldn't overlap anything else. Choosing 32M allows for
- *   the compressed kernel to be up to 16M too.
- *
- * ramdisk_addr_r simply shouldn't overlap anything else. Choosing 33M allows
- *   for the FDT/DTB to be up to 1M, which is hopefully plenty.
- */
-#define MEM_LAYOUT_ENV_SETTINGS \
-	"scriptaddr=0x10000000\0" \
-	"kernel_addr_r=0x01000000\0" \
-	"fdt_addr_r=0x02000000\0" \
-	"ramdisk_addr_r=0x02100000\0" \
 
 #ifdef CONFIG_TEGRA_KEYBOARD
 #define STDIN_KBD_KBC ",tegra-kbc"
@@ -160,27 +34,42 @@
 #define STDIN_KBD_USB ""
 #endif
 
+#ifdef CONFIG_VIDEO_TEGRA
+#define STDOUT_LCD ",lcd"
+#else
+#define STDOUT_LCD ""
+#endif
+
 #define TEGRA_DEVICE_SETTINGS \
 	"stdin=serial" STDIN_KBD_KBC STDIN_KBD_USB "\0" \
-	"stdout=serial,lcd\0" \
-	"stderr=serial,lcd\0" \
+	"stdout=serial" STDOUT_LCD "\0" \
+	"stderr=serial" STDOUT_LCD "\0" \
+	""
+
+#ifndef BOARD_EXTRA_ENV_SETTINGS
+#define BOARD_EXTRA_ENV_SETTINGS
+#endif
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	TEGRA_DEVICE_SETTINGS \
 	MEM_LAYOUT_ENV_SETTINGS \
-	BOOTCMDS_COMMON
+	"fdt_high=ffffffff\0" \
+	"initrd_high=ffffffff\0" \
+	BOOTENV \
+	BOARD_EXTRA_ENV_SETTINGS
+
+#if defined(CONFIG_TEGRA20_SFLASH) || defined(CONFIG_TEGRA20_SLINK) || defined(CONFIG_TEGRA114_SPI)
+#define CONFIG_TEGRA_SPI
+#endif
 
 /* overrides for SPL build here */
 #ifdef CONFIG_SPL_BUILD
 
-/* remove devicetree support */
-#ifdef CONFIG_OF_CONTROL
-#undef CONFIG_OF_CONTROL
-#endif
+#define CONFIG_SKIP_LOWLEVEL_INIT
 
 /* remove I2C support */
-#ifdef CONFIG_TEGRA_I2C
-#undef CONFIG_TEGRA_I2C
+#ifdef CONFIG_SYS_I2C_TEGRA
+#undef CONFIG_SYS_I2C_TEGRA
 #endif
 #ifdef CONFIG_CMD_I2C
 #undef CONFIG_CMD_I2C

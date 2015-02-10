@@ -7,14 +7,11 @@
  *
  * Copyright 2000 MontaVista Software Inc.
  *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-
+#include <errno.h>
 #include <pci.h>
 
 #undef DEBUG
@@ -194,6 +191,32 @@ void pciauto_setup_device(struct pci_controller *hose,
 	pci_hose_write_config_byte(hose, dev, PCI_LATENCY_TIMER, 0x80);
 }
 
+int pciauto_setup_rom(struct pci_controller *hose, pci_dev_t dev)
+{
+	pci_addr_t bar_value;
+	pci_size_t bar_size;
+	u32 bar_response;
+	u16 cmdstat = 0;
+
+	pci_hose_write_config_dword(hose, dev, PCI_ROM_ADDRESS, 0xfffffffe);
+	pci_hose_read_config_dword(hose, dev, PCI_ROM_ADDRESS, &bar_response);
+	if (!bar_response)
+		return -ENOENT;
+
+	bar_size = -(bar_response & ~1);
+	DEBUGF("PCI Autoconfig: ROM, size=%#x, ", bar_size);
+	if (pciauto_region_allocate(hose->pci_mem, bar_size, &bar_value) == 0) {
+		pci_hose_write_config_dword(hose, dev, PCI_ROM_ADDRESS,
+					    bar_value);
+	}
+	DEBUGF("\n");
+	pci_hose_read_config_word(hose, dev, PCI_COMMAND, &cmdstat);
+	cmdstat |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER;
+	pci_hose_write_config_word(hose, dev, PCI_COMMAND, cmdstat);
+
+	return 0;
+}
+
 void pciauto_prescan_setup_bridge(struct pci_controller *hose,
 					 pci_dev_t dev, int sub_bus)
 {
@@ -300,7 +323,7 @@ void pciauto_config_init(struct pci_controller *hose)
 {
 	int i;
 
-	hose->pci_io = hose->pci_mem = NULL;
+	hose->pci_io = hose->pci_mem = hose->pci_prefetch = NULL;
 
 	for (i = 0; i < hose->region_count; i++) {
 		switch(hose->regions[i].flags) {
@@ -390,7 +413,7 @@ int pciauto_config_device(struct pci_controller *hose, pci_dev_t dev)
 		n = pci_hose_scan_bus(hose, hose->current_busno);
 
 		/* figure out the deepest we've gone for this leg */
-		sub_bus = max(n, sub_bus);
+		sub_bus = max((unsigned int)n, sub_bus);
 		pciauto_postscan_setup_bridge(hose, dev, sub_bus);
 
 		sub_bus = hose->current_busno;

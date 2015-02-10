@@ -2,24 +2,7 @@
  * (C) Copyright 2000, 2001
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -60,7 +43,7 @@ extern int eeprom_write_enable (unsigned dev_addr, int state);
 /* ------------------------------------------------------------------------- */
 
 #if defined(CONFIG_CMD_EEPROM)
-int do_eeprom ( cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
+static int do_eeprom(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	const char *const fmt =
 		"\nEEPROM @0x%lX %s: addr %08lx  off %04lx  count %ld ... ";
@@ -178,7 +161,7 @@ int eeprom_read (unsigned dev_addr, unsigned offset, uchar *buffer, unsigned cnt
 #if defined(CONFIG_SPI) && !defined(CONFIG_ENV_EEPROM_IS_ON_I2C)
 		spi_read (addr, alen, buffer, len);
 #else
-		if (i2c_read (addr[0], offset, alen-1, buffer, len) != 0)
+		if (i2c_read(addr[0], offset, alen - 1, buffer, len))
 			rcode = 1;
 #endif
 		buffer += len;
@@ -356,7 +339,7 @@ int eeprom_write (unsigned dev_addr, unsigned offset, uchar *buffer, unsigned cn
 		/* Write is enabled ... now write eeprom value.
 		 */
 #endif
-		if (i2c_write (addr[0], offset, alen-1, buffer, len) != 0)
+		if (i2c_write(addr[0], offset, alen - 1, buffer, len))
 			rcode = 1;
 
 #endif
@@ -406,8 +389,7 @@ void eeprom_init  (void)
 #if defined(CONFIG_SPI) && !defined(CONFIG_ENV_EEPROM_IS_ON_I2C)
 	spi_init_f ();
 #endif
-#if defined(CONFIG_HARD_I2C) || \
-    defined(CONFIG_SOFT_I2C)
+#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SYS_I2C_SOFT)
 	i2c_init (CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #endif
 }
@@ -426,7 +408,7 @@ U_BOOT_CMD(
 	"read  devaddr addr off cnt\n"
 	"eeprom write devaddr addr off cnt\n"
 	"       - read/write `cnt' bytes from `devaddr` EEPROM at offset `off'"
-);
+)
 #else /* One EEPROM */
 U_BOOT_CMD(
 	eeprom,	5,	1,	do_eeprom,
@@ -434,7 +416,7 @@ U_BOOT_CMD(
 	"read  addr off cnt\n"
 	"eeprom write addr off cnt\n"
 	"       - read/write `cnt' bytes at EEPROM offset `off'"
-);
+)
 #endif /* CONFIG_SYS_I2C_MULTI_EEPROMS */
 
 #endif

@@ -3,26 +3,13 @@
  * Copyright (C) 1995-1999, 2000 Free Software Foundation, Inc.
  * This file is part of the GNU C Library.
  *
- * The GNU C Library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * The GNU C Library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with the GNU C Library; if not, write to the Free
- * Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
- * 02111-1307 USA.
+ * SPDX-License-Identifier:	LGPL-2.1+
  */
 
 /*
  * Based on code from uClibc-0.9.30.3
  * Extensions for use within U-Boot
- * Copyright (C) 2010 Wolfgang Denk <wd@denx.de>
+ * Copyright (C) 2010-2013 Wolfgang Denk <wd@denx.de>
  */
 
 #ifndef _SEARCH_H
@@ -98,12 +85,6 @@ extern int hsearch_r(ENTRY __item, ACTION __action, ENTRY ** __retval,
  */
 extern int hmatch_r(const char *__match, int __last_idx, ENTRY ** __retval,
 		    struct hsearch_data *__htab);
-/*
- * Search for an entry whose key or data contains `MATCH'.  Otherwise,
- * Same semantics as hsearch_r().
- */
-extern int hstrstr_r(const char *__match, int __last_idx, ENTRY ** __retval,
-		    struct hsearch_data *__htab);
 
 /* Search and delete entry matching ITEM.key in internal hash table. */
 extern int hdelete_r(const char *__key, struct hsearch_data *__htab,
@@ -121,7 +102,8 @@ extern ssize_t hexport_r(struct hsearch_data *__htab,
  */
 extern int himport_r(struct hsearch_data *__htab,
 		     const char *__env, size_t __size, const char __sep,
-		     int __flag, int nvars, char * const vars[]);
+		     int __flag, int __crlf_is_lf, int nvars,
+		     char * const vars[]);
 
 /* Walk the whole table calling the callback on each element */
 extern int hwalk_r(struct hsearch_data *__htab, int (*callback)(ENTRY *));
@@ -131,5 +113,12 @@ extern int hwalk_r(struct hsearch_data *__htab, int (*callback)(ENTRY *));
 #define H_FORCE		(1 << 1) /* overwrite read-only/write-once variables */
 #define H_INTERACTIVE	(1 << 2) /* indicate that an import is user directed */
 #define H_HIDE_DOT	(1 << 3) /* don't print env vars that begin with '.' */
+#define H_MATCH_KEY	(1 << 4) /* search/grep key  = variable names	     */
+#define H_MATCH_DATA	(1 << 5) /* search/grep data = variable values	     */
+#define H_MATCH_BOTH	(H_MATCH_KEY | H_MATCH_DATA) /* search/grep both     */
+#define H_MATCH_IDENT	(1 << 6) /* search for indentical strings	     */
+#define H_MATCH_SUBSTR	(1 << 7) /* search for substring matches	     */
+#define H_MATCH_REGEX	(1 << 8) /* search for regular expression matches    */
+#define H_MATCH_METHOD	(H_MATCH_IDENT | H_MATCH_SUBSTR | H_MATCH_REGEX)
 
 #endif /* search.h */

@@ -7,23 +7,7 @@
  * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
  * Alex Zuepke <azu@sysgo.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/io.h>
@@ -244,7 +228,7 @@ void pxa_clock_setup(void)
 {
 	writel(CONFIG_SYS_CKEN, CKEN);
 	writel(CONFIG_SYS_CCCR, CCCR);
-	asm volatile("mcr	p14, 0, %0, c6, c0, 0" : : "r"(2));
+	asm volatile("mcr	p14, 0, %0, c6, c0, 0" : : "r"(0x0b));
 
 	/* enable the 32Khz oscillator for RTC and PowerManager */
 	writel(OSCC_OON, OSCC);
@@ -284,7 +268,7 @@ void i2c_clk_enable(void)
 	writel(readl(CKEN) | CKEN14_I2C, CKEN);
 }
 
-void reset_cpu(ulong ignored) __attribute__((noreturn));
+void __attribute__((weak)) reset_cpu(ulong ignored) __attribute__((noreturn));
 
 void reset_cpu(ulong ignored)
 {
@@ -295,6 +279,7 @@ void reset_cpu(ulong ignored)
 	tmp = readl(OSCR);
 	tmp += 0x1000;
 	writel(tmp, OSMR3);
+	writel(MDREFR_SLFRSH, MDREFR);
 
 	for (;;)
 		;

@@ -3,26 +3,14 @@
  * Samsung S3C on-chip full/high speed USB device controllers
  * Copyright (C) 2005 for Samsung Electronics
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __S3C_USB_GADGET
 #define __S3C_USB_GADGET
 
 #include <asm/errno.h>
+#include <linux/sizes.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 #include <linux/list.h>
@@ -32,7 +20,7 @@
 
 /*-------------------------------------------------------------------------*/
 /* DMA bounce buffer size, 16K is enough even for mass storage */
-#define DMA_BUFFER_SIZE	(4096*4)
+#define DMA_BUFFER_SIZE	(16*SZ_1K)
 
 #define EP0_FIFO_SIZE		64
 #define EP_FIFO_SIZE		512
@@ -94,9 +82,6 @@ struct s3c_udc {
 
 	struct s3c_plat_otg_data *pdata;
 
-	void *dma_buf[S3C_MAX_ENDPOINTS+1];
-	dma_addr_t dma_addr[S3C_MAX_ENDPOINTS+1];
-
 	int ep0state;
 	struct s3c_ep ep[S3C_MAX_ENDPOINTS];
 
@@ -123,5 +108,6 @@ struct s3c_plat_otg_data {
 	unsigned int	regs_otg;
 	unsigned int    usb_phy_ctrl;
 	unsigned int    usb_flags;
+	unsigned int	usb_gusbcfg;
 };
 #endif

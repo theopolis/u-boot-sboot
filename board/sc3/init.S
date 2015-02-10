@@ -1,35 +1,8 @@
-/*------------------------------------------------------------------------------+
- *
- *	 This souce code has been made available to you by EuroDesign
- *	 (www.eurodsn.de). It's based on the original IBM source code, so
- *	 this follows:
- *
- *   This source code is dual-licensed.  You may use it under the terms of the
- *   GNU General Public License version 2, or under the license below.
- *
- *	 This source code has been made available to you by IBM on an AS-IS
- *	 basis.  Anyone receiving this source is licensed under IBM
- *	 copyrights to use it in any way he or she deems fit, including
- *	 copying it, modifying it, compiling it, and redistributing it either
- *	 with or without modifications.  No license under IBM patents or
- *	 patent applications is to be implied by the copyright license.
- *
- *	 Any user of this software should understand that IBM cannot provide
- *	 technical support for this software and will not be responsible for
- *	 any consequences resulting from the use of this software.
- *
- *	 Any person who transfers this source code or any derivative work
- *	 must include the IBM copyright notice, this paragraph, and the
- *	 preceding two paragraphs in the transferred software.
- *
- *	 COPYRIGHT   I B M   CORPORATION 1995
- *	 LICENSED MATERIAL  -  PROGRAM PROPERTY OF I B M
- *------------------------------------------------------------------------------- */
-
+/*
+ * SPDX-License-Identifier:	GPL-2.0	IBM-pibs
+ */
 #include <config.h>
 #include <asm/ppc4xx.h>
-
-#define _LINUX_CONFIG_H 1	/* avoid reading Linux autoconf.h file	*/
 
 #include <ppc_asm.tmpl>
 #include <ppc_defs.h>
@@ -71,7 +44,8 @@ ext_bus_cntlr_init:
  * This is need for the external flash access
  */
 		lis r25,0x0800
-		ori r25,r25,0x0280			/* 0000 1000 0xxx 0000 0000 0010 100x xxxx = 0x03800280
+		/* 0000 1000 0xxx 0000 0000 0010 100x xxxx = 0x03800280 */
+		ori r25,r25,0x0280
 /*
  * Second, create a fast timing:
  * 90ns first cycle - 3 clock access
@@ -79,7 +53,8 @@ ext_bus_cntlr_init:
  * This is used for the internal access
  */
 		lis r26,0x8900
-		ori r26,r26,0x0280			/* 1000 1001 0xxx 0000 0000 0010 100x xxxx
+		/* 1000 1001 0xxx 0000 0000 0010 100x xxxx */
+		ori r26,r26,0x0280
 /*
  * We can't change settings on CS# if we currently use them.
  * -> load a few instructions into cache and run this code from cache

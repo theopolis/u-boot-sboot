@@ -1,23 +1,7 @@
 /*
  * (C) Copyright 2011 NVIDIA Corporation <www.nvidia.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* register offset */
@@ -224,7 +208,7 @@ enum {
 #define BCH_DEC_STATUS_MAX_CORR_CNT_MASK	(0x1f << 8)
 #define BCH_DEC_STATUS_PAGE_NUMBER_MASK		0xFF
 
-#define LP_OPTIONS (NAND_NO_READRDY | NAND_NO_AUTOINCR)
+#define LP_OPTIONS	0
 
 struct nand_ctlr {
 	u32	command;	/* offset 00h */

@@ -4,23 +4,7 @@
  *
  * Michal SIMEK <monstr@monstr.eu>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -29,8 +13,6 @@
 #include <malloc.h>
 #include <asm/io.h>
 #include <fdtdec.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 #undef DEBUG
 
@@ -380,24 +362,27 @@ int xilinx_emaclite_initialize(bd_t *bis, unsigned long base_addr,
 }
 
 #ifdef CONFIG_OF_CONTROL
-int xilinx_emaclite_init(bd_t *bis)
+int xilinx_emaclite_of_init(const void *blob)
 {
 	int offset = 0;
 	u32 ret = 0;
 	u32 reg;
 
 	do {
-		offset = fdt_node_offset_by_compatible(gd->fdt_blob, offset,
+		offset = fdt_node_offset_by_compatible(blob, offset,
 					"xlnx,xps-ethernetlite-1.00.a");
 		if (offset != -1) {
-			reg = fdtdec_get_addr(gd->fdt_blob, offset, "reg");
+			reg = fdtdec_get_addr(blob, offset, "reg");
 			if (reg != FDT_ADDR_T_NONE) {
-				u32 rxpp = fdtdec_get_int(gd->fdt_blob, offset,
+				u32 rxpp = fdtdec_get_int(blob, offset,
 							"xlnx,rx-ping-pong", 0);
-				u32 txpp = fdtdec_get_int(gd->fdt_blob, offset,
+				u32 txpp = fdtdec_get_int(blob, offset,
 							"xlnx,tx-ping-pong", 0);
-				ret |= xilinx_emaclite_initialize(bis, reg,
+				ret |= xilinx_emaclite_initialize(NULL, reg,
 								txpp, rxpp);
+			} else {
+				debug("EMACLITE: Can't get base address\n");
+				return -1;
 			}
 		}
 	} while (offset != -1);

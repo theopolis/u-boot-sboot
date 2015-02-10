@@ -4,26 +4,12 @@
  *
  * (C) Copyright 2009 Freescale Semiconductor, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
+#include <bootm.h>
 #include <common.h>
+#include <netdev.h>
 #include <asm/errno.h>
 #include <asm/io.h>
 #include <asm/arch/imx-regs.h>
@@ -31,6 +17,8 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/crm_regs.h>
 #include <ipu_pixfmt.h>
+#include <thermal.h>
+#include <sata.h>
 
 #ifdef CONFIG_FSL_ESDHC
 #include <fsl_esdhc.h>
@@ -67,13 +55,14 @@ char *get_reset_cause(void)
 
 #if defined(CONFIG_MX53) || defined(CONFIG_MX6)
 #if defined(CONFIG_MX53)
-#define MEMCTL_BASE	ESDCTL_BASE_ADDR;
+#define MEMCTL_BASE	ESDCTL_BASE_ADDR
 #else
-#define MEMCTL_BASE	MMDC_P0_BASE_ADDR;
+#define MEMCTL_BASE	MMDC_P0_BASE_ADDR
 #endif
 static const unsigned char col_lookup[] = {9, 10, 11, 8, 12, 9, 9, 9};
 static const unsigned char bank_lookup[] = {3, 2};
 
+/* these MMDC registers are common to the IMX53 and IMX6 */
 struct esd_mmdc_regs {
 	uint32_t	ctl;
 	uint32_t	pdc;
@@ -82,15 +71,6 @@ struct esd_mmdc_regs {
 	uint32_t	cfg1;
 	uint32_t	cfg2;
 	uint32_t	misc;
-	uint32_t	scr;
-	uint32_t	ref;
-	uint32_t	rsvd1;
-	uint32_t	rsvd2;
-	uint32_t	rwd;
-	uint32_t	or;
-	uint32_t	mrr;
-	uint32_t	cfg3lp;
-	uint32_t	mr4;
 };
 
 #define ESD_MMDC_CTL_GET_ROW(mdctl)	((ctl >> 24) & 7)
@@ -99,6 +79,12 @@ struct esd_mmdc_regs {
 #define ESD_MMDC_CTL_GET_CS1(mdctl)	((ctl >> 30) & 1)
 #define ESD_MMDC_MISC_GET_BANK(mdmisc)	((misc >> 5) & 1)
 
+/*
+ * imx_ddr_size - return size in bytes of DRAM according MMDC config
+ * The MMDC MDCTL register holds the number of bits for row, col, and data
+ * width and the MMDC MDMISC register holds the number of banks. Combine
+ * all these bits to determine the meme size the MMDC has been configured for
+ */
 unsigned imx_ddr_size(void)
 {
 	struct esd_mmdc_regs *mem = (struct esd_mmdc_regs *)MEMCTL_BASE;
@@ -111,6 +97,11 @@ unsigned imx_ddr_size(void)
 	bits += bank_lookup[ESD_MMDC_MISC_GET_BANK(misc)];
 	bits += ESD_MMDC_CTL_GET_WIDTH(ctl);
 	bits += ESD_MMDC_CTL_GET_CS1(ctl);
+
+	/* The MX6 can do only 3840 MiB of DRAM */
+	if (bits == 32)
+		return 0xf0000000;
+
 	return 1 << bits;
 }
 #endif
@@ -122,12 +113,16 @@ const char *get_imx_type(u32 imxtype)
 	switch (imxtype) {
 	case MXC_CPU_MX6Q:
 		return "6Q";	/* Quad-core version of the mx6 */
+	case MXC_CPU_MX6D:
+		return "6D";	/* Dual-core version of the mx6 */
 	case MXC_CPU_MX6DL:
 		return "6DL";	/* Dual Lite version of the mx6 */
 	case MXC_CPU_MX6SOLO:
 		return "6SOLO";	/* Solo version of the mx6 */
 	case MXC_CPU_MX6SL:
 		return "6SL";	/* Solo-Lite version of the mx6 */
+	case MXC_CPU_MX6SX:
+		return "6SX";   /* SoloX version of the mx6 */
 	case MXC_CPU_MX51:
 		return "51";
 	case MXC_CPU_MX53:
@@ -141,6 +136,11 @@ int print_cpuinfo(void)
 {
 	u32 cpurev;
 
+#if defined(CONFIG_MX6) && defined(CONFIG_IMX6_THERMAL)
+	struct udevice *thermal_dev;
+	int cpu_tmp, ret;
+#endif
+
 	cpurev = get_cpu_rev();
 
 	printf("CPU:   Freescale i.MX%s rev%d.%d at %d MHz\n",
@@ -148,6 +148,21 @@ int print_cpuinfo(void)
 		(cpurev & 0x000F0) >> 4,
 		(cpurev & 0x0000F) >> 0,
 		mxc_get_clock(MXC_ARM_CLK) / 1000000);
+
+#if defined(CONFIG_MX6) && defined(CONFIG_IMX6_THERMAL)
+	ret = uclass_get_device(UCLASS_THERMAL, 0, &thermal_dev);
+	if (!ret) {
+		ret = thermal_get_temp(thermal_dev, &cpu_tmp);
+
+		if (!ret)
+			printf("CPU:   Temperature %d C\n", cpu_tmp);
+		else
+			printf("CPU:   Temperature: invalid sensor data\n");
+	} else {
+		printf("CPU:   Temperature: Can't find sensor device\n");
+	}
+#endif
+
 	printf("Reset cause: %s\n", get_reset_cause());
 	return 0;
 }
@@ -187,10 +202,47 @@ u32 get_ahb_clk(void)
 	return get_periph_clk() / (ahb_podf + 1);
 }
 
-#if defined(CONFIG_VIDEO_IPUV3)
 void arch_preboot_os(void)
 {
+#if defined(CONFIG_CMD_SATA)
+	sata_stop();
+#if defined(CONFIG_MX6)
+	disable_sata_clock();
+#endif
+#endif
+#if defined(CONFIG_VIDEO_IPUV3)
 	/* disable video before launching O/S */
 	ipuv3_fb_shutdown();
-}
 #endif
+}
+
+void set_chipselect_size(int const cs_size)
+{
+	unsigned int reg;
+	struct iomuxc *iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
+	reg = readl(&iomuxc_regs->gpr[1]);
+
+	switch (cs_size) {
+	case CS0_128:
+		reg &= ~0x7;	/* CS0=128MB, CS1=0, CS2=0, CS3=0 */
+		reg |= 0x5;
+		break;
+	case CS0_64M_CS1_64M:
+		reg &= ~0x3F;	/* CS0=64MB, CS1=64MB, CS2=0, CS3=0 */
+		reg |= 0x1B;
+		break;
+	case CS0_64M_CS1_32M_CS2_32M:
+		reg &= ~0x1FF;	/* CS0=64MB, CS1=32MB, CS2=32MB, CS3=0 */
+		reg |= 0x4B;
+		break;
+	case CS0_32M_CS1_32M_CS2_32M_CS3_32M:
+		reg &= ~0xFFF;  /* CS0=32MB, CS1=32MB, CS2=32MB, CS3=32MB */
+		reg |= 0x249;
+		break;
+	default:
+		printf("Unknown chip select size: %d\n", cs_size);
+		break;
+	}
+
+	writel(reg, &iomuxc_regs->gpr[1]);
+}

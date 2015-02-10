@@ -4,23 +4,7 @@
  *
  * (C) Copyright 2009 Freescale Semiconductor, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -72,6 +56,13 @@ u32 get_cpu_rev(void)
 	return system_rev;
 }
 
+#ifdef CONFIG_REVISION_TAG
+u32 __weak get_board_rev(void)
+{
+	return get_cpu_rev();
+}
+#endif
+
 #ifndef CONFIG_SYS_DCACHE_OFF
 void enable_caches(void)
 {
@@ -93,37 +84,6 @@ void imx_get_mac_from_fuse(int dev_id, unsigned char *mac)
 		mac[i] = readl(&fuse->mac_addr[i]) & 0xff;
 }
 #endif
-
-void set_chipselect_size(int const cs_size)
-{
-	unsigned int reg;
-	struct iomuxc *iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
-	reg = readl(&iomuxc_regs->gpr1);
-
-	switch (cs_size) {
-	case CS0_128:
-		reg &= ~0x7;	/* CS0=128MB, CS1=0, CS2=0, CS3=0 */
-		reg |= 0x5;
-		break;
-	case CS0_64M_CS1_64M:
-		reg &= ~0x3F;	/* CS0=64MB, CS1=64MB, CS2=0, CS3=0 */
-		reg |= 0x1B;
-		break;
-	case CS0_64M_CS1_32M_CS2_32M:
-		reg &= ~0x1FF;	/* CS0=64MB, CS1=32MB, CS2=32MB, CS3=0 */
-		reg |= 0x4B;
-		break;
-	case CS0_32M_CS1_32M_CS2_32M_CS3_32M:
-		reg &= ~0xFFF;  /* CS0=32MB, CS1=32MB, CS2=32MB, CS3=32MB */
-		reg |= 0x249;
-		break;
-	default:
-		printf("Unknown chip select size: %d\n", cs_size);
-		break;
-	}
-
-	writel(reg, &iomuxc_regs->gpr1);
-}
 
 #ifdef CONFIG_MX53
 void boot_mode_apply(unsigned cfg_val)

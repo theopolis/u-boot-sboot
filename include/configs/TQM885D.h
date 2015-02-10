@@ -1,27 +1,11 @@
 /*
- * (C) Copyright 2000-2005
+ * (C) Copyright 2000-2014
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
  * (C) Copyright 2006
  * Martin Krause, TQ-Systems GmBH, martin.krause@tqs.de
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -38,6 +22,8 @@
 
 #define CONFIG_MPC885		1	/* This is a MPC885 CPU		*/
 #define CONFIG_TQM885D		1	/* ...on a TQM88D module	*/
+#define CONFIG_SYS_GENERIC_BOARD
+#define CONFIG_DISPLAY_BOARDINFO
 
 #define	CONFIG_SYS_TEXT_BASE	0x40000000
 
@@ -101,13 +87,10 @@
 #undef	CONFIG_CAN_DRIVER		/* CAN Driver support disabled	*/
 
 /* enable I2C and select the hardware/software driver */
-#undef	CONFIG_HARD_I2C			/* I2C with hardware support	*/
-#define CONFIG_SOFT_I2C		1	/* I2C bit-banged		*/
-
-#define CONFIG_SYS_I2C_SPEED		93000	/* 93 kHz is supposed to work	*/
-#define CONFIG_SYS_I2C_SLAVE		0xFE
-
-#ifdef CONFIG_SOFT_I2C
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_SOFT			/* I2C bit-banged */
+#define CONFIG_SYS_I2C_SOFT_SPEED	93000	/* 93 kHz is supposed to work */
+#define CONFIG_SYS_I2C_SOFT_SLAVE	0xFE
 /*
  * Software (bit-bang) I2C driver configuration
  */
@@ -123,7 +106,6 @@
 #define I2C_SCL(bit)	if(bit) immr->im_cpm.cp_pbdat |=  PB_SCL; \
 			else	immr->im_cpm.cp_pbdat &= ~PB_SCL
 #define I2C_DELAY	udelay(2)	/* 1/4 I2C clock duration */
-#endif	/* CONFIG_SOFT_I2C */
 
 #define CONFIG_SYS_I2C_EEPROM_ADDR	0x50		/* EEPROM AT24C??	*/
 #define CONFIG_SYS_I2C_EEPROM_ADDR_LEN 2		/* two byte address	*/
@@ -172,7 +154,6 @@
  * Miscellaneous configurable options
  */
 #define CONFIG_SYS_LONGHELP			/* undef to save memory		*/
-#define CONFIG_SYS_PROMPT		"=> "	/* Monitor Command Prompt	*/
 
 #define CONFIG_CMDLINE_EDITING	1	/* add command line history	*/
 #define CONFIG_SYS_HUSH_PARSER		1	/* Use the HUSH parser		*/
@@ -192,8 +173,6 @@
 						   memory test.*/
 
 #define CONFIG_SYS_LOAD_ADDR		0x100000	/* default load address */
-
-#define CONFIG_SYS_HZ			1000	/* decrementer freq: 1 ms ticks */
 
 /*
  * Enable loopw command.

@@ -1,22 +1,6 @@
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -45,8 +29,8 @@ int display_get_info(int type, struct display_info *di)
 	case DISPLAY_TYPE_LCD:
 		di->pixel_width  = panel_info.vl_col;
 		di->pixel_height = panel_info.vl_row;
-		di->screen_rows = CONSOLE_ROWS;
-		di->screen_cols = CONSOLE_COLS;
+		di->screen_rows = lcd_get_screen_rows();
+		di->screen_cols = lcd_get_screen_columns();
 		break;
 #endif
 	}

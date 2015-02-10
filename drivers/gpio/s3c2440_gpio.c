@@ -2,23 +2,7 @@
  * Copyright (C) 2012
  * Gabriel Huau <contact@huau-gabriel.fr>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <asm/arch/s3c2440.h>
@@ -61,7 +45,7 @@ int gpio_set_value(unsigned gpio, int value)
 	else
 		l &= ~bit;
 
-	return writel(port, l);
+	return writel(l, port);
 }
 
 int gpio_get_value(unsigned gpio)
@@ -85,11 +69,11 @@ int gpio_free(unsigned gpio)
 
 int gpio_direction_input(unsigned gpio)
 {
-	return writel(GPIO_FULLPORT(gpio), GPIO_INPUT << GPIO_BIT(gpio));
+	return writel(GPIO_INPUT << GPIO_BIT(gpio), GPIO_FULLPORT(gpio));
 }
 
 int gpio_direction_output(unsigned gpio, int value)
 {
-	writel(GPIO_FULLPORT(gpio), GPIO_OUTPUT << GPIO_BIT(gpio));
+	writel(GPIO_OUTPUT << GPIO_BIT(gpio), GPIO_FULLPORT(gpio));
 	return gpio_set_value(gpio, value);
 }

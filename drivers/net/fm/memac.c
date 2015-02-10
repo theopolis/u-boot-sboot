@@ -2,20 +2,7 @@
  * Copyright 2012 Freescale Semiconductor, Inc.
  *	Roy Zang <tie-fei.zang@freescale.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* MAXFRM - maximum frame length */
@@ -25,7 +12,6 @@
 #include <phy.h>
 #include <asm/types.h>
 #include <asm/io.h>
-#include <asm/fsl_enet.h>
 #include <asm/fsl_memac.h>
 
 #include "fm.h"
@@ -51,7 +37,8 @@ static void memac_enable_mac(struct fsl_enet_mac *mac)
 {
 	struct memac *regs = mac->base;
 
-	setbits_be32(&regs->command_config, MEMAC_CMD_CFG_RXTX_EN);
+	setbits_be32(&regs->command_config,
+		     MEMAC_CMD_CFG_RXTX_EN | MEMAC_CMD_CFG_NO_LEN_CHK);
 }
 
 static void memac_disable_mac(struct fsl_enet_mac *mac)
@@ -103,14 +90,37 @@ static void memac_set_interface_mode(struct fsl_enet_mac *mac,
 		if_mode |= (IF_MODE_GMII | IF_MODE_RM);
 		break;
 	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
 		if_mode &= ~IF_MODE_MASK;
 		if_mode |= (IF_MODE_GMII);
+		break;
+	case PHY_INTERFACE_MODE_XGMII:
+		if_mode &= ~IF_MODE_MASK;
+		if_mode |= IF_MODE_XGMII;
 		break;
 	default:
 		break;
 	}
-	/* Enable automatic speed selection */
-	if_mode |= IF_MODE_EN_AUTO;
+	/* Enable automatic speed selection for Non-XGMII */
+	if (type != PHY_INTERFACE_MODE_XGMII)
+		if_mode |= IF_MODE_EN_AUTO;
+
+	if (type == PHY_INTERFACE_MODE_RGMII) {
+		if_mode &= ~IF_MODE_EN_AUTO;
+		if_mode &= ~IF_MODE_SETSP_MASK;
+		switch (speed) {
+		case SPEED_1000:
+			if_mode |= IF_MODE_SETSP_1000M;
+			break;
+		case SPEED_100:
+			if_mode |= IF_MODE_SETSP_100M;
+			break;
+		case SPEED_10:
+			if_mode |= IF_MODE_SETSP_10M;
+		default:
+			break;
+		}
+	}
 
 	debug(" %s, if_mode = %x\n", __func__,  if_mode);
 	debug(" %s, if_status = %x\n", __func__,  if_status);

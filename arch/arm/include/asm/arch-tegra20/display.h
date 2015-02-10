@@ -2,23 +2,7 @@
  *  (C) Copyright 2010
  *  NVIDIA Corporation <www.nvidia.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_ARCH_TEGRA_DISPLAY_H
@@ -26,6 +10,7 @@
 
 #include <asm/arch/dc.h>
 #include <fdtdec.h>
+#include <asm/gpio.h>
 
 /* This holds information about a window which can be displayed */
 struct disp_ctl_win {
@@ -88,10 +73,10 @@ struct fdt_panel_config {
 	int pwm_channel;		/* PWM channel to use for backlight */
 	enum lcd_cache_t cache_type;
 
-	struct fdt_gpio_state backlight_en;	/* GPIO for backlight enable */
-	struct fdt_gpio_state lvds_shutdown;	/* GPIO for lvds shutdown */
-	struct fdt_gpio_state backlight_vdd;	/* GPIO for backlight vdd */
-	struct fdt_gpio_state panel_vdd;	/* GPIO for panel vdd */
+	struct gpio_desc backlight_en;	/* GPIO for backlight enable */
+	struct gpio_desc lvds_shutdown;	/* GPIO for lvds shutdown */
+	struct gpio_desc backlight_vdd;	/* GPIO for backlight vdd */
+	struct gpio_desc panel_vdd;	/* GPIO for panel vdd */
 	/*
 	 * Panel required timings
 	 * Timing 1: delay between panel_vdd-rise and data-rise

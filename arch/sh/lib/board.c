@@ -2,20 +2,7 @@
  * Copyright (C) 2007, 2008, 2010
  * Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -65,6 +52,7 @@ static int sh_flash_init(void)
 #if defined(CONFIG_WATCHDOG)
 extern int watchdog_init(void);
 extern int watchdog_disable(void);
+# undef INIT_FUNC_WATCHDOG_INIT
 # define INIT_FUNC_WATCHDOG_INIT	watchdog_init,
 # define WATCHDOG_DISABLE       	watchdog_disable
 #else
@@ -167,7 +155,6 @@ void sh_generic_init(void)
 	bd->bi_sramstart = CONFIG_SYS_SRAM_BASE;
 	bd->bi_sramsize	= CONFIG_SYS_SRAM_SIZE;
 #endif
-	bd->bi_baudrate	= CONFIG_BAUDRATE;
 
 	for (init_fnc_ptr = init_sequence; *init_fnc_ptr; ++init_fnc_ptr) {
 		WATCHDOG_RESET();
@@ -198,13 +185,4 @@ void sh_generic_init(void)
 		WATCHDOG_RESET();
 		main_loop();
 	}
-}
-
-/***********************************************************************/
-
-void hang(void)
-{
-	puts("Board ERROR\n");
-	for (;;)
-		;
 }

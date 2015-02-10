@@ -5,24 +5,7 @@
  * Most of this source has been derived from the Linux USB
  * project.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -269,14 +252,42 @@ static void usb_display_config(struct usb_device *dev)
 	printf("\n");
 }
 
+static struct usb_device *usb_find_device(int devnum)
+{
+	struct usb_device *dev;
+	int d;
+
+	for (d = 0; d < USB_MAX_DEVICE; d++) {
+		dev = usb_get_dev_index(d);
+		if (dev == NULL)
+			return NULL;
+		if (dev->devnum == devnum)
+			return dev;
+	}
+
+	return NULL;
+}
+
 static inline char *portspeed(int speed)
 {
-	if (speed == USB_SPEED_HIGH)
-		return "480 Mb/s";
-	else if (speed == USB_SPEED_LOW)
-		return "1.5 Mb/s";
-	else
-		return "12 Mb/s";
+	char *speed_str;
+
+	switch (speed) {
+	case USB_SPEED_SUPER:
+		speed_str = "5 Gb/s";
+		break;
+	case USB_SPEED_HIGH:
+		speed_str = "480 Mb/s";
+		break;
+	case USB_SPEED_LOW:
+		speed_str = "1.5 Mb/s";
+		break;
+	default:
+		speed_str = "12 Mb/s";
+		break;
+	}
+
+	return speed_str;
 }
 
 /* shows the device tree recursively */
@@ -348,6 +359,66 @@ static void usb_show_tree(struct usb_device *dev)
 	usb_show_tree_graph(dev, &preamble[0]);
 }
 
+static int usb_test(struct usb_device *dev, int port, char* arg)
+{
+	int mode;
+
+	if (port > dev->maxchild) {
+		printf("Device is no hub or does not have %d ports.\n", port);
+		return 1;
+	}
+
+	switch (arg[0]) {
+	case 'J':
+	case 'j':
+		printf("Setting Test_J mode");
+		mode = USB_TEST_MODE_J;
+		break;
+	case 'K':
+	case 'k':
+		printf("Setting Test_K mode");
+		mode = USB_TEST_MODE_K;
+		break;
+	case 'S':
+	case 's':
+		printf("Setting Test_SE0_NAK mode");
+		mode = USB_TEST_MODE_SE0_NAK;
+		break;
+	case 'P':
+	case 'p':
+		printf("Setting Test_Packet mode");
+		mode = USB_TEST_MODE_PACKET;
+		break;
+	case 'F':
+	case 'f':
+		printf("Setting Test_Force_Enable mode");
+		mode = USB_TEST_MODE_FORCE_ENABLE;
+		break;
+	default:
+		printf("Unrecognized test mode: %s\nAvailable modes: "
+		       "J, K, S[E0_NAK], P[acket], F[orce_Enable]\n", arg);
+		return 1;
+	}
+
+	if (port)
+		printf(" on downstream facing port %d...\n", port);
+	else
+		printf(" on upstream facing port...\n");
+
+	if (usb_control_msg(dev, usb_sndctrlpipe(dev, 0), USB_REQ_SET_FEATURE,
+			    port ? USB_RT_PORT : USB_RECIP_DEVICE,
+			    port ? USB_PORT_FEAT_TEST : USB_FEAT_TEST,
+			    (mode << 8) | port,
+			    NULL, 0, USB_CNTL_TIMEOUT) == -1) {
+		printf("Error during SET_FEATURE.\n");
+		return 1;
+	} else {
+		printf("Test mode successfully set. Use 'usb start' "
+		       "to return to normal operation.\n");
+		return 0;
+	}
+}
+
 
 /******************************************************************************
  * usb boot command intepreter. Derived from diskboot
@@ -359,6 +430,36 @@ static int do_usbboot(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 }
 #endif /* CONFIG_USB_STORAGE */
 
+static int do_usb_stop_keyboard(int force)
+{
+#ifdef CONFIG_USB_KEYBOARD
+	if (usb_kbd_deregister(force) != 0) {
+		printf("USB not stopped: usbkbd still using USB\n");
+		return 1;
+	}
+#endif
+	return 0;
+}
+
+static void do_usb_start(void)
+{
+	bootstage_mark_name(BOOTSTAGE_ID_USB_START, "usb_start");
+
+	if (usb_init() < 0)
+		return;
+
+#ifdef CONFIG_USB_STORAGE
+	/* try to recognize storage devices immediately */
+	usb_stor_curr_dev = usb_stor_scan(1);
+#endif
+#ifdef CONFIG_USB_HOST_ETHER
+	/* try to recognize ethernet devices immediately */
+	usb_ether_curr_dev = usb_host_eth_scan(1);
+#endif
+#ifdef CONFIG_USB_KEYBOARD
+	drv_usb_kbd_init();
+#endif
+}
 
 /******************************************************************************
  * usb command intepreter
@@ -376,40 +477,27 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if (argc < 2)
 		return CMD_RET_USAGE;
 
-	if ((strncmp(argv[1], "reset", 5) == 0) ||
-		 (strncmp(argv[1], "start", 5) == 0)) {
-		bootstage_mark_name(BOOTSTAGE_ID_USB_START, "usb_start");
+	if (strncmp(argv[1], "start", 5) == 0) {
+		if (usb_started)
+			return 0; /* Already started */
+		printf("starting USB...\n");
+		do_usb_start();
+		return 0;
+	}
+
+	if (strncmp(argv[1], "reset", 5) == 0) {
+		printf("resetting USB...\n");
+		if (do_usb_stop_keyboard(1) != 0)
+			return 1;
 		usb_stop();
-		printf("(Re)start USB...\n");
-		if (usb_init() >= 0) {
-#ifdef CONFIG_USB_STORAGE
-			/* try to recognize storage devices immediately */
-			usb_stor_curr_dev = usb_stor_scan(1);
-#endif
-#ifdef CONFIG_USB_HOST_ETHER
-			/* try to recognize ethernet devices immediately */
-			usb_ether_curr_dev = usb_host_eth_scan(1);
-#endif
-#ifdef CONFIG_USB_KEYBOARD
-			drv_usb_kbd_init();
-#endif
-		}
+		do_usb_start();
 		return 0;
 	}
 	if (strncmp(argv[1], "stop", 4) == 0) {
-#ifdef CONFIG_USB_KEYBOARD
-		if (argc == 2) {
-			if (usb_kbd_deregister() != 0) {
-				printf("USB not stopped: usbkbd still"
-					" using USB\n");
-				return 1;
-			}
-		} else {
-			/* forced stop, switch console in to serial */
+		if (argc != 2)
 			console_assign(stdin, "serial");
-			usb_kbd_deregister();
-		}
-#endif
+		if (do_usb_stop_keyboard(0) != 0)
+			return 1;
 		printf("stopping USB..\n");
 		usb_stop();
 		return 0;
@@ -441,17 +529,9 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			}
 			return 0;
 		} else {
-			int d;
-
-			i = simple_strtoul(argv[2], NULL, 16);
+			i = simple_strtoul(argv[2], NULL, 10);
 			printf("config for device %d\n", i);
-			for (d = 0; d < USB_MAX_DEVICE; d++) {
-				dev = usb_get_dev_index(d);
-				if (dev == NULL)
-					break;
-				if (dev->devnum == i)
-					break;
-			}
+			dev = usb_find_device(i);
 			if (dev == NULL) {
 				printf("*** No device available ***\n");
 				return 0;
@@ -461,6 +541,18 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			}
 		}
 		return 0;
+	}
+	if (strncmp(argv[1], "test", 4) == 0) {
+		if (argc < 5)
+			return CMD_RET_USAGE;
+		i = simple_strtoul(argv[2], NULL, 10);
+		dev = usb_find_device(i);
+		if (dev == NULL) {
+			printf("Device %d does not exist.\n", i);
+			return 1;
+		}
+		i = simple_strtoul(argv[3], NULL, 10);
+		return usb_test(dev, i, argv[4]);
 	}
 #ifdef CONFIG_USB_STORAGE
 	if (strncmp(argv[1], "stor", 4) == 0)
@@ -571,7 +663,6 @@ static int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return CMD_RET_USAGE;
 }
 
-#ifdef CONFIG_USB_STORAGE
 U_BOOT_CMD(
 	usb,	5,	1,	do_usb,
 	"USB sub-system",
@@ -580,30 +671,26 @@ U_BOOT_CMD(
 	"usb stop [f] - stop USB [f]=force stop\n"
 	"usb tree - show USB device tree\n"
 	"usb info [dev] - show available USB devices\n"
+	"usb test [dev] [port] [mode] - set USB 2.0 test mode\n"
+	"    (specify port 0 to indicate the device's upstream port)\n"
+	"    Available modes: J, K, S[E0_NAK], P[acket], F[orce_Enable]\n"
+#ifdef CONFIG_USB_STORAGE
 	"usb storage - show details of USB storage devices\n"
 	"usb dev [dev] - show or set current USB storage device\n"
 	"usb part [dev] - print partition table of one or all USB storage"
-	" devices\n"
+	"    devices\n"
 	"usb read addr blk# cnt - read `cnt' blocks starting at block `blk#'\n"
 	"    to memory address `addr'\n"
 	"usb write addr blk# cnt - write `cnt' blocks starting at block `blk#'\n"
 	"    from memory address `addr'"
+#endif /* CONFIG_USB_STORAGE */
 );
 
 
+#ifdef CONFIG_USB_STORAGE
 U_BOOT_CMD(
 	usbboot,	3,	1,	do_usbboot,
 	"boot from USB device",
 	"loadAddr dev:part"
 );
-
-#else
-U_BOOT_CMD(
-	usb,	5,	1,	do_usb,
-	"USB sub-system",
-	"start - start (scan) USB controller\n"
-	"usb reset - reset (rescan) USB controller\n"
-	"usb tree - show USB device tree\n"
-	"usb info [dev] - show available USB devices"
-);
-#endif
+#endif /* CONFIG_USB_STORAGE */

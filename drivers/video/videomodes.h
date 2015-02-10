@@ -2,25 +2,10 @@
  * (C) Copyright 2004
  * Pierre Aubert, Staubli Faverges , <p.aubert@staubli.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
+#include <edid.h>
 
 #ifndef CONFIG_SYS_DEFAULT_VIDEO_MODE
 #define CONFIG_SYS_DEFAULT_VIDEO_MODE	0x301
@@ -51,8 +36,10 @@
 struct ctfb_res_modes {
 	int xres;		/* visible resolution		*/
 	int yres;
+	int refresh;		/* vertical refresh rate in hz  */
 	/* Timing: All values in pixclocks, except pixclock (of course) */
 	int pixclock;		/* pixel clock in ps (pico seconds) */
+	int pixclock_khz;	/* pixel clock in kHz           */
 	int left_margin;	/* time from sync to picture	*/
 	int right_margin;	/* time from picture to sync	*/
 	int upper_margin;	/* time from sync to picture	*/
@@ -78,7 +65,11 @@ struct ctfb_vesa_modes {
 #define RES_MODE_960_720	3
 #define RES_MODE_1152x864	4
 #define RES_MODE_1280x1024	5
-#define RES_MODES_COUNT		6
+#define RES_MODE_1280x720	6
+#define RES_MODE_1360x768	7
+#define RES_MODE_1920x1080	8
+#define RES_MODE_1920x1200	9
+#define RES_MODES_COUNT		10
 
 #define VESA_MODES_COUNT 19
 
@@ -89,3 +80,16 @@ int video_get_params (struct ctfb_res_modes *pPar, char *penv);
 
 int video_get_video_mode(unsigned int *xres, unsigned int *yres,
 	unsigned int *depth, unsigned int *freq, const char **options);
+
+void video_get_ctfb_res_modes(int default_mode, unsigned int default_depth,
+			      const struct ctfb_res_modes **mode_ret,
+			      unsigned int *depth_ret,
+			      const char **options);
+
+void video_get_option_string(const char *options, const char *name,
+			     char *dest, int dest_len, const char *def);
+
+int video_get_option_int(const char *options, const char *name, int def);
+
+int video_edid_dtd_to_ctfb_res_modes(struct edid_detailed_timing *t,
+				     struct ctfb_res_modes *mode);

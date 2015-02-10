@@ -4,31 +4,19 @@
  * Copyright (C) 2011
  * Heiko Schocher, DENX Software Engineering, hs@denx.de.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
+#include <cli.h>
 #include <errno.h>
-#include <hush.h>
 #include <linux/mtd/nand.h>
 #include <nand.h>
 #include <miiphy.h>
 #include <netdev.h>
 #include <asm/io.h>
 #include <asm/arch/hardware.h>
-#include <asm/arch/nand_defs.h>
+#include <asm/ti-common/davinci_nand.h>
 #include <asm/arch/davinci_misc.h>
 #ifdef CONFIG_DAVINCI_MMC
 #include <mmc.h>
@@ -120,7 +108,7 @@ int board_eth_init(bd_t *bis)
 #ifdef CONFIG_NAND_DAVINCI
 static int
 davinci_std_read_page_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
-				   uint8_t *buf, int page)
+				   uint8_t *buf, int oob_required, int page)
 {
 	struct nand_chip *this = mtd->priv;
 	int i, eccsize = chip->ecc.size;
@@ -167,8 +155,9 @@ davinci_std_read_page_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
 	return 0;
 }
 
-static void davinci_std_write_page_syndrome(struct mtd_info *mtd,
-				    struct nand_chip *chip, const uint8_t *buf)
+static int davinci_std_write_page_syndrome(struct mtd_info *mtd,
+				    struct nand_chip *chip, const uint8_t *buf,
+				    int oob_required)
 {
 	unsigned char davinci_ecc_buf[NAND_MAX_OOBSIZE];
 	struct nand_chip *this = mtd->priv;
@@ -218,6 +207,7 @@ static void davinci_std_write_page_syndrome(struct mtd_info *mtd,
 	i = mtd->oobsize - (oob - chip->oob_poi);
 	if (i)
 		chip->write_buf(mtd, oob, i);
+	return 0;
 }
 
 static int davinci_std_write_oob_syndrome(struct mtd_info *mtd,
@@ -239,7 +229,7 @@ static int davinci_std_write_oob_syndrome(struct mtd_info *mtd,
 }
 
 static int davinci_std_read_oob_syndrome(struct mtd_info *mtd,
-	struct nand_chip *chip, int page, int sndcmd)
+	struct nand_chip *chip, int page)
 {
 	struct nand_chip *this = mtd->priv;
 	uint8_t *buf = chip->oob_poi;
@@ -249,7 +239,7 @@ static int davinci_std_read_oob_syndrome(struct mtd_info *mtd,
 
 	chip->read_buf(mtd, bufpoi, mtd->oobsize);
 
-	return 1;
+	return 0;
 }
 
 static void nand_dm365evm_select_chip(struct mtd_info *mtd, int chip)
@@ -561,7 +551,8 @@ static char *menu_handle(struct menu_display *display)
 	char *s;
 	char temp[6][200];
 
-	m = menu_create(display->title, display->timeout, 1, ait_menu_print);
+	m = menu_create(display->title, display->timeout, 1, ait_menu_print,
+			NULL, NULL);
 
 	for (i = 0; display->menulist[i]; i++) {
 		sprintf(key, "%d", i + 1);
@@ -786,7 +777,7 @@ static void ait_menu_read_env(char *name)
 
 	sprintf(output, "%s old: %s value: ", name, getenv(name));
 	memset(cbuf, 0, CONFIG_SYS_CBSIZE);
-	readret = readline_into_buffer(output, cbuf, 0);
+	readret = cli_readline_into_buffer(output, cbuf, 0);
 
 	if (readret >= 0) {
 		ret = setenv(name, cbuf);

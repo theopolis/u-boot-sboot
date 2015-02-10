@@ -15,13 +15,12 @@
 #include <asm/errno.h>
 #include <asm/byteorder.h>
 #include <asm/blackfin.h>
+#include <asm/clock.h>
 #include <asm/portmux.h>
 #include <asm/mach-common/bits/sdh.h>
 #include <asm/mach-common/bits/dma.h>
 
-#if defined(__ADSPBF50x__) || defined(__ADSPBF51x__)
-# define bfin_read_SDH_PWR_CTL		bfin_read_RSI_PWR_CONTROL
-# define bfin_write_SDH_PWR_CTL		bfin_write_RSI_PWR_CONTROL
+#if defined(__ADSPBF50x__) || defined(__ADSPBF51x__) || defined(__ADSPBF60x__)
 # define bfin_read_SDH_CLK_CTL		bfin_read_RSI_CLK_CONTROL
 # define bfin_write_SDH_CLK_CTL		bfin_write_RSI_CLK_CONTROL
 # define bfin_write_SDH_ARGUMENT	bfin_write_RSI_ARGUMENT
@@ -38,10 +37,21 @@
 # define bfin_write_SDH_STATUS_CLR 	bfin_write_RSI_STATUSCL
 # define bfin_read_SDH_CFG		bfin_read_RSI_CONFIG
 # define bfin_write_SDH_CFG		bfin_write_RSI_CONFIG
+# if defined(__ADSPBF60x__)
+# define bfin_read_SDH_BLK_SIZE		bfin_read_RSI_BLKSZ
+# define bfin_write_SDH_BLK_SIZE	bfin_write_RSI_BLKSZ
+# define bfin_write_DMA_START_ADDR	bfin_write_DMA10_START_ADDR
+# define bfin_write_DMA_X_COUNT		bfin_write_DMA10_X_COUNT
+# define bfin_write_DMA_X_MODIFY	bfin_write_DMA10_X_MODIFY
+# define bfin_write_DMA_CONFIG		bfin_write_DMA10_CONFIG
+# else
+# define bfin_read_SDH_PWR_CTL		bfin_read_RSI_PWR_CONTROL
+# define bfin_write_SDH_PWR_CTL		bfin_write_RSI_PWR_CONTROL
 # define bfin_write_DMA_START_ADDR	bfin_write_DMA4_START_ADDR
 # define bfin_write_DMA_X_COUNT		bfin_write_DMA4_X_COUNT
 # define bfin_write_DMA_X_MODIFY	bfin_write_DMA4_X_MODIFY
 # define bfin_write_DMA_CONFIG		bfin_write_DMA4_CONFIG
+# endif
 # define PORTMUX_PINS \
 	{ P_RSI_DATA0, P_RSI_DATA1, P_RSI_DATA2, P_RSI_DATA3, P_RSI_CMD, P_RSI_CLK, 0 }
 #elif defined(__ADSPBF54x__)
@@ -70,6 +80,9 @@ sdh_send_cmd(struct mmc *mmc, struct mmc_cmd *mmc_cmd)
 		sdh_cmd |= CMD_RSP;
 	if (flags & MMC_RSP_136)
 		sdh_cmd |= CMD_L_RSP;
+#ifdef RSI_BLKSZ
+	sdh_cmd |= CMD_DATA0_BUSY;
+#endif
 
 	bfin_write_SDH_ARGUMENT(arg);
 	bfin_write_SDH_COMMAND(sdh_cmd);
@@ -104,6 +117,12 @@ sdh_send_cmd(struct mmc *mmc, struct mmc_cmd *mmc_cmd)
 
 	bfin_write_SDH_STATUS_CLR(CMD_SENT_STAT | CMD_RESP_END_STAT |
 				CMD_TIMEOUT_STAT | CMD_CRC_FAIL_STAT);
+#ifdef RSI_BLKSZ
+	/* wait till card ready */
+	while (!(bfin_read_RSI_ESTAT() & SD_CARD_READY))
+		continue;
+	bfin_write_RSI_ESTAT(SD_CARD_READY);
+#endif
 
 	return ret;
 }
@@ -113,16 +132,19 @@ static int sdh_setup_data(struct mmc *mmc, struct mmc_data *data)
 {
 	u16 data_ctl = 0;
 	u16 dma_cfg = 0;
-	int ret = 0;
 	unsigned long data_size = data->blocksize * data->blocks;
 
 	/* Don't support write yet. */
 	if (data->flags & MMC_DATA_WRITE)
 		return UNUSABLE_ERR;
-	data_ctl |= ((ffs(data_size) - 1) << 4);
+#ifndef RSI_BLKSZ
+	data_ctl |= ((ffs(data->blocksize) - 1) << 4);
+#else
+	bfin_write_SDH_BLK_SIZE(data->blocksize);
+#endif
 	data_ctl |= DTX_DIR;
 	bfin_write_SDH_DATA_CTL(data_ctl);
-	dma_cfg = WDSIZE_32 | RESTART | WNR | DMAEN;
+	dma_cfg = WDSIZE_32 | PSIZE_32 | RESTART | WNR | DMAEN;
 
 	bfin_write_SDH_DATA_TIMER(-1);
 
@@ -137,7 +159,7 @@ static int sdh_setup_data(struct mmc *mmc, struct mmc_data *data)
 	/* kick off transfer */
 	bfin_write_SDH_DATA_CTL(bfin_read_SDH_DATA_CTL() | DTX_DMA_E | DTX_E);
 
-	return ret;
+	return 0;
 }
 
 
@@ -147,17 +169,28 @@ static int bfin_sdh_request(struct mmc *mmc, struct mmc_cmd *cmd,
 	u32 status;
 	int ret = 0;
 
+	if (data) {
+		ret = sdh_setup_data(mmc, data);
+		if (ret)
+			return ret;
+	}
+
 	ret = sdh_send_cmd(mmc, cmd);
 	if (ret) {
+		bfin_write_SDH_COMMAND(0);
+		bfin_write_DMA_CONFIG(0);
+		bfin_write_SDH_DATA_CTL(0);
+		SSYNC();
 		printf("sending CMD%d failed\n", cmd->cmdidx);
 		return ret;
 	}
+
 	if (data) {
-		ret = sdh_setup_data(mmc, data);
 		do {
 			udelay(1);
 			status = bfin_read_SDH_STATUS();
-		} while (!(status & (DAT_BLK_END | DAT_END | DAT_TIME_OUT | DAT_CRC_FAIL | RX_OVERRUN)));
+		} while (!(status & (DAT_END | DAT_TIME_OUT | DAT_CRC_FAIL |
+			 RX_OVERRUN)));
 
 		if (status & DAT_TIME_OUT) {
 			bfin_write_SDH_STATUS_CLR(DAT_TIMEOUT_STAT);
@@ -208,10 +241,12 @@ static void bfin_sdh_set_ios(struct mmc *mmc)
 
 	if (mmc->bus_width == 4) {
 		cfg = bfin_read_SDH_CFG();
-		cfg &= ~0x80;
-		cfg |= 0x40;
+#ifndef RSI_BLKSZ
+		cfg &= ~PD_SDDAT3;
+#endif
+		cfg |= PUP_SDDAT3;
 		bfin_write_SDH_CFG(cfg);
-		clk_ctl |= WIDE_BUS;
+		clk_ctl |= WIDE_BUS_4;
 	}
 	bfin_write_SDH_CLK_CTL(clk_ctl);
 	sdh_set_clk(mmc->clock);
@@ -220,46 +255,50 @@ static void bfin_sdh_set_ios(struct mmc *mmc)
 static int bfin_sdh_init(struct mmc *mmc)
 {
 	const unsigned short pins[] = PORTMUX_PINS;
-	u16 pwr_ctl = 0;
+	int ret;
 
 	/* Initialize sdh controller */
-	peripheral_request_list(pins, "bfin_sdh");
+	ret = peripheral_request_list(pins, "bfin_sdh");
+	if (ret < 0)
+		return ret;
 #if defined(__ADSPBF54x__)
 	bfin_write_DMAC1_PERIMUX(bfin_read_DMAC1_PERIMUX() | 0x1);
 #endif
 	bfin_write_SDH_CFG(bfin_read_SDH_CFG() | CLKS_EN);
 	/* Disable card detect pin */
 	bfin_write_SDH_CFG((bfin_read_SDH_CFG() & 0x1F) | 0x60);
-
-	pwr_ctl |= ROD_CTL;
-	pwr_ctl |= PWR_ON;
-	bfin_write_SDH_PWR_CTL(pwr_ctl);
+#ifndef RSI_BLKSZ
+	bfin_write_SDH_PWR_CTL(PWR_ON | ROD_CTL);
+#else
+	bfin_write_SDH_CFG(bfin_read_SDH_CFG() | PWR_ON);
+#endif
 	return 0;
 }
 
+static const struct mmc_ops bfin_mmc_ops = {
+	.send_cmd	= bfin_sdh_request,
+	.set_ios	= bfin_sdh_set_ios,
+	.init		= bfin_sdh_init,
+};
+
+static struct mmc_config bfin_mmc_cfg = {
+	.name		= "Blackfin SDH",
+	.ops		= &bfin_mmc_ops,
+	.host_caps	= MMC_MODE_4BIT,
+	.voltages	= MMC_VDD_32_33 | MMC_VDD_33_34,
+	.b_max		= CONFIG_SYS_MMC_MAX_BLK_COUNT,
+};
 
 int bfin_mmc_init(bd_t *bis)
 {
-	struct mmc *mmc = NULL;
+	struct mmc *mmc;
 
-	mmc = malloc(sizeof(struct mmc));
+	bfin_mmc_cfg.f_max = get_sclk();
+	bfin_mmc_cfg.f_min = bfin_mmc_cfg.f_max >> 9;
 
-	if (!mmc)
-		return -ENOMEM;
-	sprintf(mmc->name, "Blackfin SDH");
-	mmc->send_cmd = bfin_sdh_request;
-	mmc->set_ios = bfin_sdh_set_ios;
-	mmc->init = bfin_sdh_init;
-	mmc->getcd = NULL;
-	mmc->host_caps = MMC_MODE_4BIT;
-
-	mmc->voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
-	mmc->f_max = get_sclk();
-	mmc->f_min = mmc->f_max >> 9;
-
-	mmc->b_max = 0;
-
-	mmc_register(mmc);
+	mmc = mmc_create(&bfin_mmc_cfg, NULL);
+	if (mmc == NULL)
+		return -1;
 
 	return 0;
 }

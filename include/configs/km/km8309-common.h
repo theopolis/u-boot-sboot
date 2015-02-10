@@ -4,10 +4,7 @@
  *
  * Based on km8321-common.h, see respective copyright notice for credits
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_KM8309_COMMON_H
@@ -18,11 +15,10 @@
  */
 #define CONFIG_E300		1	/* E300 family */
 #define CONFIG_QE		1	/* Has QE */
-#define CONFIG_MPC83xx		1	/* MPC83xx family */
 #define CONFIG_MPC830x		1	/* MPC830x family */
 #define CONFIG_MPC8309		1	/* MPC8309 CPU specific */
 
-#define CONFIG_KM_DEF_ARCH	"arch=ppc_8xx\0"
+#define CONFIG_KM_DEF_ARCH	"arch=ppc_82xx\0"
 #define CONFIG_CMD_DIAG		1
 
 /* include common defines/options for all 83xx Keymile boards */
@@ -31,9 +27,7 @@
 /* QE microcode/firmware address */
 #define CONFIG_SYS_QE_FMAN_FW_IN_NOR
 /* at end of uboot partition, before env */
-#define CONFIG_SYS_QE_FMAN_FW_ADDR   0xF00B0000
-
-#define CONFIG_MISC_INIT_R
+#define CONFIG_SYS_QE_FW_ADDR   0xF00B0000
 
 /*
  * System IO Config

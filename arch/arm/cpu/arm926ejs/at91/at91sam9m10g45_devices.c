@@ -3,23 +3,7 @@
  * Stelian Pop <stelian@popies.net>
  * Lead Tech Design <www.leadtechdesign.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -179,5 +163,22 @@ void at91_macb_hw_init(void)
 	at91_set_b_periph(AT91_PIO_PORTA, 7,  0);	/* ETX3 */
 	at91_set_b_periph(AT91_PIO_PORTA, 27, 0);	/* ETXER */
 #endif
+}
+#endif
+
+#ifdef CONFIG_GENERIC_ATMEL_MCI
+void at91_mci_hw_init(void)
+{
+	struct at91_pmc *pmc = (struct at91_pmc *)ATMEL_BASE_PMC;
+
+	at91_set_a_periph(AT91_PIO_PORTA, 0, 0);	/* MCI0 CLK */
+	at91_set_a_periph(AT91_PIO_PORTA, 1, 0);	/* MCI0 CDA */
+	at91_set_a_periph(AT91_PIO_PORTA, 2, 0);	/* MCI0 DA0 */
+	at91_set_a_periph(AT91_PIO_PORTA, 3, 0);	/* MCI0 DA1 */
+	at91_set_a_periph(AT91_PIO_PORTA, 4, 0);	/* MCI0 DA2 */
+	at91_set_a_periph(AT91_PIO_PORTA, 5, 0);	/* MCI0 DA3 */
+
+	/* Enable clock */
+	writel(1 << ATMEL_ID_MCI0, &pmc->pcer);
 }
 #endif

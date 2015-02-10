@@ -4,29 +4,13 @@
  *
  * Configuration settings for the CPUAT91 board.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _CONFIG_CPUAT91_H
 #define _CONFIG_CPUAT91_H
 
-#include <asm/sizes.h>
+#include <linux/sizes.h>
 
 #ifdef CONFIG_RAMBOOT
 #define CONFIG_SKIP_LOWLEVEL_INIT
@@ -41,9 +25,7 @@
 #define AT91C_MAIN_CLOCK		((AT91C_XTAL_CLOCK / 4) * 39)
 #define AT91C_MASTER_CLOCK		(AT91C_MAIN_CLOCK / 3)
 #define CONFIG_SYS_HZ_CLOCK		(AT91C_MASTER_CLOCK / 2)
-#define CONFIG_SYS_HZ			1000
 
-#define CONFIG_ARM920T
 #define CONFIG_AT91RM9200
 #define CONFIG_CPUAT91
 #define USE_920T_MMU
@@ -92,7 +74,6 @@
 #define CONFIG_USART_ID		0/* ignored in arm */
 
 #undef CONFIG_HARD_I2C
-#undef CONFIG_SOFT_I2C
 #define AT91_PIN_SDA			(1<<25)
 #define AT91_PIN_SCL			(1<<26)
 
@@ -139,7 +120,7 @@
 #undef CONFIG_CMD_NFS
 #undef CONFIG_CMD_DHCP
 
-#ifdef CONFIG_SOFT_I2C
+#ifdef CONFIG_SYS_I2C_SOFT
 #define CONFIG_CMD_EEPROM
 #define CONFIG_CMD_I2C
 #endif
@@ -177,6 +158,7 @@
 
 #if defined(CONFIG_CMD_USB)
 #define CONFIG_USB_ATMEL
+#define CONFIG_USB_ATMEL_CLK_SEL_PLLB
 #define CONFIG_USB_OHCI_NEW
 #define CONFIG_USB_STORAGE
 #define CONFIG_DOS_PARTITION

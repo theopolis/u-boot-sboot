@@ -5,26 +5,10 @@
  * This driver is written to transfer 8 bit at-a-time and uses the dedicated
  * SPI slave select pins as bit-banged GPIO to work with spi_flash subsystem.
  *
- *
  * Copyright (C) 2011 Ruggedcom, Inc.
  * Richard Retanubun (richardretanubun@freescale.com)
  *
- * See file CREDITS for list of people who contributed to this project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -120,13 +104,11 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 	if (!spi_cs_is_valid(bus, cs))
 		return NULL;
 
-	dev = malloc(sizeof(struct cf_qspi_slave));
+	dev = spi_alloc_slave(struct cf_qspi_slave, bus, cs);
 	if (!dev)
 		return NULL;
 
 	/* Initialize to known value */
-	dev->slave.bus = bus;
-	dev->slave.cs  = cs;
 	dev->regs      = (qspi_t *)MMAP_QSPI;
 	dev->qmr       = 0;
 	dev->qwr       = 0;
@@ -173,7 +155,7 @@ int spi_xfer(struct spi_slave *slave, unsigned int bitlen, const void *dout,
 	volatile qspi_t *qspi = dev->regs;
 	u8 *txbuf = (u8 *)dout;
 	u8 *rxbuf = (u8 *)din;
-	u32 count = ((bitlen / 8) + (bitlen % 8 ? 1 : 0));
+	u32 count = DIV_ROUND_UP(bitlen, 8);
 	u32 n, i = 0;
 
 	/* Sanitize arguments */

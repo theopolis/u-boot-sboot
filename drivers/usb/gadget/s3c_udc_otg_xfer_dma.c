@@ -15,20 +15,7 @@
  * Marek Szyprowski <m.szyprowski@samsung.com>
  * Lukasz Majewski <l.majewski@samsumg.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 static u8 clear_feature_num;
@@ -41,10 +28,6 @@ int clear_feature_flag;
 static inline void s3c_udc_ep0_zlp(struct s3c_udc *dev)
 {
 	u32 ep_ctrl;
-
-	flush_dcache_range((unsigned long) usb_ctrl_dma_addr,
-			   (unsigned long) usb_ctrl_dma_addr
-			   + DMA_BUFFER_SIZE);
 
 	writel(usb_ctrl_dma_addr, &reg->in_endp[EP0_CON].diepdma);
 	writel(DIEPT_SIZ_PKT_CNT(1), &reg->in_endp[EP0_CON].dieptsiz);
@@ -64,10 +47,6 @@ void s3c_udc_pre_setup(void)
 
 	debug_cond(DEBUG_IN_EP,
 		   "%s : Prepare Setup packets.\n", __func__);
-
-	invalidate_dcache_range((unsigned long) usb_ctrl_dma_addr,
-				(unsigned long) usb_ctrl_dma_addr
-				+ DMA_BUFFER_SIZE);
 
 	writel(DOEPT_SIZ_PKT_CNT(1) | sizeof(struct usb_ctrlrequest),
 	       &reg->out_endp[EP0_CON].doeptsiz);
@@ -95,10 +74,6 @@ static inline void s3c_ep0_complete_out(void)
 	debug_cond(DEBUG_IN_EP,
 		"%s : Prepare Complete Out packet.\n", __func__);
 
-	invalidate_dcache_range((unsigned long) usb_ctrl_dma_addr,
-				(unsigned long) usb_ctrl_dma_addr
-				+ DMA_BUFFER_SIZE);
-
 	writel(DOEPT_SIZ_PKT_CNT(1) | sizeof(struct usb_ctrlrequest),
 	       &reg->out_endp[EP0_CON].doeptsiz);
 	writel(usb_ctrl_dma_addr, &reg->out_endp[EP0_CON].doepdma);
@@ -122,26 +97,20 @@ static int setdma_rx(struct s3c_ep *ep, struct s3c_request *req)
 	u32 ep_num = ep_index(ep);
 
 	buf = req->req.buf + req->req.actual;
-
-	length = min(req->req.length - req->req.actual, (int)ep->ep.maxpacket);
+	length = min_t(u32, req->req.length - req->req.actual,
+		       ep_num ? DMA_BUFFER_SIZE : ep->ep.maxpacket);
 
 	ep->len = length;
 	ep->dma_buf = buf;
 
-	invalidate_dcache_range((unsigned long) ep->dev->dma_buf[ep_num],
-				(unsigned long) ep->dev->dma_buf[ep_num]
-				+ DMA_BUFFER_SIZE);
-
-	if (length == 0)
+	if (ep_num == EP0_CON || length == 0)
 		pktcnt = 1;
 	else
 		pktcnt = (length - 1)/(ep->ep.maxpacket) + 1;
 
-	pktcnt = 1;
 	ctrl =  readl(&reg->out_endp[ep_num].doepctl);
 
-	writel(the_controller->dma_addr[ep_index(ep)+1],
-	       &reg->out_endp[ep_num].doepdma);
+	writel((unsigned int) ep->dma_buf, &reg->out_endp[ep_num].doepdma);
 	writel(DOEPT_SIZ_PKT_CNT(pktcnt) | DOEPT_SIZ_XFER_SIZE(length),
 	       &reg->out_endp[ep_num].doeptsiz);
 	writel(DEPCTL_EPENA|DEPCTL_CNAK|ctrl, &reg->out_endp[ep_num].doepctl);
@@ -164,7 +133,6 @@ int setdma_tx(struct s3c_ep *ep, struct s3c_request *req)
 	u32 *buf, ctrl = 0;
 	u32 length, pktcnt;
 	u32 ep_num = ep_index(ep);
-	u32 *p = the_controller->dma_buf[ep_index(ep)+1];
 
 	buf = req->req.buf + req->req.actual;
 	length = req->req.length - req->req.actual;
@@ -174,10 +142,10 @@ int setdma_tx(struct s3c_ep *ep, struct s3c_request *req)
 
 	ep->len = length;
 	ep->dma_buf = buf;
-	memcpy(p, ep->dma_buf, length);
 
-	flush_dcache_range((unsigned long) p ,
-			   (unsigned long) p + DMA_BUFFER_SIZE);
+	flush_dcache_range((unsigned long) ep->dma_buf,
+			   (unsigned long) ep->dma_buf +
+			   ROUND(ep->len, CONFIG_SYS_CACHELINE_SIZE));
 
 	if (length == 0)
 		pktcnt = 1;
@@ -190,8 +158,7 @@ int setdma_tx(struct s3c_ep *ep, struct s3c_request *req)
 	while (readl(&reg->grstctl) & TX_FIFO_FLUSH)
 		;
 
-	writel(the_controller->dma_addr[ep_index(ep)+1],
-	       &reg->in_endp[ep_num].diepdma);
+	writel((unsigned long) ep->dma_buf, &reg->in_endp[ep_num].diepdma);
 	writel(DIEPT_SIZ_PKT_CNT(pktcnt) | DIEPT_SIZ_XFER_SIZE(length),
 	       &reg->in_endp[ep_num].dieptsiz);
 
@@ -224,7 +191,6 @@ static void complete_rx(struct s3c_udc *dev, u8 ep_num)
 	struct s3c_ep *ep = &dev->ep[ep_num];
 	struct s3c_request *req = NULL;
 	u32 ep_tsr = 0, xfer_size = 0, is_short = 0;
-	u32 *p = the_controller->dma_buf[ep_index(ep)+1];
 
 	if (list_empty(&ep->queue)) {
 		debug_cond(DEBUG_OUT_EP != 0,
@@ -244,10 +210,23 @@ static void complete_rx(struct s3c_udc *dev, u8 ep_num)
 
 	xfer_size = ep->len - xfer_size;
 
-	invalidate_dcache_range((unsigned long) p,
-				(unsigned long) p + DMA_BUFFER_SIZE);
-
-	memcpy(ep->dma_buf, p, ep->len);
+	/*
+	 * NOTE:
+	 *
+	 * Please be careful with proper buffer allocation for USB request,
+	 * which needs to be aligned to CONFIG_SYS_CACHELINE_SIZE, not only
+	 * with starting address, but also its size shall be a cache line
+	 * multiplication.
+	 *
+	 * This will prevent from corruption of data allocated immediatelly
+	 * before or after the buffer.
+	 *
+	 * For armv7, the cache_v7.c provides proper code to emit "ERROR"
+	 * message to warn users.
+	 */
+	invalidate_dcache_range((unsigned long) ep->dma_buf,
+				(unsigned long) ep->dma_buf +
+				ROUND(xfer_size, CONFIG_SYS_CACHELINE_SIZE));
 
 	req->req.actual += min(xfer_size, req->req.length - req->req.actual);
 	is_short = (xfer_size < ep->ep.maxpacket);
@@ -487,7 +466,7 @@ static int s3c_udc_irq(int irq, void *_dev)
 	struct s3c_udc *dev = _dev;
 	u32 intr_status;
 	u32 usb_status, gintmsk;
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	spin_lock_irqsave(&dev->lock, flags);
 
@@ -572,7 +551,7 @@ static int s3c_udc_irq(int irq, void *_dev)
 				debug_cond(DEBUG_ISR,
 					"\t\tOTG core got reset (%d)!!\n",
 					reset_available);
-				reconfig_usbd();
+				reconfig_usbd(dev);
 				dev->ep0state = WAIT_FOR_SETUP;
 				reset_available = 0;
 				s3c_udc_pre_setup();
@@ -606,7 +585,7 @@ static int s3c_queue(struct usb_ep *_ep, struct usb_request *_req,
 	struct s3c_request *req;
 	struct s3c_ep *ep;
 	struct s3c_udc *dev;
-	unsigned long flags;
+	unsigned long flags = 0;
 	u32 ep_num, gintsts;
 
 	req = container_of(_req, struct s3c_request, req);
@@ -741,19 +720,14 @@ static int write_fifo_ep0(struct s3c_ep *ep, struct s3c_request *req)
 
 int s3c_fifo_read(struct s3c_ep *ep, u32 *cp, int max)
 {
-	u32 bytes;
-
-	bytes = sizeof(struct usb_ctrlrequest);
-
-	invalidate_dcache_range((unsigned long) ep->dev->dma_buf[ep_index(ep)],
-				(unsigned long) ep->dev->dma_buf[ep_index(ep)]
-				+ DMA_BUFFER_SIZE);
+	invalidate_dcache_range((unsigned long)cp, (unsigned long)cp +
+				ROUND(max, CONFIG_SYS_CACHELINE_SIZE));
 
 	debug_cond(DEBUG_EP0 != 0,
-		   "%s: bytes=%d, ep_index=%d %p\n", __func__,
-		   bytes, ep_index(ep), ep->dev->dma_buf[ep_index(ep)]);
+		   "%s: bytes=%d, ep_index=%d 0x%p\n", __func__,
+		   max, ep_index(ep), cp);
 
-	return bytes;
+	return max;
 }
 
 /**
@@ -885,14 +859,12 @@ static int s3c_ep0_write(struct s3c_udc *dev)
 	return 1;
 }
 
-u16	g_status;
-
 int s3c_udc_get_status(struct s3c_udc *dev,
 		struct usb_ctrlrequest *crq)
 {
 	u8 ep_num = crq->wIndex & 0x7F;
+	u16 g_status = 0;
 	u32 ep_ctrl;
-	u32 *p = the_controller->dma_buf[1];
 
 	debug_cond(DEBUG_SETUP != 0,
 		   "%s: *** USB_REQ_GET_STATUS\n", __func__);
@@ -930,12 +902,13 @@ int s3c_udc_get_status(struct s3c_udc *dev,
 		return 1;
 	}
 
-	memcpy(p, &g_status, sizeof(g_status));
+	memcpy(usb_ctrl, &g_status, sizeof(g_status));
 
-	flush_dcache_range((unsigned long) p,
-			   (unsigned long) p + DMA_BUFFER_SIZE);
+	flush_dcache_range((unsigned long) usb_ctrl,
+			   (unsigned long) usb_ctrl +
+			   ROUND(sizeof(g_status), CONFIG_SYS_CACHELINE_SIZE));
 
-	writel(the_controller->dma_addr[1], &reg->in_endp[EP0_CON].diepdma);
+	writel(usb_ctrl_dma_addr, &reg->in_endp[EP0_CON].diepdma);
 	writel(DIEPT_SIZ_PKT_CNT(1) | DIEPT_SIZ_XFER_SIZE(2),
 	       &reg->in_endp[EP0_CON].dieptsiz);
 
@@ -1060,7 +1033,7 @@ static int s3c_udc_set_halt(struct usb_ep *_ep, int value)
 {
 	struct s3c_ep	*ep;
 	struct s3c_udc	*dev;
-	unsigned long	flags;
+	unsigned long	flags = 0;
 	u8		ep_num;
 
 	ep = container_of(_ep, struct s3c_ep, ep);

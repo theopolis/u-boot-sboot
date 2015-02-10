@@ -2,23 +2,7 @@
  * (C) Copyright 2000
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* #define DEBUG */
@@ -104,7 +88,6 @@ flash_protect (int flag, ulong from, ulong to, flash_info_t *info)
 flash_info_t *
 addr2info (ulong addr)
 {
-#ifndef CONFIG_SPD823TS
 	flash_info_t *info;
 	int i;
 
@@ -120,7 +103,6 @@ addr2info (ulong addr)
 			return (info);
 		}
 	}
-#endif /* CONFIG_SPD823TS */
 
 	return (NULL);
 }
@@ -141,14 +123,14 @@ addr2info (ulong addr)
 int
 flash_write (char *src, ulong addr, ulong cnt)
 {
-#ifdef CONFIG_SPD823TS
-	return (ERR_TIMOUT);	/* any other error codes are possible as well */
-#else
 	int i;
 	ulong         end        = addr + cnt - 1;
 	flash_info_t *info_first = addr2info (addr);
 	flash_info_t *info_last  = addr2info (end );
 	flash_info_t *info;
+	__maybe_unused char *src_orig = src;
+	__maybe_unused char *addr_orig = (char *)addr;
+	__maybe_unused ulong cnt_orig = cnt;
 
 	if (cnt == 0) {
 		return (ERR_OK);
@@ -185,8 +167,15 @@ flash_write (char *src, ulong addr, ulong cnt)
 		addr += len;
 		src  += len;
 	}
+
+#if defined(CONFIG_FLASH_VERIFY)
+	if (memcmp(src_orig, addr_orig, cnt_orig)) {
+		printf("\nVerify failed!\n");
+		return ERR_PROG_ERROR;
+	}
+#endif /* CONFIG_SYS_FLASH_VERIFY_AFTER_WRITE */
+
 	return (ERR_OK);
-#endif /* CONFIG_SPD823TS */
 }
 
 /*-----------------------------------------------------------------------

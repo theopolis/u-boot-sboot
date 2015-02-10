@@ -5,23 +5,7 @@
  * (C) Copyright 2002
  * Daniel Engström, Omicron Ceti AB, <daniel@omicron.se>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -40,11 +24,9 @@
 #error "CONFIG_SYS_NUM_IRQS must equal 16 if CONFIG_SYS_NUM_IRQS is defined"
 #endif
 
-int interrupt_init(void)
+int i8259_init(void)
 {
 	u8 i;
-
-	disable_interrupts();
 
 	/* Mask all interrupts */
 	outb(0xff, MASTER_PIC + IMR);
@@ -78,7 +60,8 @@ int interrupt_init(void)
 	 */
 	unmask_irq(2);
 
-	enable_interrupts();
+	/* Interrupt 9 should be level triggered (SCI). The OS might do this */
+	configure_irq_trigger(9, true);
 
 	return 0;
 }
@@ -129,4 +112,39 @@ void specific_eoi(int irq)
 	}
 
 	outb(OCW2_SEOI | irq, MASTER_PIC + OCW2);
+}
+
+#define ELCR1			0x4d0
+#define ELCR2			0x4d1
+
+void configure_irq_trigger(int int_num, bool is_level_triggered)
+{
+	u16 int_bits = inb(ELCR1) | (((u16)inb(ELCR2)) << 8);
+
+	debug("%s: current interrupts are 0x%x\n", __func__, int_bits);
+	if (is_level_triggered)
+		int_bits |= (1 << int_num);
+	else
+		int_bits &= ~(1 << int_num);
+
+	/* Write new values */
+	debug("%s: try to set interrupts 0x%x\n", __func__, int_bits);
+	outb((u8)(int_bits & 0xff), ELCR1);
+	outb((u8)(int_bits >> 8), ELCR2);
+
+#ifdef PARANOID_IRQ_TRIGGERS
+	/*
+	 * Try reading back the new values. This seems like an error but is
+	 * not
+	 */
+	if (inb(ELCR1) != (int_bits & 0xff)) {
+		printf("%s: lower order bits are wrong: want 0x%x, got 0x%x\n",
+		       __func__, (int_bits & 0xff), inb(ELCR1));
+	}
+
+	if (inb(ELCR2) != (int_bits >> 8)) {
+		printf("%s: higher order bits are wrong: want 0x%x, got 0x%x\n",
+		       __func__, (int_bits>>8), inb(ELCR2));
+	}
+#endif
 }

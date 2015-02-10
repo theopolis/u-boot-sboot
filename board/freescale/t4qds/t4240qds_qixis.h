@@ -1,20 +1,7 @@
 /*
  * Copyright 2012 Freescale Semiconductor, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __T4020QDS_QIXIS_H__
@@ -42,7 +29,7 @@
 #define QIXIS_DDRCLK_125		0x2
 #define QIXIS_DDRCLK_133		0x3
 
-#define BRDCFG5_RESET			0x00
+#define BRDCFG5_IRE			0x20	/* i2c Remote i2c1 enable */
 
 #define BRDCFG12_SD3EN_MASK		0x20
 #define BRDCFG12_SD3MX_MASK		0x08

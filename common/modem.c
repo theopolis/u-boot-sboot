@@ -2,23 +2,7 @@
  * (C) Copyright 2002-2009
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -35,7 +19,7 @@ static inline void mdm_readline(char *buf, int bufsiz)
 	for(;;) {
 		c = serial_getc();
 
-		/*		dbg("(%c)", c); */
+		debug("(%c)", c);
 
 		switch(c) {
 		case '\r':
@@ -56,7 +40,6 @@ static inline void mdm_readline(char *buf, int bufsiz)
 	}
 }
 
-extern void  dbg(const char *fmt, ...);
 int mdm_init (void)
 {
 	char env_str[16];
@@ -82,15 +65,15 @@ int mdm_init (void)
 			serial_puts("\n");
 			for(;;) {
 				mdm_readline(console_buffer, CONFIG_SYS_CBSIZE);
-				dbg("ini%d: [%s]", i, console_buffer);
+				debug("ini%d: [%s]", i, console_buffer);
 
 				if ((strcmp(console_buffer, "OK") == 0) ||
 					(strcmp(console_buffer, "ERROR") == 0)) {
-					dbg("ini%d: cmd done", i);
+					debug("ini%d: cmd done", i);
 					break;
 				} else /* in case we are originating call ... */
 					if (strncmp(console_buffer, "CONNECT", 7) == 0) {
-						dbg("ini%d: connect", i);
+						debug("ini%d: connect", i);
 						return 0;
 					}
 			}
@@ -106,9 +89,9 @@ int mdm_init (void)
 	for(;i > 1;) { /* if 'i' > 1 - wait for connection
 				  message from modem */
 		mdm_readline(console_buffer, CONFIG_SYS_CBSIZE);
-		dbg("ini_f: [%s]", console_buffer);
+		debug("ini_f: [%s]", console_buffer);
 		if (strncmp(console_buffer, "CONNECT", 7) == 0) {
-			dbg("ini_f: connected");
+			debug("ini_f: connected");
 			return 0;
 		}
 	}

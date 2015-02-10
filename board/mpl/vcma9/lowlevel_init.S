@@ -8,23 +8,7 @@
  * David Mueller, ELSOFT AG, <d.mueller@elsoft.ch>
  * (C) Copyright 2002, 2003, 2004, 2005
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 
@@ -213,13 +197,10 @@
 #define REFCNT_266		0
 /**************************************/
 
-_TEXT_BASE:
-	.word	CONFIG_SYS_TEXT_BASE
-
 .globl lowlevel_init
 lowlevel_init:
 	/* use r0 to relocate DATA read/write to flash rather than memory ! */
-	ldr	r0, _TEXT_BASE
+	ldr	r0, =CONFIG_SYS_TEXT_BASE
 	ldr	r13, =BWSCON
 
 	/* enable minimal access to PLD */
@@ -248,7 +229,7 @@ lowlevel_init:
 	bne     0b
 
 	/* PLD access is now possible */
-	/* r3 = SDRAMDATA
+	/* r3 = SDRAMDATA */
 	/* r13 = pointer to MEM controller regs */
 	ldr	r1, =PLD_BASE
 	mov	r4, #SDRAMENTRY_SIZE

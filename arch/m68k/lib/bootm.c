@@ -2,23 +2,7 @@
  * (C) Copyright 2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307	 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -66,24 +50,19 @@ void arch_lmb_reserve(struct lmb *lmb)
 
 int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *images)
 {
-	ulong rd_len;
-	ulong initrd_start, initrd_end;
 	int ret;
-
-	ulong cmd_start, cmd_end;
 	bd_t  *kbd;
 	void  (*kernel) (bd_t *, ulong, ulong, ulong, ulong);
 	struct lmb *lmb = &images->lmb;
 
+	/*
+	 * allow the PREP bootm subcommand, it is required for bootm to work
+	 */
+	if (flag & BOOTM_STATE_OS_PREP)
+		return 0;
+
 	if ((flag != 0) && (flag != BOOTM_STATE_OS_GO))
 		return 1;
-
-	/* allocate space and init command line */
-	ret = boot_get_cmdline (lmb, &cmd_start, &cmd_end);
-	if (ret) {
-		puts("ERROR with allocation of cmdline\n");
-		goto error;
-	}
 
 	/* allocate space for kernel copy of board info */
 	ret = boot_get_kbd (lmb, &kbd);
@@ -93,13 +72,11 @@ int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *ima
 	}
 	set_clocks_in_mhz(kbd);
 
-	kernel = (void (*)(bd_t *, ulong, ulong, ulong, ulong))images->ep;
-
-	rd_len = images->rd_end - images->rd_start;
-	ret = boot_ramdisk_high (lmb, images->rd_start, rd_len,
-			&initrd_start, &initrd_end);
+	ret = image_setup_linux(images);
 	if (ret)
 		goto error;
+
+	kernel = (void (*)(bd_t *, ulong, ulong, ulong, ulong))images->ep;
 
 	debug("## Transferring control to Linux (at address %08lx) ...\n",
 	      (ulong) kernel);
@@ -115,7 +92,8 @@ int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *ima
 	 *   sp+16: Start of command line string
 	 *   sp+20: End   of command line string
 	 */
-	(*kernel) (kbd, initrd_start, initrd_end, cmd_start, cmd_end);
+	(*kernel)(kbd, images->initrd_start, images->initrd_end,
+		  images->cmdline_start, images->cmdline_end);
 	/* does not return */
 error:
 	return 1;

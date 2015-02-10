@@ -2,21 +2,9 @@
  * (C) Copyright 2009 SAMSUNG Electronics
  * Minkyu Kang <mk7.kang@samsung.com>
  * Jaehoon Chung <jh80.chung@samsung.com>
- * Portions Copyright 2011-2012 NVIDIA Corporation
+ * Portions Copyright 2011-2013 NVIDIA Corporation
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <bouncebuf.h>
@@ -25,46 +13,48 @@
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch-tegra/clk_rst.h>
+#include <asm/arch-tegra/mmc.h>
 #include <asm/arch-tegra/tegra_mmc.h>
 #include <mmc.h>
 
-/* support 4 mmc hosts */
-struct mmc mmc_dev[4];
-struct mmc_host mmc_host[4];
+DECLARE_GLOBAL_DATA_PTR;
 
+struct mmc_host mmc_host[CONFIG_SYS_MMC_MAX_DEVICE];
 
-/**
- * Get the host address and peripheral ID for a device. Devices are numbered
- * from 0 to 3.
- *
- * @param host		Structure to fill in (base, reg, mmc_id)
- * @param dev_index	Device index (0-3)
- */
-static void tegra_get_setup(struct mmc_host *host, int dev_index)
+#ifndef CONFIG_OF_CONTROL
+#error "Please enable device tree support to use this driver"
+#endif
+
+static void mmc_set_power(struct mmc_host *host, unsigned short power)
 {
-	debug("tegra_get_setup: dev_index = %d\n", dev_index);
+	u8 pwr = 0;
+	debug("%s: power = %x\n", __func__, power);
 
-	switch (dev_index) {
-	case 1:
-		host->base = TEGRA_SDMMC3_BASE;
-		host->mmc_id = PERIPH_ID_SDMMC3;
-		break;
-	case 2:
-		host->base = TEGRA_SDMMC2_BASE;
-		host->mmc_id = PERIPH_ID_SDMMC2;
-		break;
-	case 3:
-		host->base = TEGRA_SDMMC1_BASE;
-		host->mmc_id = PERIPH_ID_SDMMC1;
-		break;
-	case 0:
-	default:
-		host->base = TEGRA_SDMMC4_BASE;
-		host->mmc_id = PERIPH_ID_SDMMC4;
-		break;
+	if (power != (unsigned short)-1) {
+		switch (1 << power) {
+		case MMC_VDD_165_195:
+			pwr = TEGRA_MMC_PWRCTL_SD_BUS_VOLTAGE_V1_8;
+			break;
+		case MMC_VDD_29_30:
+		case MMC_VDD_30_31:
+			pwr = TEGRA_MMC_PWRCTL_SD_BUS_VOLTAGE_V3_0;
+			break;
+		case MMC_VDD_32_33:
+		case MMC_VDD_33_34:
+			pwr = TEGRA_MMC_PWRCTL_SD_BUS_VOLTAGE_V3_3;
+			break;
+		}
 	}
+	debug("%s: pwr = %X\n", __func__, pwr);
 
-	host->reg = (struct tegra_mmc *)host->base;
+	/* Set the bus voltage first (if any) */
+	writeb(pwr, &host->reg->pwrcon);
+	if (pwr == 0)
+		return;
+
+	/* Now enable bus power */
+	pwr |= TEGRA_MMC_PWRCTL_SD_BUS_POWER;
+	writeb(pwr, &host->reg->pwrcon);
 }
 
 static void mmc_prepare_data(struct mmc_host *host, struct mmc_data *data,
@@ -155,7 +145,7 @@ static int mmc_wait_inhibit(struct mmc_host *host,
 static int mmc_send_cmd_bounced(struct mmc *mmc, struct mmc_cmd *cmd,
 			struct mmc_data *data, struct bounce_buffer *bbstate)
 {
-	struct mmc_host *host = (struct mmc_host *)mmc->priv;
+	struct mmc_host *host = mmc->priv;
 	int flags, i;
 	int result;
 	unsigned int mask = 0;
@@ -303,7 +293,7 @@ static int mmc_send_cmd_bounced(struct mmc *mmc, struct mmc_cmd *cmd,
 				/* Transfer Complete */
 				debug("r/w is done\n");
 				break;
-			} else if (get_timer(start) > 2000UL) {
+			} else if (get_timer(start) > 8000UL) {
 				writel(mask, &host->reg->norintsts);
 				printf("%s: MMC Timeout\n"
 				       "    Interrupt status        0x%08x\n"
@@ -324,7 +314,7 @@ static int mmc_send_cmd_bounced(struct mmc *mmc, struct mmc_cmd *cmd,
 	return 0;
 }
 
-static int mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
+static int tegra_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 			struct mmc_data *data)
 {
 	void *buf;
@@ -363,8 +353,7 @@ static void mmc_change_clock(struct mmc_host *host, uint clock)
 	debug(" mmc_change_clock called\n");
 
 	/*
-	 * Change Tegra SDMMCx clock divisor here. Source is 216MHz,
-	 * PLLP_OUT0
+	 * Change Tegra SDMMCx clock divisor here. Source is PLLP_OUT0
 	 */
 	if (clock == 0)
 		goto out;
@@ -407,7 +396,7 @@ out:
 	host->clock = clock;
 }
 
-static void mmc_set_ios(struct mmc *mmc)
+static void tegra_mmc_set_ios(struct mmc *mmc)
 {
 	struct mmc_host *host = mmc->priv;
 	unsigned char ctrl;
@@ -439,7 +428,7 @@ static void mmc_set_ios(struct mmc *mmc)
 	debug("mmc_set_ios: hostctl = %08X\n", ctrl);
 }
 
-static void mmc_reset(struct mmc_host *host)
+static void mmc_reset(struct mmc_host *host, struct mmc *mmc)
 {
 	unsigned int timeout;
 	debug(" mmc_reset called\n");
@@ -465,15 +454,23 @@ static void mmc_reset(struct mmc_host *host)
 		timeout--;
 		udelay(1000);
 	}
+
+	/* Set SD bus voltage & enable bus power */
+	mmc_set_power(host, fls(mmc->cfg->voltages) - 1);
+	debug("%s: power control = %02X, host control = %02X\n", __func__,
+		readb(&host->reg->pwrcon), readb(&host->reg->hostctl));
+
+	/* Make sure SDIO pads are set up */
+	pad_init_mmc(host);
 }
 
-static int mmc_core_init(struct mmc *mmc)
+static int tegra_mmc_core_init(struct mmc *mmc)
 {
-	struct mmc_host *host = (struct mmc_host *)mmc->priv;
+	struct mmc_host *host = mmc->priv;
 	unsigned int mask;
 	debug(" mmc_core_init called\n");
 
-	mmc_reset(host);
+	mmc_reset(host, mmc);
 
 	host->version = readw(&host->reg->hcver);
 	debug("host version = %x\n", host->version);
@@ -512,78 +509,188 @@ static int mmc_core_init(struct mmc *mmc)
 	return 0;
 }
 
-int tegra_mmc_getcd(struct mmc *mmc)
+static int tegra_mmc_getcd(struct mmc *mmc)
 {
-	struct mmc_host *host = (struct mmc_host *)mmc->priv;
+	struct mmc_host *host = mmc->priv;
 
 	debug("tegra_mmc_getcd called\n");
 
-	if (host->cd_gpio >= 0)
-		return !gpio_get_value(host->cd_gpio);
+	if (dm_gpio_is_valid(&host->cd_gpio))
+		return dm_gpio_get_value(&host->cd_gpio);
 
 	return 1;
 }
 
-int tegra_mmc_init(int dev_index, int bus_width, int pwr_gpio, int cd_gpio)
+static const struct mmc_ops tegra_mmc_ops = {
+	.send_cmd	= tegra_mmc_send_cmd,
+	.set_ios	= tegra_mmc_set_ios,
+	.init		= tegra_mmc_core_init,
+	.getcd		= tegra_mmc_getcd,
+};
+
+static int do_mmc_init(int dev_index)
 {
 	struct mmc_host *host;
-	char gpusage[12]; /* "SD/MMCn PWR" or "SD/MMCn CD" */
 	struct mmc *mmc;
 
-	debug(" tegra_mmc_init: index %d, bus width %d "
-		"pwr_gpio %d cd_gpio %d\n",
-		dev_index, bus_width, pwr_gpio, cd_gpio);
-
+	/* DT should have been read & host config filled in */
 	host = &mmc_host[dev_index];
+	if (!host->enabled)
+		return -1;
+
+	debug(" do_mmc_init: index %d, bus width %d pwr_gpio %d cd_gpio %d\n",
+	      dev_index, host->width, gpio_get_number(&host->pwr_gpio),
+	      gpio_get_number(&host->cd_gpio));
 
 	host->clock = 0;
-	host->pwr_gpio = pwr_gpio;
-	host->cd_gpio = cd_gpio;
-	tegra_get_setup(host, dev_index);
-
 	clock_start_periph_pll(host->mmc_id, CLOCK_ID_PERIPH, 20000000);
 
-	if (host->pwr_gpio >= 0) {
-		sprintf(gpusage, "SD/MMC%d PWR", dev_index);
-		gpio_request(host->pwr_gpio, gpusage);
-		gpio_direction_output(host->pwr_gpio, 1);
-	}
+	if (dm_gpio_is_valid(&host->pwr_gpio))
+		dm_gpio_set_value(&host->pwr_gpio, 1);
 
-	if (host->cd_gpio >= 0) {
-		sprintf(gpusage, "SD/MMC%d CD", dev_index);
-		gpio_request(host->cd_gpio, gpusage);
-		gpio_direction_input(host->cd_gpio);
-	}
+	memset(&host->cfg, 0, sizeof(host->cfg));
 
-	mmc = &mmc_dev[dev_index];
+	host->cfg.name = "Tegra SD/MMC";
+	host->cfg.ops = &tegra_mmc_ops;
 
-	sprintf(mmc->name, "Tegra SD/MMC");
-	mmc->priv = host;
-	mmc->send_cmd = mmc_send_cmd;
-	mmc->set_ios = mmc_set_ios;
-	mmc->init = mmc_core_init;
-	mmc->getcd = tegra_mmc_getcd;
-
-	mmc->voltages = MMC_VDD_32_33 | MMC_VDD_33_34 | MMC_VDD_165_195;
-	mmc->host_caps = 0;
-	if (bus_width == 8)
-		mmc->host_caps |= MMC_MODE_8BIT;
-	if (bus_width >= 4)
-		mmc->host_caps |= MMC_MODE_4BIT;
-	mmc->host_caps |= MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
+	host->cfg.voltages = MMC_VDD_32_33 | MMC_VDD_33_34 | MMC_VDD_165_195;
+	host->cfg.host_caps = 0;
+	if (host->width == 8)
+		host->cfg.host_caps |= MMC_MODE_8BIT;
+	if (host->width >= 4)
+		host->cfg.host_caps |= MMC_MODE_4BIT;
+	host->cfg.host_caps |= MMC_MODE_HS_52MHz | MMC_MODE_HS | MMC_MODE_HC;
 
 	/*
 	 * min freq is for card identification, and is the highest
 	 *  low-speed SDIO card frequency (actually 400KHz)
 	 * max freq is highest HS eMMC clock as per the SD/MMC spec
 	 *  (actually 52MHz)
-	 * Both of these are the closest equivalents w/216MHz source
-	 *  clock and Tegra SDMMC divisors.
 	 */
-	mmc->f_min = 375000;
-	mmc->f_max = 48000000;
+	host->cfg.f_min = 375000;
+	host->cfg.f_max = 48000000;
 
-	mmc_register(mmc);
+	host->cfg.b_max = CONFIG_SYS_MMC_MAX_BLK_COUNT;
+
+	mmc = mmc_create(&host->cfg, host);
+	if (mmc == NULL)
+		return -1;
 
 	return 0;
+}
+
+/**
+ * Get the host address and peripheral ID for a node.
+ *
+ * @param blob		fdt blob
+ * @param node		Device index (0-3)
+ * @param host		Structure to fill in (reg, width, mmc_id)
+ */
+static int mmc_get_config(const void *blob, int node, struct mmc_host *host)
+{
+	debug("%s: node = %d\n", __func__, node);
+
+	host->enabled = fdtdec_get_is_enabled(blob, node);
+
+	host->reg = (struct tegra_mmc *)fdtdec_get_addr(blob, node, "reg");
+	if ((fdt_addr_t)host->reg == FDT_ADDR_T_NONE) {
+		debug("%s: no sdmmc base reg info found\n", __func__);
+		return -FDT_ERR_NOTFOUND;
+	}
+
+	host->mmc_id = clock_decode_periph_id(blob, node);
+	if (host->mmc_id == PERIPH_ID_NONE) {
+		debug("%s: could not decode periph id\n", __func__);
+		return -FDT_ERR_NOTFOUND;
+	}
+
+	/*
+	 * NOTE: mmc->bus_width is determined by mmc.c dynamically.
+	 * TBD: Override it with this value?
+	 */
+	host->width = fdtdec_get_int(blob, node, "bus-width", 0);
+	if (!host->width)
+		debug("%s: no sdmmc width found\n", __func__);
+
+	/* These GPIOs are optional */
+	gpio_request_by_name_nodev(blob, node, "cd-gpios", 0, &host->cd_gpio,
+				   GPIOD_IS_IN);
+	gpio_request_by_name_nodev(blob, node, "wp-gpios", 0, &host->wp_gpio,
+				   GPIOD_IS_IN);
+	gpio_request_by_name_nodev(blob, node, "power-gpios", 0,
+				   &host->pwr_gpio, GPIOD_IS_OUT);
+
+	debug("%s: found controller at %p, width = %d, periph_id = %d\n",
+		__func__, host->reg, host->width, host->mmc_id);
+	return 0;
+}
+
+/*
+ * Process a list of nodes, adding them to our list of SDMMC ports.
+ *
+ * @param blob          fdt blob
+ * @param node_list     list of nodes to process (any <=0 are ignored)
+ * @param count         number of nodes to process
+ * @return 0 if ok, -1 on error
+ */
+static int process_nodes(const void *blob, int node_list[], int count)
+{
+	struct mmc_host *host;
+	int i, node;
+
+	debug("%s: count = %d\n", __func__, count);
+
+	/* build mmc_host[] for each controller */
+	for (i = 0; i < count; i++) {
+		node = node_list[i];
+		if (node <= 0)
+			continue;
+
+		host = &mmc_host[i];
+		host->id = i;
+
+		if (mmc_get_config(blob, node, host)) {
+			printf("%s: failed to decode dev %d\n",	__func__, i);
+			return -1;
+		}
+		do_mmc_init(i);
+	}
+	return 0;
+}
+
+void tegra_mmc_init(void)
+{
+	int node_list[CONFIG_SYS_MMC_MAX_DEVICE], count;
+	const void *blob = gd->fdt_blob;
+	debug("%s entry\n", __func__);
+
+	/* See if any Tegra124 MMC controllers are present */
+	count = fdtdec_find_aliases_for_id(blob, "sdhci",
+		COMPAT_NVIDIA_TEGRA124_SDMMC, node_list,
+		CONFIG_SYS_MMC_MAX_DEVICE);
+	debug("%s: count of Tegra124 sdhci nodes is %d\n", __func__, count);
+	if (process_nodes(blob, node_list, count)) {
+		printf("%s: Error processing T30 mmc node(s)!\n", __func__);
+		return;
+	}
+
+	/* See if any Tegra30 MMC controllers are present */
+	count = fdtdec_find_aliases_for_id(blob, "sdhci",
+		COMPAT_NVIDIA_TEGRA30_SDMMC, node_list,
+		CONFIG_SYS_MMC_MAX_DEVICE);
+	debug("%s: count of T30 sdhci nodes is %d\n", __func__, count);
+	if (process_nodes(blob, node_list, count)) {
+		printf("%s: Error processing T30 mmc node(s)!\n", __func__);
+		return;
+	}
+
+	/* Now look for any Tegra20 MMC controllers */
+	count = fdtdec_find_aliases_for_id(blob, "sdhci",
+		COMPAT_NVIDIA_TEGRA20_SDMMC, node_list,
+		CONFIG_SYS_MMC_MAX_DEVICE);
+	debug("%s: count of T20 sdhci nodes is %d\n", __func__, count);
+	if (process_nodes(blob, node_list, count)) {
+		printf("%s: Error processing T20 mmc node(s)!\n", __func__);
+		return;
+	}
 }

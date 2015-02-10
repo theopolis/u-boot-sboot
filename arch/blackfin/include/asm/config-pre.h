@@ -9,9 +9,6 @@
 #ifndef __ASM_BLACKFIN_CONFIG_PRE_H__
 #define __ASM_BLACKFIN_CONFIG_PRE_H__
 
-/* Misc helper functions */
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
 /* Bootmode defines -- your config needs to select this via CONFIG_BFIN_BOOT_MODE.
  * Depending on your cpu, some of these may not be valid, check your HRM.
  * The actual values here are meaningless as long as they're unique.
@@ -29,6 +26,8 @@
 #define BFIN_BOOT_16HOST_DMA  11      /* boot ldr from 16-bit host dma */
 #define BFIN_BOOT_8HOST_DMA   12      /* boot ldr from 8-bit host dma */
 #define BFIN_BOOT_NAND        13      /* boot ldr from nand flash */
+#define BFIN_BOOT_RSI_MASTER  14      /* boot ldr from rsi */
+#define BFIN_BOOT_LP_SLAVE    15      /* boot ldr from link port */
 
 #ifndef __ASSEMBLY__
 static inline const char *get_bfin_boot_mode(int bfin_boot)
@@ -47,6 +46,8 @@ static inline const char *get_bfin_boot_mode(int bfin_boot)
 	case BFIN_BOOT_16HOST_DMA: return "16bit dma";
 	case BFIN_BOOT_8HOST_DMA:  return "8bit dma";
 	case BFIN_BOOT_NAND:       return "nand flash";
+	case BFIN_BOOT_RSI_MASTER: return "rsi master";
+	case BFIN_BOOT_LP_SLAVE:   return "link port slave";
 	default:                   return "INVALID";
 	}
 }

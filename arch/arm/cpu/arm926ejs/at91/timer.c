@@ -3,23 +3,7 @@
  * Stelian Pop <stelian@popies.net>
  * Lead Tech Design <www.leadtechdesign.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -52,14 +36,14 @@ DECLARE_GLOBAL_DATA_PTR;
 static inline unsigned long long tick_to_time(unsigned long long tick)
 {
 	tick *= CONFIG_SYS_HZ;
-	do_div(tick, gd->timer_rate_hz);
+	do_div(tick, gd->arch.timer_rate_hz);
 
 	return tick;
 }
 
 static inline unsigned long long usec_to_tick(unsigned long long usec)
 {
-	usec *= gd->timer_rate_hz;
+	usec *= gd->arch.timer_rate_hz;
 	do_div(usec, 1000000);
 
 	return usec;
@@ -79,8 +63,8 @@ int timer_init(void)
 	/* Enable PITC */
 	writel(TIMER_LOAD_VAL | AT91_PIT_MR_EN , &pit->mr);
 
-	gd->timer_rate_hz = gd->mck_rate_hz / 16;
-	gd->tbu = gd->tbl = 0;
+	gd->arch.timer_rate_hz = gd->arch.mck_rate_hz / 16;
+	gd->arch.tbu = gd->arch.tbl = 0;
 
 	return 0;
 }
@@ -95,10 +79,10 @@ unsigned long long get_ticks(void)
 	ulong now = readl(&pit->piir);
 
 	/* increment tbu if tbl has rolled over */
-	if (now < gd->tbl)
-		gd->tbu++;
-	gd->tbl = now;
-	return (((unsigned long long)gd->tbu) << 32) | gd->tbl;
+	if (now < gd->arch.tbl)
+		gd->arch.tbu++;
+	gd->arch.tbl = now;
+	return (((unsigned long long)gd->arch.tbu) << 32) | gd->arch.tbl;
 }
 
 void __udelay(unsigned long usec)
@@ -132,5 +116,5 @@ ulong get_timer(ulong base)
  */
 ulong get_tbclk(void)
 {
-	return gd->timer_rate_hz;
+	return gd->arch.timer_rate_hz;
 }

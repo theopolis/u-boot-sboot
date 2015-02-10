@@ -4,23 +4,7 @@
  * Linus Walleij <linus.walleij@linaro.org>
  * Common ARM Integrator configuration settings
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #define CONFIG_INTEGRATOR
@@ -28,7 +12,6 @@
 #define CONFIG_SYS_TEXT_BASE		0x01000000
 #define CONFIG_SYS_MEMTEST_START	0x100000
 #define CONFIG_SYS_MEMTEST_END		0x10000000
-#define CONFIG_SYS_HZ			1000
 #define CONFIG_SYS_TIMERBASE		0x13000100	/* Timer1 */
 #define CONFIG_SYS_LOAD_ADDR		0x7fc0	/* default load address */
 #define CONFIG_SYS_LONGHELP
@@ -41,7 +24,9 @@
 
 #define CONFIG_CMDLINE_TAG		/* enable passing of ATAGs  */
 #define CONFIG_SETUP_MEMORY_TAGS
+#define CONFIG_OF_LIBFDT		/* enable passing a Device Tree */
 #define CONFIG_MISC_INIT_R		/* call misc_init_r during start up */
+#define CONFIG_SYS_GENERIC_BOARD
 
 /*
  * There are various dependencies on the core module (CM) fitted

@@ -11,6 +11,7 @@
  * published by the Free Software Foundation.
  */
 
+#include <div64.h>
 #include "yaffsfs.h"
 #include "yaffs_guts.h"
 #include "yaffscfg.h"
@@ -1603,8 +1604,8 @@ static int yaffsfs_DoStat(struct yaffs_obj *obj, struct yaffs_stat *buf)
 		buf->st_rdev = obj->yst_rdev;
 		buf->st_size = yaffs_get_obj_length(obj);
 		buf->st_blksize = obj->my_dev->data_bytes_per_chunk;
-		buf->st_blocks = (buf->st_size + buf->st_blksize - 1) /
-		    buf->st_blksize;
+		buf->st_blocks = lldiv(buf->st_size + buf->st_blksize - 1,
+		    buf->st_blksize);
 #if CONFIG_YAFFS_WINCE
 		buf->yst_wince_atime[0] = obj->win_atime[0];
 		buf->yst_wince_atime[1] = obj->win_atime[1];
@@ -3135,10 +3136,6 @@ int yaffs_link(const YCHAR *oldpath, const YCHAR *linkpath)
 
 int yaffs_mknod(const YCHAR *pathname, mode_t mode, dev_t dev)
 {
-	pathname = pathname;
-	mode = mode;
-	dev = dev;
-
 	yaffsfs_SetError(-EINVAL);
 	return -1;
 }
@@ -3186,9 +3183,7 @@ int yaffs_set_error(int error)
 
 int yaffs_dump_dev(const YCHAR *path)
 {
-#if 1
-	path = path;
-#else
+#if 0
 	YCHAR *rest;
 
 	struct yaffs_obj *obj = yaffsfs_FindRoot(path, &rest);

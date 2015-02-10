@@ -3,20 +3,7 @@
  *
  * Register definitions for the DaVinci SPI Controller
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _DAVINCI_SPI_H_
@@ -86,6 +73,39 @@ struct davinci_spi_regs {
 
 /* SPIDEF */
 #define SPIDEF_CSDEF0_MASK	BIT(0)
+
+#define SPI0_BUS		0
+#define SPI0_BASE		CONFIG_SYS_SPI_BASE
+/*
+ * Define default SPI0_NUM_CS as 1 for existing platforms that uses this
+ * driver. Platform can configure number of CS using CONFIG_SYS_SPI0_NUM_CS
+ * if more than one CS is supported and by defining CONFIG_SYS_SPI0.
+ */
+#ifndef CONFIG_SYS_SPI0
+#define SPI0_NUM_CS		1
+#else
+#define SPI0_NUM_CS		CONFIG_SYS_SPI0_NUM_CS
+#endif
+
+/*
+ * define CONFIG_SYS_SPI1 when platform has spi-1 device (bus #1) and
+ * CONFIG_SYS_SPI1_NUM_CS defines number of CS on this bus
+ */
+#ifdef CONFIG_SYS_SPI1
+#define SPI1_BUS		1
+#define SPI1_NUM_CS		CONFIG_SYS_SPI1_NUM_CS
+#define SPI1_BASE		CONFIG_SYS_SPI1_BASE
+#endif
+
+/*
+ * define CONFIG_SYS_SPI2 when platform has spi-2 device (bus #2) and
+ * CONFIG_SYS_SPI2_NUM_CS defines number of CS on this bus
+ */
+#ifdef CONFIG_SYS_SPI2
+#define SPI2_BUS		2
+#define SPI2_NUM_CS		CONFIG_SYS_SPI2_NUM_CS
+#define SPI2_BASE		CONFIG_SYS_SPI2_BASE
+#endif
 
 struct davinci_spi_slave {
 	struct spi_slave slave;

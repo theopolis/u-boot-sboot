@@ -5,70 +5,42 @@
 # (C) Copyright 2000
 # Murray Jensen <Murray.Jensen@csiro.au>
 #
-# See file CREDITS for list of people who contributed to this
-# project.
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307 USA
+# SPDX-License-Identifier:	GPL-2.0+
 #
 
-include $(TOPDIR)/config.mk
+ifneq ($(HOSTOS),cygwin)
 
-BINS	= gdbsend gdbcont
+# Location of a usable BFD library, where we define "usable" as
+# "built for ${HOST}, supports ${TARGET}".  Sensible values are
+# - When cross-compiling: the root of the cross-environment
+# - Linux/ppc (native): /usr
+# - NetBSD/ppc (native): you lose ... (must extract these from the
+#   binutils build directory, plus the native and U-Boot include
+#   files don't like each other)
 
-COBJS	= gdbsend.o gdbcont.o error.o remote.o serial.o
-
-HOSTOBJS := $(addprefix $(obj),$(COBJS))
-HOSTSRCS := $(COBJS:.o=.c)
-BINS	:= $(addprefix $(obj),$(BINS))
+ifeq ($(HOSTOS),darwin)
+BFD_ROOT_DIR =		/usr/local/tools
+else
+ifeq ($(HOSTARCH),$(ARCH))
+# native
+BFD_ROOT_DIR =		/usr
+else
+#BFD_ROOT_DIR =		/LinuxPPC/CDK		# Linux/i386
+#BFD_ROOT_DIR =		/usr/pkg/cross		# NetBSD/i386
+BFD_ROOT_DIR =		/opt/powerpc
+endif
+endif
 
 #
 # Use native tools and options
 #
-HOSTCPPFLAGS = -I$(BFD_ROOT_DIR)/include
+HOST_EXTRACFLAGS := -I$(BFD_ROOT_DIR)/include -pedantic
 
-HOSTOS := $(shell uname -s | sed -e 's/\([Cc][Yy][Gg][Ww][Ii][Nn]\).*/cygwin/')
+hostprogs-y := gdbsend gdbcont
 
-ifeq ($(HOSTOS),cygwin)
+gdbsend-objs := gdbsend.o error.o remote.o serial.o
+gdbcont-objs := gdbcont.o error.o remote.o serial.o
 
-all:
-$(obj).depend:
-
-else	# ! CYGWIN
-
-all:	$(obj).depend $(BINS)
-
-$(obj)gdbsend:	$(obj)gdbsend.o $(obj)error.o $(obj)remote.o $(obj)serial.o
-		$(HOSTCC) $(HOSTCFLAGS) $(HOSTLDFLAGS) -o $@ $^
-
-$(obj)gdbcont:	$(obj)gdbcont.o $(obj)error.o $(obj)remote.o $(obj)serial.o
-		$(HOSTCC) $(HOSTCFLAGS) $(HOSTLDFLAGS) -o $@ $^
-
-clean:
-	rm -f $(HOSTOBJS)
-
-distclean:	clean
-	rm -f $(BINS) $(obj)core $(obj)*.bak $(obj).depend
-
-#########################################################################
-
-# defines $(obj).depend target
-include $(SRCTREE)/rules.mk
-
-sinclude $(obj).depend
-
-#########################################################################
+always := $(hostprogs-y)
 
 endif	# cygwin

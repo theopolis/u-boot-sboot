@@ -1,29 +1,15 @@
 /*
  * Copyright 2010-2011 Freescale Semiconductor, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <command.h>
 #include <linux/compiler.h>
+#include <asm/fsl_errata.h>
 #include <asm/processor.h>
+#include <fsl_usb.h>
 #include "fsl_corenet_serdes.h"
 
 #ifdef CONFIG_SYS_FSL_ERRATUM_A004849
@@ -128,6 +114,21 @@ static void check_erratum_a4580(uint32_t svr)
 }
 #endif
 
+#ifdef CONFIG_SYS_FSL_ERRATUM_A007212
+/*
+ * This workaround can be implemented in PBI, or by u-boot.
+ */
+static void check_erratum_a007212(void)
+{
+	u32 __iomem *plldgdcr = (void *)(CONFIG_SYS_DCSRBAR + 0x21c20);
+
+	if (in_be32(plldgdcr) & 0x1fe) {
+		/* check if PLL ratio is set by workaround */
+		puts("Work-around for Erratum A007212 enabled\n");
+	}
+}
+#endif
+
 static int do_errata(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 #ifdef CONFIG_SYS_FSL_ERRATUM_NMG_CPU_A011
@@ -171,7 +172,7 @@ static int do_errata(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	puts("Work-around for Erratum CPU-A003999 enabled\n");
 #endif
 #if defined(CONFIG_SYS_FSL_ERRATUM_DDR_A003474)
-	puts("Work-around for Erratum DDR-A003473 enabled\n");
+	puts("Work-around for Erratum DDR-A003474 enabled\n");
 #endif
 #if defined(CONFIG_SYS_FSL_ERRATUM_DDR_MSYNC_IN)
 	puts("Work-around for DDR MSYNC_IN Erratum enabled\n");
@@ -231,6 +232,9 @@ static int do_errata(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	if ((SVR_MAJ(svr) == 1) || IS_SVR_REV(svr, 2, 0))
 		puts("Work-around for Erratum NMG ETSEC129 enabled\n");
 #endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A004508
+	puts("Work-around for Erratum A004508 enabled\n");
+#endif
 #ifdef CONFIG_SYS_FSL_ERRATUM_A004510
 	puts("Work-around for Erratum A004510 enabled\n");
 #endif
@@ -239,6 +243,18 @@ static int do_errata(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #endif
 #ifdef CONFIG_SYS_FSL_ERRATUM_A_004934
 	puts("Work-around for Erratum A004934 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A005871
+	if (IS_SVR_REV(svr, 1, 0))
+		puts("Work-around for Erratum A005871 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A006475
+	if (SVR_MAJ(get_svr()) == 1)
+		puts("Work-around for Erratum A006475 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A006384
+	if (SVR_MAJ(get_svr()) == 1)
+		puts("Work-around for Erratum A006384 enabled\n");
 #endif
 #ifdef CONFIG_SYS_FSL_ERRATUM_A004849
 	/* This work-around is implemented in PBI, so just check for it */
@@ -251,6 +267,62 @@ static int do_errata(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #ifdef CONFIG_SYS_P4080_ERRATUM_PCIE_A003
 	puts("Work-around for Erratum PCIe-A003 enabled\n");
 #endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_USB14
+	puts("Work-around for Erratum USB14 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A007186
+	if (has_erratum_a007186())
+		puts("Work-around for Erratum A007186 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A006593
+	puts("Work-around for Erratum A006593 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A006379
+	if (has_erratum_a006379())
+		puts("Work-around for Erratum A006379 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_SEC_A003571
+	if (IS_SVR_REV(svr, 1, 0))
+		puts("Work-around for Erratum A003571 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A005812
+	puts("Work-around for Erratum A-005812 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A005125
+	puts("Work-around for Erratum A005125 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A007075
+	if (has_erratum_a007075())
+		puts("Work-around for Erratum A007075 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A007798
+	if (has_erratum_a007798())
+		puts("Work-around for Erratum A007798 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_I2C_A004447
+	if ((SVR_SOC_VER(svr) == SVR_8548 && IS_SVR_REV(svr, 3, 1)) ||
+	    (SVR_REV(svr) <= CONFIG_SYS_FSL_A004447_SVR_REV))
+		puts("Work-around for Erratum I2C-A004447 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A006261
+	if (has_erratum_a006261())
+		puts("Work-around for Erratum A006261 enabled\n");
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A007212
+	check_erratum_a007212();
+#endif
+#ifdef CONFIG_SYS_FSL_ERRATUM_A005434
+	puts("Work-around for Erratum A-005434 enabled\n");
+#endif
+#if defined(CONFIG_SYS_FSL_ERRATUM_A008044) && \
+	defined(CONFIG_A008044_WORKAROUND)
+	if (IS_SVR_REV(svr, 1, 0))
+		puts("Work-around for Erratum A-008044 enabled\n");
+#endif
+#if defined(CONFIG_SYS_FSL_B4860QDS_XFI_ERR) && defined(CONFIG_B4860QDS)
+	puts("Work-around for Erratum XFI on B4860QDS enabled\n");
+#endif
+
 	return 0;
 }
 

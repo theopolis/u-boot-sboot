@@ -2,23 +2,7 @@
  * (C) Copyright 2001
  * Kyle Harris, kharris@nexus-tech.net
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -36,6 +20,7 @@
 #include <image.h>
 #include <malloc.h>
 #include <asm/byteorder.h>
+#include <asm/io.h>
 #if defined(CONFIG_8xx)
 #include <mpc8xx.h>
 #endif
@@ -44,9 +29,12 @@ int
 source (ulong addr, const char *fit_uname)
 {
 	ulong		len;
-	image_header_t	*hdr;
+#if defined(CONFIG_IMAGE_FORMAT_LEGACY)
+	const image_header_t *hdr;
+#endif
 	ulong		*data;
 	int		verify;
+	void *buf;
 #if defined(CONFIG_FIT)
 	const void*	fit_hdr;
 	int		noffset;
@@ -56,9 +44,11 @@ source (ulong addr, const char *fit_uname)
 
 	verify = getenv_yesno ("verify");
 
-	switch (genimg_get_format ((void *)addr)) {
+	buf = map_sysmem(addr, 0);
+	switch (genimg_get_format(buf)) {
+#if defined(CONFIG_IMAGE_FORMAT_LEGACY)
 	case IMAGE_FORMAT_LEGACY:
-		hdr = (image_header_t *)addr;
+		hdr = buf;
 
 		if (!image_check_magic (hdr)) {
 			puts ("Bad magic number\n");
@@ -97,6 +87,7 @@ source (ulong addr, const char *fit_uname)
 		 */
 		while (*data++);
 		break;
+#endif
 #if defined(CONFIG_FIT)
 	case IMAGE_FORMAT_FIT:
 		if (fit_uname == NULL) {
@@ -104,7 +95,7 @@ source (ulong addr, const char *fit_uname)
 			return 1;
 		}
 
-		fit_hdr = (const void *)addr;
+		fit_hdr = buf;
 		if (!fit_check_format (fit_hdr)) {
 			puts ("Bad FIT image format\n");
 			return 1;
@@ -124,7 +115,7 @@ source (ulong addr, const char *fit_uname)
 
 		/* verify integrity */
 		if (verify) {
-			if (!fit_image_check_hashes (fit_hdr, noffset)) {
+			if (!fit_image_verify(fit_hdr, noffset)) {
 				puts ("Bad Data Hash\n");
 				return 1;
 			}
@@ -151,8 +142,7 @@ source (ulong addr, const char *fit_uname)
 
 /**************************************************/
 #if defined(CONFIG_CMD_SOURCE)
-int
-do_source (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+static int do_source(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	ulong addr;
 	int rcode;

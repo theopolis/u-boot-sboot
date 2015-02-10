@@ -1,23 +1,9 @@
 /*
  * Copyright (c) 2011 The Chromium OS Authors.
  * Copyright (C) 2009 NVIDIA, Corporation
- * See file CREDITS for list of people who contributed to this
- * project.
+ * Copyright (C) 2007-2008 SMSC (Steve Glendinning)
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <asm/unaligned.h>
@@ -28,6 +14,12 @@
 #include <malloc.h>
 
 /* SMSC LAN95xx based USB 2.0 Ethernet Devices */
+
+/* LED defines */
+#define LED_GPIO_CFG			(0x24)
+#define LED_GPIO_CFG_SPD_LED		(0x01000000)
+#define LED_GPIO_CFG_LNK_LED		(0x00100000)
+#define LED_GPIO_CFG_FDX_LED		(0x00010000)
 
 /* Tx command words */
 #define TX_CMD_A_FIRST_SEG_		0x00002000
@@ -265,10 +257,6 @@ static int smsc95xx_eeprom_confirm_not_busy(struct ueth_data *dev)
 
 	do {
 		smsc95xx_read_reg(dev, E2P_CMD, &val);
-		if (!(val & E2P_CMD_LOADED_)) {
-			debug("No EEPROM present\n");
-			return -1;
-		}
 		if (!(val & E2P_CMD_BUSY_))
 			return 0;
 		udelay(40);
@@ -610,6 +598,14 @@ static int smsc95xx_init(struct eth_device *eth, bd_t *bd)
 		return ret;
 	debug("ID_REV = 0x%08x\n", read_buf);
 
+	/* Configure GPIO pins as LED outputs */
+	write_buf = LED_GPIO_CFG_SPD_LED | LED_GPIO_CFG_LNK_LED |
+		LED_GPIO_CFG_FDX_LED;
+	ret = smsc95xx_write_reg(dev, LED_GPIO_CFG, write_buf);
+	if (ret < 0)
+		return ret;
+	debug("LED_GPIO_CFG set\n");
+
 	/* Init Tx */
 	write_buf = 0;
 	ret = smsc95xx_write_reg(dev, FLOW, write_buf);
@@ -802,6 +798,9 @@ struct smsc95xx_dongle {
 static const struct smsc95xx_dongle smsc95xx_dongles[] = {
 	{ 0x0424, 0xec00 },	/* LAN9512/LAN9514 Ethernet */
 	{ 0x0424, 0x9500 },	/* LAN9500 Ethernet */
+	{ 0x0424, 0x9730 },	/* LAN9730 Ethernet (HSIC) */
+	{ 0x0424, 0x9900 },	/* SMSC9500 USB Ethernet Device (SAL10) */
+	{ 0x0424, 0x9e00 },	/* LAN9500A Ethernet */
 	{ 0x0000, 0x0000 }	/* END - Do not remove */
 };
 

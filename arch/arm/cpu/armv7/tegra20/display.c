@@ -2,23 +2,7 @@
  *  (C) Copyright 2010
  *  NVIDIA Corporation <www.nvidia.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -61,8 +45,8 @@ static void update_window(struct dc_ctlr *dc, struct disp_ctl_win *win)
 	writel(0, &dc->win.h_initial_dda);
 	writel(0, &dc->win.v_initial_dda);
 
-	h_dda = (win->w * 0x1000) / max(win->out_w - 1, 1);
-	v_dda = (win->h * 0x1000) / max(win->out_h - 1, 1);
+	h_dda = (win->w * 0x1000) / max(win->out_w - 1, 1U);
+	v_dda = (win->h * 0x1000) / max(win->out_h - 1, 1U);
 
 	val = h_dda << H_DDA_INC_SHIFT;
 	val |= v_dda << V_DDA_INC_SHIFT;
@@ -210,7 +194,8 @@ static void rgb_enable(struct dc_com_reg *com)
 		writel(rgb_sel_tab[i], &com->pin_output_sel[i]);
 }
 
-int setup_window(struct disp_ctl_win *win, struct fdt_disp_config *config)
+static int setup_window(struct disp_ctl_win *win,
+			struct fdt_disp_config *config)
 {
 	win->x = 0;
 	win->y = 0;
@@ -344,7 +329,7 @@ static int tegra_display_decode_config(const void *blob,
 	rgb = fdt_subnode_offset(blob, node, "rgb");
 
 	config->panel_node = fdtdec_lookup_phandle(blob, rgb, "nvidia,panel");
-	if (!config->panel_node < 0) {
+	if (config->panel_node < 0) {
 		debug("%s: Cannot find panel information\n", __func__);
 		return -1;
 	}

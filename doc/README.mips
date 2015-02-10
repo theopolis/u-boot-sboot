@@ -16,11 +16,6 @@ Toolchains
 Known Issues
 ------------
 
-  * Little endian build problem
-
-    If use non-ELDK toolchains, -EB will be set to CPPFLAGS. Therefore all
-    objects will be generated in big-endian format.
-
   * Cache incoherency issue caused by do_bootelf_exec() at cmd_elf.c
 
     Cache will be disabled before entering the loaded ELF image without
@@ -44,8 +39,6 @@ TODOs
 
   * Secondary cache support missing
 
-  * Centralize the link directive files
-
   * Initialize TLB entries redardless of their use
 
   * R2000/R3000 class parts are not supported
@@ -55,3 +48,7 @@ TODOs
   * Due to cache initialization issues, the DRAM on board must be
     initialized in board specific assembler language before the cache init
     code is run -- that is, initialize the DRAM in lowlevel_init().
+
+  * centralize/share more CPU code of MIPS32, MIPS64 and XBurst
+
+  * support Qemu Malta

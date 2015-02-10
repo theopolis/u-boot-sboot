@@ -2,23 +2,7 @@
  * (C) Copyright 2002 ELTEC Elektronik AG
  * Frank Gottschling <fgottschling@eltec.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /* i8042.c - Intel 8042 keyboard driver routines */
@@ -414,7 +398,7 @@ int i8042_kbd_init(void)
  * i8042_tstc - test if keyboard input is available
  *		option: cursor blinking if called in a loop
  */
-int i8042_tstc(void)
+int i8042_tstc(struct stdio_dev *dev)
 {
 	unsigned char scan_code = 0;
 
@@ -448,7 +432,7 @@ int i8042_tstc(void)
  * i8042_getc - wait till keyboard input is available
  *		option: turn on/off cursor while waiting
  */
-int i8042_getc(void)
+int i8042_getc(struct stdio_dev *dev)
 {
 	int ret_chr;
 	unsigned char scan_code;

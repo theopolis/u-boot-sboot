@@ -52,7 +52,7 @@
 #define CONFIG_EBIU_AMBCTL0_VAL	0x7BB07BB0
 #define CONFIG_EBIU_AMBCTL1_VAL	0xFFC27BB0
 
-#define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
+#define CONFIG_SYS_MONITOR_LEN		(768 * 1024)
 #define CONFIG_SYS_MALLOC_LEN		(384 * 1024)
 
 
@@ -67,7 +67,7 @@
 #define CONFIG_HOSTNAME		bf537-stamp
 /* Uncomment next line to use fixed MAC address */
 /* #define CONFIG_ETHADDR	02:80:ad:20:31:e8 */
-
+#define CONFIG_LIB_RAND
 
 /*
  * Flash Settings
@@ -118,8 +118,8 @@
  * it linked after the configuration sector.
  */
 # define LDS_BOARD_TEXT \
-	arch/blackfin/lib/libblackfin.o (.text*); \
-	arch/blackfin/cpu/libblackfin.o (.text*); \
+	arch/blackfin/lib/built-in.o (.text*); \
+	arch/blackfin/cpu/built-in.o (.text*); \
 	. = DEFINED(env_offset) ? env_offset : .; \
 	common/env_embedded.o (.text*);
 #endif
@@ -128,22 +128,24 @@
 /*
  * I2C Settings
  */
-#define CONFIG_BFIN_TWI_I2C	1
-#define CONFIG_HARD_I2C		1
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_ADI
 
 
 /*
  * SPI_MMC Settings
  */
+#define CONFIG_MMC_SPI
+#ifdef CONFIG_MMC_SPI
 #define CONFIG_MMC
 #define CONFIG_GENERIC_MMC
-#define CONFIG_MMC_SPI
-
+#endif
 
 /*
  * NAND Settings
  */
 /* #define CONFIG_NAND_PLAT */
+#ifdef CONFIG_NAND_PLAT
 #define CONFIG_SYS_NAND_BASE		0x20212000
 #define CONFIG_SYS_MAX_NAND_DEVICE	1
 
@@ -158,7 +160,7 @@
 #define NAND_PLAT_WRITE_CMD(chip, cmd) BFIN_NAND_WRITE(BFIN_NAND_CLE(chip), cmd)
 #define NAND_PLAT_WRITE_ADR(chip, cmd) BFIN_NAND_WRITE(BFIN_NAND_ALE(chip), cmd)
 #define NAND_PLAT_GPIO_DEV_READY       GPIO_PF3
-
+#endif /* CONFIG_NAND_PLAT */
 
 /*
  * CF-CARD IDE-HDD Support

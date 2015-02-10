@@ -18,23 +18,7 @@
  *
  * Copyright (C) 2007 Sergey Kubushyn <ksi@koi8.net>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -60,8 +44,8 @@ int timer_init(void)
 	writel(0x0, &timer->tim34);
 	writel(TIMER_LOAD_VAL, &timer->prd34);
 	writel(2 << 22, &timer->tcr);
-	gd->timer_rate_hz = CONFIG_SYS_HZ_CLOCK / TIM_CLK_DIV;
-	gd->timer_reset_value = 0;
+	gd->arch.timer_rate_hz = CONFIG_SYS_HZ_CLOCK / TIM_CLK_DIV;
+	gd->arch.timer_reset_value = 0;
 
 	return(0);
 }
@@ -74,27 +58,28 @@ unsigned long long get_ticks(void)
 	unsigned long now = readl(&timer->tim34);
 
 	/* increment tbu if tbl has rolled over */
-	if (now < gd->tbl)
-		gd->tbu++;
-	gd->tbl = now;
+	if (now < gd->arch.tbl)
+		gd->arch.tbu++;
+	gd->arch.tbl = now;
 
-	return (((unsigned long long)gd->tbu) << 32) | gd->tbl;
+	return (((unsigned long long)gd->arch.tbu) << 32) | gd->arch.tbl;
 }
 
 ulong get_timer(ulong base)
 {
 	unsigned long long timer_diff;
 
-	timer_diff = get_ticks() - gd->timer_reset_value;
+	timer_diff = get_ticks() - gd->arch.timer_reset_value;
 
-	return lldiv(timer_diff, (gd->timer_rate_hz / CONFIG_SYS_HZ)) - base;
+	return lldiv(timer_diff,
+		     (gd->arch.timer_rate_hz / CONFIG_SYS_HZ)) - base;
 }
 
 void __udelay(unsigned long usec)
 {
 	unsigned long long endtime;
 
-	endtime = lldiv((unsigned long long)usec * gd->timer_rate_hz,
+	endtime = lldiv((unsigned long long)usec * gd->arch.timer_rate_hz,
 			1000000UL);
 	endtime += get_ticks();
 
@@ -108,7 +93,7 @@ void __udelay(unsigned long usec)
  */
 ulong get_tbclk(void)
 {
-	return gd->timer_rate_hz;
+	return gd->arch.timer_rate_hz;
 }
 
 #ifdef CONFIG_HW_WATCHDOG

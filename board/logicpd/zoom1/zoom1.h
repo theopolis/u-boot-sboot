@@ -6,23 +6,7 @@
  * Derived from: board/omap3/beagle/beagle.h
  * Dirk Behme <dirk.behme@gmail.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #ifndef _BOARD_ZOOM1_H_
 #define _BOARD_ZOOM1_H_
@@ -32,6 +16,13 @@ const omap3_sysinfo sysinfo = {
 	"OMAP3 Zoom MDK Rev 1",
 	"NAND",
 };
+
+#define ZOOM1_ENET_GPMC_CONF1  0x00611000
+#define ZOOM1_ENET_GPMC_CONF2  0x001F1F01
+#define ZOOM1_ENET_GPMC_CONF3  0x00080803
+#define ZOOM1_ENET_GPMC_CONF4  0x1D091D09
+#define ZOOM1_ENET_GPMC_CONF5  0x041D1F1F
+#define ZOOM1_ENET_GPMC_CONF6  0x1D0904C4
 
 /*
  * IEN	- Input Enable
@@ -110,13 +101,13 @@ const omap3_sysinfo sysinfo = {
 	MUX_VAL(CP(GPMC_D14),		(IEN  | PTD | DIS | M0)) /*GPMC_D14*/\
 	MUX_VAL(CP(GPMC_D15),		(IEN  | PTD | DIS | M0)) /*GPMC_D15*/\
 	MUX_VAL(CP(GPMC_NCS0),		(IDIS | PTU | EN  | M0)) /*GPMC_nCS0*/\
-	MUX_VAL(CP(GPMC_NCS1),		(IDIS | PTU | EN  | M7)) /*GPMC_nCS1*/\
-	MUX_VAL(CP(GPMC_NCS2),		(IDIS | PTU | EN  | M7)) /*GPMC_nCS2*/\
-	MUX_VAL(CP(GPMC_NCS3),		(IDIS | PTU | EN  | M7)) /*GPMC_nCS3*/\
-	MUX_VAL(CP(GPMC_NCS4),		(IDIS | PTU | EN  | M7)) /*GPMC_nCS4*/\
-	MUX_VAL(CP(GPMC_NCS5),		(IDIS | PTD | DIS | M7)) /*GPMC_nCS5*/\
+	MUX_VAL(CP(GPMC_NCS1),		(IDIS | PTU | EN  | M0)) /*GPMC_nCS1*/\
+	MUX_VAL(CP(GPMC_NCS2),		(IDIS | PTU | DIS | M7)) /*GPMC_nCS2*/\
+	MUX_VAL(CP(GPMC_NCS3),		(IEN  | PTU | DIS | M4)) /*GPMC_nCS3 -> GPIO54*/\
+	MUX_VAL(CP(GPMC_NCS4),		(IDIS | PTU | DIS | M4)) /*GPMC_nCS4 -> GPIO 55*/\
+	MUX_VAL(CP(GPMC_NCS5),		(IDIS | PTD | DIS | M4)) /*GPMC_nCS5 -> GPIO 56*/\
 	MUX_VAL(CP(GPMC_NCS6),		(IEN  | PTD | DIS | M7)) /*GPMC_nCS6*/\
-	MUX_VAL(CP(GPMC_NCS7),		(IEN  | PTU | EN  | M7)) /*GPMC_nCS7*/\
+	MUX_VAL(CP(GPMC_NCS7),		(IEN  | PTU | EN  | M1)) /*GPMC_nCS7 -> GPMC_IO_DIR*/\
 	MUX_VAL(CP(GPMC_CLK),		(IDIS | PTD | DIS | M0)) /*GPMC_CLK*/\
 	MUX_VAL(CP(GPMC_NADV_ALE),	(IDIS | PTD | DIS | M0)) /*GPMC_nADV_ALE*/\
 	MUX_VAL(CP(GPMC_NOE),		(IDIS | PTD | DIS | M0)) /*GPMC_nOE*/\

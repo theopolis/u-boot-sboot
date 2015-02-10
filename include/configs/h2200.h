@@ -3,19 +3,7 @@
  *
  * Copyright (C) 2012 Lukasz Dalek <luk0104@gmail.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __CONFIG_H
@@ -24,12 +12,11 @@
 #define MACH_TYPE_H2200			341
 #define CONFIG_MACH_TYPE		MACH_TYPE_H2200
 
+#define CONFIG_SYS_GENERIC_BOARD
 #define CONFIG_CPU_PXA25X		1
 #define CONFIG_BOARD_H2200
 
 #define CONFIG_SYS_NO_FLASH
-
-#define CONFIG_SYS_HZ			1000
 
 #define CONFIG_NR_DRAM_BANKS		1
 #define PHYS_SDRAM_1			0xa0000000 /* SDRAM Bank #1 */
@@ -129,13 +116,13 @@
 #define CONFIG_BAUDRATE			115200
 #define CONFIG_SYS_BAUDRATE_TABLE	{ 9600, 38400, 115200 }
 
-#define CONFIG_CMD_IMPORTENV		1
 #define CONFIG_CMD_LOADB
 #define CONFIG_CMD_SOURCE
 #define CONFIG_CMD_RUN
 #define CONFIG_CMD_IMI
 
 #define CONFIG_FIT
+#define CONFIG_FIT_DISABLE_SHA256
 #define CONFIG_SETUP_MEMORY_TAGS
 #define CONFIG_CMDLINE_TAG
 #define CONFIG_INITRD_TAG

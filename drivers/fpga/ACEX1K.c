@@ -5,24 +5,7 @@
  * (C) Copyright 2002
  * Rich Ireland, Enterasys Networks, rireland@enterasys.com.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>		/* core U-Boot definitions */
@@ -140,7 +123,7 @@ static int ACEX1K_ps_load(Altera_desc *desc, const void *buf, size_t bsize)
 		}
 
 		/* Establish the initial state */
-		(*fn->config) (TRUE, TRUE, cookie);	/* Assert nCONFIG */
+		(*fn->config) (true, true, cookie);	/* Assert nCONFIG */
 
 		udelay(2);		/* T_cfg > 2us	*/
 
@@ -152,7 +135,7 @@ static int ACEX1K_ps_load(Altera_desc *desc, const void *buf, size_t bsize)
 			return FPGA_FAIL;
 		}
 
-		(*fn->config) (FALSE, TRUE, cookie);	/* Deassert nCONFIG */
+		(*fn->config) (false, true, cookie);	/* Deassert nCONFIG */
 		udelay(2);		/* T_cf2st1 < 4us	*/
 
 		/* Wait for nSTATUS to be released (i.e. deasserted) */
@@ -192,13 +175,13 @@ static int ACEX1K_ps_load(Altera_desc *desc, const void *buf, size_t bsize)
 			i = 8;
 			do {
 				/* Deassert the clock */
-				(*fn->clk) (FALSE, TRUE, cookie);
+				(*fn->clk) (false, true, cookie);
 				CONFIG_FPGA_DELAY ();
 				/* Write data */
-				(*fn->data) ( (val & 0x01), TRUE, cookie);
+				(*fn->data) ((val & 0x01), true, cookie);
 				CONFIG_FPGA_DELAY ();
 				/* Assert the clock */
-				(*fn->clk) (TRUE, TRUE, cookie);
+				(*fn->clk) (true, true, cookie);
 				CONFIG_FPGA_DELAY ();
 				val >>= 1;
 				i --;
@@ -232,9 +215,9 @@ static int ACEX1K_ps_load(Altera_desc *desc, const void *buf, size_t bsize)
 
 	for (i = 0; i < 12; i++) {
 		CONFIG_FPGA_DELAY ();
-		(*fn->clk) (TRUE, TRUE, cookie);	/* Assert the clock pin */
+		(*fn->clk) (true, true, cookie);	/* Assert the clock pin */
 		CONFIG_FPGA_DELAY ();
-		(*fn->clk) (FALSE, TRUE, cookie);	/* Deassert the clock pin */
+		(*fn->clk) (false, true, cookie);	/* Deassert the clock pin */
 	}
 
 	ret_val = FPGA_SUCCESS;

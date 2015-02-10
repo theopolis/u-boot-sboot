@@ -3,19 +3,7 @@
  *
  * Based on ti/evm/evm.h
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _AM3517EVM_H_
@@ -337,8 +325,6 @@ const omap3_sysinfo sysinfo = {
 	MUX_VAL(CP(SYS_32K),		(IEN  | PTD | EN  | M4)) \
 	MUX_VAL(CP(SYS_CLKREQ),		(IEN  | PTD | DIS | M0)) \
 	MUX_VAL(CP(SYS_NIRQ),		(IEN  | PTD | EN  | M4)) \
-	MUX_VAL(CP(SYS_NRESWARM),	(IEN | PTU | DIS | M4)) \
-					/* SYS_nRESWARM */\
 	MUX_VAL(CP(SYS_BOOT0),		(IEN  | PTD | DIS | M4)) \
 	MUX_VAL(CP(SYS_BOOT1),		(IEN  | PTD | DIS | M4)) \
 	MUX_VAL(CP(SYS_BOOT2),		(IEN  | PTD | DIS | M4)) \
@@ -353,7 +339,7 @@ const omap3_sysinfo sysinfo = {
 	MUX_VAL(CP(SYS_CLKOUT1),	(IEN  | PTD | DIS | M4))\
 	MUX_VAL(CP(SYS_CLKOUT2),	(IDIS | PTU | DIS | M4))\
 	/* JTAG */\
-	MUX_VAL(CP(JTAG_nTRST),		(IEN | PTU | EN  | M4)) \
+	MUX_VAL(CP(JTAG_NTRST),		(IEN | PTU | EN  | M4)) \
 	MUX_VAL(CP(JTAG_TCK),		(IEN | PTU | EN  | M4)) \
 	MUX_VAL(CP(JTAG_TMS),		(IEN | PTU | EN  | M4)) \
 	MUX_VAL(CP(JTAG_TDI),		(IEN | PTU | EN  | M4)) \

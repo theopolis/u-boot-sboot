@@ -3,23 +3,7 @@
  * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
  * Copyright (C) 2009-2012 Genesi USA, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -30,6 +14,7 @@
 #include <asm/arch/sys_proto.h>
 #include <asm/arch/crm_regs.h>
 #include <asm/arch/clock.h>
+#include <asm/imx-common/spi.h>
 #include <i2c.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
@@ -168,6 +153,11 @@ static iomux_v3_cfg_t const efikamx_spi_pads[] = {
  * PMIC configuration
  */
 #ifdef CONFIG_MXC_SPI
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 1) ? 121 : -1;
+}
+
 static void power_init(void)
 {
 	unsigned int val;
@@ -175,7 +165,7 @@ static void power_init(void)
 	struct pmic *p;
 	int ret;
 
-	ret = pmic_init(I2C_PMIC);
+	ret = pmic_init(CONFIG_FSL_PMIC_BUS);
 	if (ret)
 		return;
 
@@ -293,7 +283,7 @@ static iomux_v3_cfg_t const efikamx_sdhc1_pads[] = {
 
 static iomux_v3_cfg_t const efikamx_sdhc1_cd_pads[] = {
 	MX51_PAD_GPIO1_0__SD1_CD,
-	MX51_PAD_EIM_CS2__SD1_CD,
+	NEW_PAD_CTRL(MX51_PAD_EIM_CS2__GPIO2_27, MX51_ESDHC_PAD_CTRL),
 };
 
 #define EFIKAMX_SDHC1_CD	IMX_GPIO_NR(1, 0)

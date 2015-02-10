@@ -2,23 +2,7 @@
  * (C) Copyright 2004
  * Pierre AUBERT, Staubli Faverges, <p.aubert@staubli.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * Init is derived from Linux code.
  */
@@ -57,25 +41,17 @@ int ide_preinit (void)
 	/* All sample codes do that... */
 	*(vu_long *) MPC5XXX_ATA_SHARE_COUNT = 0;
 
-#if defined(CONFIG_UC101)
-	/* Configure and reset host */
-	*(vu_long *) MPC5XXX_ATA_HOST_CONFIG =
-		MPC5xxx_ATA_HOSTCONF_SMR | MPC5xxx_ATA_HOSTCONF_FR;
-	udelay (10);
-	*(vu_long *) MPC5XXX_ATA_HOST_CONFIG = 0;
-#else
 	/* Configure and reset host */
 	*(vu_long *) MPC5XXX_ATA_HOST_CONFIG = MPC5xxx_ATA_HOSTCONF_IORDY |
 		MPC5xxx_ATA_HOSTCONF_SMR | MPC5xxx_ATA_HOSTCONF_FR;
 	udelay (10);
 	*(vu_long *) MPC5XXX_ATA_HOST_CONFIG = MPC5xxx_ATA_HOSTCONF_IORDY;
-#endif
 
 	/* Disable prefetch on Commbus */
 	psdma->PtdCntrl |= 1;
 
 	/* Init timings : we use PIO mode 0 timings */
-	period = 1000000000 / gd->ipb_clk;	/* period in ns */
+	period = 1000000000 / gd->arch.ipb_clk;	/* period in ns */
 
 	t0 = CALC_TIMING (600);
 	t2_8 = CALC_TIMING (290);

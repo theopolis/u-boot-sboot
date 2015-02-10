@@ -4,23 +4,7 @@
  * (C) Copyright 2000-2006
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 
@@ -36,10 +20,8 @@
 #include <asm/mp.h>
 
 #if defined(CONFIG_OF_LIBFDT)
-#include <fdt.h>
 #include <libfdt.h>
 #include <fdt_support.h>
-
 #endif
 
 #ifdef CONFIG_SYS_INIT_RAM_LOCK
@@ -48,8 +30,8 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-extern ulong get_effective_memsize(void);
 static ulong get_sp (void);
+extern void ft_fixup_num_cores(void *blob);
 static void set_clocks_in_mhz (bd_t *kbd);
 
 #ifndef CONFIG_SYS_LINUX_LOWMEM_MAX_SIZE
@@ -70,6 +52,13 @@ static void boot_jump_linux(bootm_headers_t *images)
 		(ulong)kernel);
 
 	bootstage_mark(BOOTSTAGE_ID_RUN_OS);
+
+#ifdef CONFIG_BOOTSTAGE_FDT
+	bootstage_fdt_add_report();
+#endif
+#ifdef CONFIG_BOOTSTAGE_REPORT
+	bootstage_report();
+#endif
 
 #if defined(CONFIG_SYS_INIT_RAM_LOCK) && !defined(CONFIG_E500)
 	unlock_ram_in_cache();
@@ -137,7 +126,7 @@ void arch_lmb_reserve(struct lmb *lmb)
 #endif
 
 	size = min(bootm_size, get_effective_memsize());
-	size = min(size, CONFIG_SYS_LINUX_LOWMEM_MAX_SIZE);
+	size = min(size, (ulong)CONFIG_SYS_LINUX_LOWMEM_MAX_SIZE);
 
 	if (size < bootm_size) {
 		ulong base = bootmap_base + size;
@@ -222,101 +211,19 @@ static int boot_bd_t_linux(bootm_headers_t *images)
 	return ret;
 }
 
-/*
- * Verify the device tree.
- *
- * This function is called after all device tree fix-ups have been enacted,
- * so that the final device tree can be verified.  The definition of "verified"
- * is up to the specific implementation.  However, it generally means that the
- * addresses of some of the devices in the device tree are compared with the
- * actual addresses at which U-Boot has placed them.
- *
- * Returns 1 on success, 0 on failure.  If 0 is returned, U-boot will halt the
- * boot process.
- */
-static int __ft_verify_fdt(void *fdt)
-{
-	return 1;
-}
-__attribute__((weak, alias("__ft_verify_fdt"))) int ft_verify_fdt(void *fdt);
-
 static int boot_body_linux(bootm_headers_t *images)
 {
-	ulong rd_len;
-	struct lmb *lmb = &images->lmb;
-	ulong *initrd_start = &images->initrd_start;
-	ulong *initrd_end = &images->initrd_end;
-#if defined(CONFIG_OF_LIBFDT)
-	ulong of_size = images->ft_len;
-	char **of_flat_tree = &images->ft_addr;
-#endif
-
 	int ret;
-
-#if defined(CONFIG_OF_LIBFDT)
-	boot_fdt_add_mem_rsv_regions(lmb, *of_flat_tree);
-#endif
-
-	/* allocate space and init command line */
-	ret = boot_cmdline_linux(images);
-	if (ret)
-		return ret;
 
 	/* allocate space for kernel copy of board info */
 	ret = boot_bd_t_linux(images);
 	if (ret)
 		return ret;
 
-	rd_len = images->rd_end - images->rd_start;
-	ret = boot_ramdisk_high (lmb, images->rd_start, rd_len, initrd_start, initrd_end);
+	ret = image_setup_linux(images);
 	if (ret)
 		return ret;
 
-#if defined(CONFIG_OF_LIBFDT)
-	ret = boot_relocate_fdt(lmb, of_flat_tree, &of_size);
-	if (ret)
-		return ret;
-
-	/*
-	 * Add the chosen node if it doesn't exist, add the env and bd_t
-	 * if the user wants it (the logic is in the subroutines).
-	 */
-	if (of_size) {
-		if (fdt_chosen(*of_flat_tree, 1) < 0) {
-			puts ("ERROR: ");
-			puts ("/chosen node create failed");
-			puts (" - must RESET the board to recover.\n");
-			return -1;
-		}
-#ifdef CONFIG_OF_BOARD_SETUP
-		/* Call the board-specific fixup routine */
-		ft_board_setup(*of_flat_tree, gd->bd);
-#endif
-
-		/* Delete the old LMB reservation */
-		lmb_free(lmb, (phys_addr_t)(u32)*of_flat_tree,
-				(phys_size_t)fdt_totalsize(*of_flat_tree));
-
-		ret = fdt_resize(*of_flat_tree);
-		if (ret < 0)
-			return ret;
-		of_size = ret;
-
-		if (*initrd_start && *initrd_end) {
-			of_size += FDT_RAMDISK_OVERHEAD;
-			fdt_set_totalsize(*of_flat_tree, of_size);
-		}
-		/* Create a new LMB reservation */
-		lmb_reserve(lmb, (ulong)*of_flat_tree, of_size);
-
-		/* fixup the initrd now that we know where it should be */
-		if (*initrd_start && *initrd_end)
-			fdt_initrd(*of_flat_tree, *initrd_start, *initrd_end, 1);
-
-		if (!ft_verify_fdt(*of_flat_tree))
-			return -1;
-	}
-#endif	/* CONFIG_OF_LIBFDT */
 	return 0;
 }
 
@@ -337,11 +244,6 @@ int do_bootm_linux(int flag, int argc, char * const argv[], bootm_headers_t *ima
 
 	if (flag & BOOTM_STATE_OS_PREP) {
 		boot_prep_linux(images);
-		return 0;
-	}
-
-	if (flag & BOOTM_STATE_OS_GO) {
-		boot_jump_linux(images);
 		return 0;
 	}
 
@@ -370,13 +272,6 @@ static void set_clocks_in_mhz (bd_t *kbd)
 		/* convert all clock information to MHz */
 		kbd->bi_intfreq /= 1000000L;
 		kbd->bi_busfreq /= 1000000L;
-#if defined(CONFIG_MPC8220)
-		kbd->bi_inpfreq /= 1000000L;
-		kbd->bi_pcifreq /= 1000000L;
-		kbd->bi_pevfreq /= 1000000L;
-		kbd->bi_flbfreq /= 1000000L;
-		kbd->bi_vcofreq /= 1000000L;
-#endif
 #if defined(CONFIG_CPM2)
 		kbd->bi_cpmfreq /= 1000000L;
 		kbd->bi_brgfreq /= 1000000L;
@@ -389,3 +284,58 @@ static void set_clocks_in_mhz (bd_t *kbd)
 #endif /* CONFIG_MPC5xxx */
 	}
 }
+
+#if defined(CONFIG_BOOTM_VXWORKS)
+void boot_prep_vxworks(bootm_headers_t *images)
+{
+#if defined(CONFIG_OF_LIBFDT)
+	int off;
+	u64 base, size;
+
+	if (!images->ft_addr)
+		return;
+
+	base = (u64)gd->bd->bi_memstart;
+	size = (u64)gd->bd->bi_memsize;
+
+	off = fdt_path_offset(images->ft_addr, "/memory");
+	if (off < 0)
+		fdt_fixup_memory(images->ft_addr, base, size);
+
+#if defined(CONFIG_MP)
+#if defined(CONFIG_MPC85xx)
+	ft_fixup_cpu(images->ft_addr, base + size);
+	ft_fixup_num_cores(images->ft_addr);
+#elif defined(CONFIG_MPC86xx)
+	off = fdt_add_mem_rsv(images->ft_addr,
+			determine_mp_bootpg(NULL), (u64)4096);
+	if (off < 0)
+		printf("## WARNING %s: %s\n", __func__, fdt_strerror(off));
+	ft_fixup_num_cores(images->ft_addr);
+#endif
+	flush_cache((unsigned long)images->ft_addr, images->ft_len);
+#endif
+#endif
+}
+
+void boot_jump_vxworks(bootm_headers_t *images)
+{
+	/* PowerPC VxWorks boot interface conforms to the ePAPR standard
+	 * general purpuse registers:
+	 *
+	 *	r3: Effective address of the device tree image
+	 *	r4: 0
+	 *	r5: 0
+	 *	r6: ePAPR magic value
+	 *	r7: shall be the size of the boot IMA in bytes
+	 *	r8: 0
+	 *	r9: 0
+	 *	TCR: WRC = 0, no watchdog timer reset will occur
+	 */
+	WATCHDOG_RESET();
+
+	((void (*)(void *, ulong, ulong, ulong,
+		ulong, ulong, ulong))images->ep)(images->ft_addr,
+		0, 0, EPAPR_MAGIC, getenv_bootm_mapsize(), 0, 0);
+}
+#endif

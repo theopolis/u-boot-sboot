@@ -2,45 +2,22 @@
 # (C) Copyright 2007
 # Wolfgang Denk, DENX Software Engineering, wd@denx.de.
 #
-# See file CREDITS for list of people who contributed to this
-# project.
+# SPDX-License-Identifier:	GPL-2.0+
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307 USA
-#
-include $(TOPDIR)/config.mk
 
-LIB	= libpost$(ARCH)fpu.o
+objs-before-objcopy := 20001122-1.o 20010114-2.o 20010226-1.o 980619-1.o \
+	acc1.o compare-fp-1.o fpu.o mul-subnormal-single-1.o darwin-ldouble.o
+targets += $(objs-before-objcopy)
 
-COBJS-$(CONFIG_HAS_POST)	+= 20001122-1.o
-COBJS-$(CONFIG_HAS_POST)	+= 20010114-2.o
-COBJS-$(CONFIG_HAS_POST)	+= 20010226-1.o
-COBJS-$(CONFIG_HAS_POST)	+= 980619-1.o
-COBJS-$(CONFIG_HAS_POST)	+= acc1.o
-COBJS-$(CONFIG_HAS_POST)	+= compare-fp-1.o
-COBJS-$(CONFIG_HAS_POST)	+= fpu.o
-COBJS-$(CONFIG_HAS_POST)	+= mul-subnormal-single-1.o
+# remove -msoft-float flag
+$(foreach m, $(objs-before-objcopy), $(eval CFLAGS_REMOVE_$m := -msoft-float))
+ccflags-y := -mhard-float -fkeep-inline-functions
 
-COBJS-$(CONFIG_HAS_POST)	+= darwin-ldouble.o
+# Do not delete intermidiate files (*.o)
+.SECONDARY: $(call objectify, $(objs-before-objcopy))
 
-include $(TOPDIR)/post/rules.mk
+obj-y := $(objs-before-objcopy:.o=_.o)
 
-CFLAGS := $(shell echo $(CFLAGS) | sed s/-msoft-float//)
-CFLAGS += -mhard-float -fkeep-inline-functions
-
-$(obj)%.o:	%.c
-	$(CC)  $(ALL_CFLAGS) -o $@.fp $< -c
-	$(OBJCOPY) -R .gnu.attributes $@.fp $@
-	rm -f $@.fp
+OBJCOPYFLAGS := -R .gnu.attributes
+$(obj)/%_.o: $(obj)/%.o FORCE
+	$(call if_changed,objcopy)

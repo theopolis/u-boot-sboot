@@ -5,23 +5,7 @@
  * (C) Copyright 2005-2009 Samsung Electronics
  * Kyungmin Park <kyungmin.park@samsung.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -68,7 +52,7 @@ void env_relocate_spec(void)
 	/* Check OneNAND exist */
 	if (mtd->writesize)
 		/* Ignore read fail */
-		mtd->read(mtd, env_addr, ONENAND_MAX_ENV_SIZE,
+		mtd_read(mtd, env_addr, ONENAND_MAX_ENV_SIZE,
 				&retlen, (u_char *)buf);
 	else
 		mtd->writesize = MAX_ONENAND_PAGESIZE;
@@ -82,8 +66,7 @@ void env_relocate_spec(void)
 int saveenv(void)
 {
 	env_t	env_new;
-	ssize_t	len;
-	char	*res;
+	int ret;
 	struct mtd_info *mtd = &onenand_mtd;
 #ifdef CONFIG_ENV_ADDR_FLEX
 	struct onenand_chip *this = &onenand_chip;
@@ -94,13 +77,9 @@ int saveenv(void)
 		.callback	= NULL,
 	};
 
-	res = (char *)&env_new.data;
-	len = hexport_r(&env_htab, '\0', 0, &res, ENV_SIZE, 0, NULL);
-	if (len < 0) {
-		error("Cannot export environment: errno = %d\n", errno);
-		return 1;
-	}
-	env_new.crc = crc32(0, env_new.data, ENV_SIZE);
+	ret = env_export(&env_new);
+	if (ret)
+		return ret;
 
 	instr.len = CONFIG_ENV_SIZE;
 #ifdef CONFIG_ENV_ADDR_FLEX
@@ -113,12 +92,12 @@ int saveenv(void)
 #endif
 	instr.addr = env_addr;
 	instr.mtd = mtd;
-	if (mtd->erase(mtd, &instr)) {
+	if (mtd_erase(mtd, &instr)) {
 		printf("OneNAND: erase failed at 0x%08llx\n", env_addr);
 		return 1;
 	}
 
-	if (mtd->write(mtd, env_addr, ONENAND_MAX_ENV_SIZE, &retlen,
+	if (mtd_write(mtd, env_addr, ONENAND_MAX_ENV_SIZE, &retlen,
 			(u_char *)&env_new)) {
 		printf("OneNAND: write failed at 0x%llx\n", instr.addr);
 		return 2;

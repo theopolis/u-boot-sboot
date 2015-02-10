@@ -7,23 +7,7 @@
  * Copyright (C) 2008 Ronetix Ilko Iliev (www.ronetix.at)
  * Copyright (C) 2009 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
@@ -42,27 +26,18 @@
 #define CONFIG_SYS_MATRIX_EBICSA_VAL CONFIG_SYS_MATRIX_EBI0CSA_VAL
 #endif
 
-_TEXT_BASE:
-	.word	CONFIG_SYS_TEXT_BASE
-
 .globl lowlevel_init
 .type lowlevel_init,function
 lowlevel_init:
 
-	mov	r5, pc		/* r5 = POS1 + 4 current */
 POS1:
+	adr	r5, POS1	/* r5 = POS1 run time */
 	ldr	r0, =POS1	/* r0 = POS1 compile */
-	ldr	r2, _TEXT_BASE
-	sub	r0, r0, r2	/* r0 = POS1-_TEXT_BASE (POS1 relative) */
 	sub	r5, r5, r0	/* r0 = CONFIG_SYS_TEXT_BASE-1 */
-	sub	r5, r5, #4	/* r1 = text base - current */
 
 	/* memory control configuration 1 */
 	ldr	r0, =SMRDATA
 	ldr	r2, =SMRDATA1
-	ldr	r1, _TEXT_BASE
-	sub	r0, r0, r1
-	sub	r2, r2, r1
 	add	r0, r0, r5
 	add	r2, r2, r5
 0:
@@ -165,9 +140,6 @@ PLL_setup_end:
 
 	ldr	r0, =SMRDATA1
 	ldr	r2, =SMRDATA2
-	ldr	r1, _TEXT_BASE
-	sub	r0, r0, r1
-	sub	r2, r2, r1
 	add	r0, r0, r5
 	add	r2, r2, r5
 2:

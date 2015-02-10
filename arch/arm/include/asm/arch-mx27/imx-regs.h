@@ -2,23 +2,7 @@
  * (c) 2007 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
  * (c) 2009 Ilya Yanok, Emcraft Systems <yanok@emcraft.com>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _IMX_REGS_H
@@ -176,7 +160,7 @@ struct iim_regs {
 	u32 iim_sdat;
 	u32 iim_prev;
 	u32 iim_srev;
-	u32 iim_prog_p;
+	u32 iim_prg_p;
 	u32 iim_scs0;
 	u32 iim_scs1;
 	u32 iim_scs2;
@@ -185,7 +169,7 @@ struct iim_regs {
 	struct fuse_bank {
 		u32 fuse_regs[0x20];
 		u32 fuse_rsvd[0xe0];
-	} bank[1];
+	} bank[2];
 };
 
 struct fuse_bank0_regs {
@@ -222,10 +206,15 @@ struct fuse_bank0_regs {
 #define IMX_PLL_BASE		(0x27000 + IMX_IO_BASE)
 #define IMX_SYSTEM_CTL_BASE	(0x27800 + IMX_IO_BASE)
 #define IMX_IIM_BASE		(0x28000 + IMX_IO_BASE)
+#define IIM_BASE_ADDR		IMX_IIM_BASE
 #define IMX_FEC_BASE		(0x2b000 + IMX_IO_BASE)
 
+#define IMX_NFC_BASE		(0xD8000000)
 #define IMX_ESD_BASE		(0xD8001000)
 #define IMX_WEIM_BASE		(0xD8002000)
+
+#define NFC_BASE_ADDR		IMX_NFC_BASE
+
 
 /* FMCR System Control bit definition*/
 #define UART4_RXD_CTL	(1 << 25)

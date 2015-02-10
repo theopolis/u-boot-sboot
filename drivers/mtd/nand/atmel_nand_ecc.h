@@ -2,10 +2,7 @@
  * Error Corrected Code Controller (ECC) - System peripherals regsters.
  * Based on AT91SAM9260 datasheet revision B.
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef ATMEL_NAND_ECC_H
@@ -36,6 +33,9 @@
 /* Register access macros for PMECC */
 #define pmecc_readl(addr, reg) \
 	readl(&addr->reg)
+
+#define pmecc_readb(addr, reg) \
+	readb(&addr->reg)
 
 #define pmecc_writel(addr, reg, value) \
 	writel((value), &addr->reg)
@@ -140,6 +140,10 @@ struct pmecc_errloc_regs {
 /* Galois field dimension */
 #define PMECC_GF_DIMENSION_13			13
 #define PMECC_GF_DIMENSION_14			14
+
+/* Primitive Polynomial used by PMECC */
+#define PMECC_GF_13_PRIMITIVE_POLY		0x201b
+#define PMECC_GF_14_PRIMITIVE_POLY		0x4443
 
 #define PMECC_INDEX_TABLE_SIZE_512		0x2000
 #define PMECC_INDEX_TABLE_SIZE_1024		0x4000

@@ -1,23 +1,7 @@
 /*
  * (C) Copyright 2009 Freescale Semiconductor, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __ASM_ARCH_MX5_IMX_REGS_H__
@@ -218,11 +202,6 @@
  */
 #define WBED		1
 
-#define CS0_128					0
-#define CS0_64M_CS1_64M				1
-#define CS0_64M_CS1_32M_CS2_32M			2
-#define CS0_32M_CS1_32M_CS2_32M_CS3_32M		3
-
 /*
  * CSPI register definitions
  */
@@ -230,6 +209,7 @@
 #define MXC_CSPICTRL_EN		(1 << 0)
 #define MXC_CSPICTRL_MODE	(1 << 1)
 #define MXC_CSPICTRL_XCH	(1 << 2)
+#define MXC_CSPICTRL_MODE_MASK	(0xf << 4)
 #define MXC_CSPICTRL_CHIPSELECT(x)	(((x) & 0x3) << 12)
 #define MXC_CSPICTRL_BITCOUNT(x)	(((x) & 0xfff) << 20)
 #define MXC_CSPICTRL_PREDIV(x)	(((x) & 0xF) << 12)
@@ -245,9 +225,10 @@
 #define MXC_CSPICTRL_CHAN	18
 
 /* Bit position inside CON register to be associated with SS */
-#define MXC_CSPICON_POL		4
-#define MXC_CSPICON_PHA		0
-#define MXC_CSPICON_SSPOL	12
+#define MXC_CSPICON_PHA		0  /* SCLK phase control */
+#define MXC_CSPICON_POL		4  /* SCLK polarity */
+#define MXC_CSPICON_SSPOL	12 /* SS polarity */
+#define MXC_CSPICON_CTL		20 /* inactive state of SCLK */
 #define MXC_SPI_BASE_ADDRESSES \
 	CSPI1_BASE_ADDR, \
 	CSPI2_BASE_ADDR, \
@@ -266,6 +247,8 @@
 /* M4IF */
 #define M4IF_FBPM0	0x40
 #define M4IF_FIDBP	0x48
+#define M4IF_GENP_WEIM_MM_MASK		0x00000001
+#define WEIM_GCR2_MUX16_BYP_GRANT_MASK	0x00001000
 
 /* Assuming 24MHz input clock with doubler ON */
 /*                            MFI         PDF */
@@ -426,8 +409,7 @@ struct weim {
 
 #if defined(CONFIG_MX51)
 struct iomuxc {
-	u32	gpr0;
-	u32	gpr1;
+	u32	gpr[2];
 	u32	omux0;
 	u32	omux1;
 	u32	omux2;
@@ -436,9 +418,7 @@ struct iomuxc {
 };
 #elif defined(CONFIG_MX53)
 struct iomuxc {
-	u32	gpr0;
-	u32	gpr1;
-	u32	gpr2;
+	u32	gpr[3];
 	u32	omux0;
 	u32	omux1;
 	u32	omux2;
@@ -498,7 +478,7 @@ struct iim_regs {
 	u32	sdat;
 	u32	prev;
 	u32	srev;
-	u32	preg_p;
+	u32	prg_p;
 	u32	scs0;
 	u32	scs1;
 	u32	scs2;
@@ -507,12 +487,22 @@ struct iim_regs {
 	struct fuse_bank {
 		u32	fuse_regs[0x20];
 		u32	fuse_rsvd[0xe0];
+#if defined(CONFIG_MX51)
 	} bank[4];
+#elif defined(CONFIG_MX53)
+	} bank[5];
+#endif
 };
 
 struct fuse_bank0_regs {
-	u32	fuse0_23[24];
+	u32	fuse0_7[8];
+	u32	uid[8];
+	u32	fuse16_23[8];
+#if defined(CONFIG_MX51)
+	u32	imei[8];
+#elif defined(CONFIG_MX53)
 	u32	gp[8];
+#endif
 };
 
 struct fuse_bank1_regs {
@@ -520,6 +510,14 @@ struct fuse_bank1_regs {
 	u32	mac_addr[6];
 	u32	fuse15_31[0x11];
 };
+
+#if defined(CONFIG_MX53)
+struct fuse_bank4_regs {
+	u32	fuse0_4[5];
+	u32	gp[3];
+	u32	fuse8_31[0x18];
+};
+#endif
 
 #endif /* __ASSEMBLER__*/
 

@@ -1,23 +1,7 @@
 /*
  * Copyright (C) 2004-2009 Freescale Semiconductor, Inc.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -232,12 +216,12 @@ void cpu_init_f (volatile immap_t * im)
 	clrsetbits_be32(&im->clk.sccr, sccr_mask, sccr_val);
 
 	/* RSR - Reset Status Register - clear all status (4.6.1.3) */
-	gd->reset_status = __raw_readl(&im->reset.rsr);
+	gd->arch.reset_status = __raw_readl(&im->reset.rsr);
 	__raw_writel(~(RSR_RES), &im->reset.rsr);
 
 	/* AER - Arbiter Event Register - store status */
-	gd->arbiter_event_attributes = __raw_readl(&im->arbiter.aeatr);
-	gd->arbiter_event_address = __raw_readl(&im->arbiter.aeadr);
+	gd->arch.arbiter_event_attributes = __raw_readl(&im->arbiter.aeatr);
+	gd->arch.arbiter_event_address = __raw_readl(&im->arbiter.aeadr);
 
 	/*
 	 * RMR - Reset Mode Register
@@ -331,7 +315,7 @@ void cpu_init_f (volatile immap_t * im)
 #endif
 #if defined(CONFIG_USB_EHCI_FSL) && defined(CONFIG_MPC831x)
 	uint32_t temp;
-	struct usb_ehci *ehci = (struct usb_ehci *)CONFIG_SYS_FSL_USB_ADDR;
+	struct usb_ehci *ehci = (struct usb_ehci *)CONFIG_SYS_FSL_USB1_ADDR;
 
 	/* Configure interface. */
 	setbits_be32(&ehci->control, REFSEL_16MHZ | UTMI_PHY_EN);
@@ -440,42 +424,44 @@ static int print_83xx_arb_event(int force)
 		"reserved"
 	};
 
-	int etype = (gd->arbiter_event_attributes & AEATR_EVENT)
-	            >> AEATR_EVENT_SHIFT;
-	int mstr_id = (gd->arbiter_event_attributes & AEATR_MSTR_ID)
-	              >> AEATR_MSTR_ID_SHIFT;
-	int tbst = (gd->arbiter_event_attributes & AEATR_TBST)
-	           >> AEATR_TBST_SHIFT;
-	int tsize = (gd->arbiter_event_attributes & AEATR_TSIZE)
-	            >> AEATR_TSIZE_SHIFT;
-	int ttype = (gd->arbiter_event_attributes & AEATR_TTYPE)
-	            >> AEATR_TTYPE_SHIFT;
+	int etype = (gd->arch.arbiter_event_attributes & AEATR_EVENT)
+		    >> AEATR_EVENT_SHIFT;
+	int mstr_id = (gd->arch.arbiter_event_attributes & AEATR_MSTR_ID)
+		      >> AEATR_MSTR_ID_SHIFT;
+	int tbst = (gd->arch.arbiter_event_attributes & AEATR_TBST)
+		   >> AEATR_TBST_SHIFT;
+	int tsize = (gd->arch.arbiter_event_attributes & AEATR_TSIZE)
+		    >> AEATR_TSIZE_SHIFT;
+	int ttype = (gd->arch.arbiter_event_attributes & AEATR_TTYPE)
+		    >> AEATR_TTYPE_SHIFT;
 
-	if (!force && !gd->arbiter_event_address)
+	if (!force && !gd->arch.arbiter_event_address)
 		return 0;
 
 	puts("Arbiter Event Status:\n");
-	printf("       Event Address: 0x%08lX\n", gd->arbiter_event_address);
+	printf("       Event Address: 0x%08lX\n",
+	       gd->arch.arbiter_event_address);
 	printf("       Event Type:    0x%1x  = %s\n", etype, event[etype]);
 	printf("       Master ID:     0x%02x = %s\n", mstr_id, master[mstr_id]);
 	printf("       Transfer Size: 0x%1x  = %d bytes\n", (tbst<<3) | tsize,
 				tbst ? (tsize ? tsize : 8) : 16 + 8 * tsize);
 	printf("       Transfer Type: 0x%02x = %s\n", ttype, transfer[ttype]);
 
-	return gd->arbiter_event_address;
+	return gd->arch.arbiter_event_address;
 }
 
 #elif defined(CONFIG_DISPLAY_AER_BRIEF)
 
 static int print_83xx_arb_event(int force)
 {
-	if (!force && !gd->arbiter_event_address)
+	if (!force && !gd->arch.arbiter_event_address)
 		return 0;
 
 	printf("Arbiter Event Status: AEATR=0x%08lX, AEADR=0x%08lX\n",
-		gd->arbiter_event_attributes, gd->arbiter_event_address);
+		gd->arch.arbiter_event_attributes,
+		gd->arch.arbiter_event_address);
 
-	return gd->arbiter_event_address;
+	return gd->arch.arbiter_event_address;
 }
 #endif /* CONFIG_DISPLAY_AER_xxxx */
 
@@ -499,7 +485,7 @@ int prt_83xx_rsr(void)
 		RSR_HRS,  "External/Internal Hard"}
 	};
 	static int n = sizeof bits / sizeof bits[0];
-	ulong rsr = gd->reset_status;
+	ulong rsr = gd->arch.reset_status;
 	int i;
 	char *sep;
 

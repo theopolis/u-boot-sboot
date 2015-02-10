@@ -7,35 +7,29 @@
  * Based on code from LTIB:
  * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __MX28_REGS_LCDIF_H__
 #define __MX28_REGS_LCDIF_H__
 
-#include <asm/arch/regs-common.h>
+#include <asm/imx-common/regs-common.h>
 
 #ifndef	__ASSEMBLY__
 struct mxs_lcdif_regs {
 	mxs_reg_32(hw_lcdif_ctrl)		/* 0x00 */
 	mxs_reg_32(hw_lcdif_ctrl1)		/* 0x10 */
+#if defined(CONFIG_MX28)
 	mxs_reg_32(hw_lcdif_ctrl2)		/* 0x20 */
-	mxs_reg_32(hw_lcdif_transfer_count)	/* 0x30 */
-	mxs_reg_32(hw_lcdif_cur_buf)		/* 0x40 */
-	mxs_reg_32(hw_lcdif_next_buf)		/* 0x50 */
+#endif
+	mxs_reg_32(hw_lcdif_transfer_count)	/* 0x20/0x30 */
+	mxs_reg_32(hw_lcdif_cur_buf)		/* 0x30/0x40 */
+	mxs_reg_32(hw_lcdif_next_buf)		/* 0x40/0x50 */
+
+#if defined(CONFIG_MX23)
+	uint32_t	reserved1[4];
+#endif
+
 	mxs_reg_32(hw_lcdif_timing)		/* 0x60 */
 	mxs_reg_32(hw_lcdif_vdctrl0)		/* 0x70 */
 	mxs_reg_32(hw_lcdif_vdctrl1)		/* 0x80 */
@@ -54,13 +48,19 @@ struct mxs_lcdif_regs {
 	mxs_reg_32(hw_lcdif_csc_coeffctrl4)	/* 0x150 */
 	mxs_reg_32(hw_lcdif_csc_offset)	/* 0x160 */
 	mxs_reg_32(hw_lcdif_csc_limit)		/* 0x170 */
-	mxs_reg_32(hw_lcdif_data)		/* 0x180 */
-	mxs_reg_32(hw_lcdif_bm_error_stat)	/* 0x190 */
+
+#if defined(CONFIG_MX23)
+	uint32_t	reserved2[12];
+#endif
+	mxs_reg_32(hw_lcdif_data)		/* 0x1b0/0x180 */
+	mxs_reg_32(hw_lcdif_bm_error_stat)	/* 0x1c0/0x190 */
+#if defined(CONFIG_MX28)
 	mxs_reg_32(hw_lcdif_crc_stat)		/* 0x1a0 */
-	mxs_reg_32(hw_lcdif_lcdif_stat)	/* 0x1b0 */
-	mxs_reg_32(hw_lcdif_version)		/* 0x1c0 */
-	mxs_reg_32(hw_lcdif_debug0)		/* 0x1d0 */
-	mxs_reg_32(hw_lcdif_debug1)		/* 0x1e0 */
+#endif
+	mxs_reg_32(hw_lcdif_lcdif_stat)		/* 0x1d0/0x1b0 */
+	mxs_reg_32(hw_lcdif_version)		/* 0x1e0/0x1c0 */
+	mxs_reg_32(hw_lcdif_debug0)		/* 0x1f0/0x1d0 */
+	mxs_reg_32(hw_lcdif_debug1)		/* 0x200/0x1e0 */
 	mxs_reg_32(hw_lcdif_debug2)		/* 0x1f0 */
 };
 #endif
@@ -191,8 +191,13 @@ struct mxs_lcdif_regs {
 #define	LCDIF_VDCTRL1_VSYNC_PERIOD_MASK				0xffffffff
 #define	LCDIF_VDCTRL1_VSYNC_PERIOD_OFFSET			0
 
+#if defined(CONFIG_MX23)
+#define	LCDIF_VDCTRL2_HSYNC_PULSE_WIDTH_MASK			(0xff << 24)
+#define	LCDIF_VDCTRL2_HSYNC_PULSE_WIDTH_OFFSET			24
+#elif defined(CONFIG_MX28)
 #define	LCDIF_VDCTRL2_HSYNC_PULSE_WIDTH_MASK			(0x3fff << 18)
 #define	LCDIF_VDCTRL2_HSYNC_PULSE_WIDTH_OFFSET			18
+#endif
 #define	LCDIF_VDCTRL2_HSYNC_PERIOD_MASK				0x3ffff
 #define	LCDIF_VDCTRL2_HSYNC_PERIOD_OFFSET			0
 

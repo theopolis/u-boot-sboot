@@ -7,11 +7,9 @@
 # (mem base + reserved)
 #
 
-#Provide at least 16MB spacing between us and the Linux Kernel image
-PAD_TO	:= 12320
-UBL_CONFIG = $(SRCTREE)/board/$(BOARDDIR)/ublimage.cfg
+UBL_CONFIG = $(srctree)/board/$(BOARDDIR)/ublimage.cfg
 ifndef CONFIG_SPL_BUILD
-ALL-y += $(obj)u-boot.ubl
+ALL-y += u-boot.ubl
 else
 # as SPL_TEXT_BASE is not page-aligned, we need for some
 # linkers the -n flag (Do not page align data), to prevent

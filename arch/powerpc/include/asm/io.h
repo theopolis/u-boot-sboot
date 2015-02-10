@@ -7,7 +7,6 @@
 #ifndef _PPC_IO_H
 #define _PPC_IO_H
 
-#include <linux/config.h>
 #include <asm/byteorder.h>
 
 #ifdef CONFIG_ADDR_MAP
@@ -123,6 +122,9 @@ static inline void isync(void)
 #define iobarrier_rw() eieio()
 #define iobarrier_r()  eieio()
 #define iobarrier_w()  eieio()
+
+#define mb()	sync()
+#define isb()	isync()
 
 /*
  * Non ordered and non-swapping "raw" accessors

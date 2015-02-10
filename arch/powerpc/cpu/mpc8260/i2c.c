@@ -5,23 +5,7 @@
  * (C) Copyright 2000 Sysgo Real-Time Solutions, GmbH <www.elinos.com>
  * Marius Groeger <mgroeger@sysgo.de>
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -221,14 +205,14 @@ void i2c_init(int speed, int slaveadd)
 	i2c_init_board();
 #endif
 
-	dpaddr = *((unsigned short *) (&immap->im_dprambase[PROFF_I2C_BASE]));
+	dpaddr = immap->im_dprambase16[PROFF_I2C_BASE / sizeof(u16)];
 	if (dpaddr == 0) {
 		/* need to allocate dual port ram */
 		dpaddr = m8260_cpm_dpalloc(64 +
 					(NUM_RX_BDS * sizeof(I2C_BD)) +
 					(NUM_TX_BDS * sizeof(I2C_BD)) +
 					MAX_TX_SPACE, 64);
-		*((unsigned short *)(&immap->im_dprambase[PROFF_I2C_BASE])) =
+		immap->im_dprambase16[PROFF_I2C_BASE / sizeof(u16)] =
 			dpaddr;
 	}
 
@@ -259,7 +243,7 @@ void i2c_init(int speed, int slaveadd)
 	 * divide BRGCLK by 1)
 	 */
 	debug("[I2C] Setting rate...\n");
-	i2c_setrate(gd->brg_clk, CONFIG_SYS_I2C_SPEED);
+	i2c_setrate(gd->arch.brg_clk, CONFIG_SYS_I2C_SPEED);
 
 	/* Set I2C controller in master mode */
 	i2c->i2c_i2com = 0x01;
@@ -305,7 +289,7 @@ void i2c_newio(i2c_state_t *state)
 
 	debug("[I2C] i2c_newio\n");
 
-	dpaddr = *((unsigned short *)(&immap->im_dprambase[PROFF_I2C_BASE]));
+	dpaddr = immap->im_dprambase16[PROFF_I2C_BASE / sizeof(u16)];
 	iip = (iic_t *)&immap->im_dprambase[dpaddr];
 	state->rx_idx = 0;
 	state->tx_idx = 0;
@@ -480,7 +464,7 @@ int i2c_doio(i2c_state_t *state)
 		return I2CERR_QUEUE_EMPTY;
 	}
 
-	dpaddr = *((unsigned short *)(&immap->im_dprambase[PROFF_I2C_BASE]));
+	dpaddr = immap->im_dprambase16[PROFF_I2C_BASE / sizeof(u16)];
 	iip = (iic_t *)&immap->im_dprambase[dpaddr];
 	iip->iic_rbptr = iip->iic_rbase;
 	iip->iic_tbptr = iip->iic_tbase;
@@ -746,23 +730,9 @@ unsigned int i2c_get_bus_num(void)
 
 int i2c_set_bus_num(unsigned int bus)
 {
-#if defined(CONFIG_I2C_MUX)
-	if (bus < CONFIG_SYS_MAX_I2C_BUS) {
-		i2c_bus_num = bus;
-	} else {
-		int ret;
-
-		ret = i2x_mux_select_mux(bus);
-		if (ret == 0)
-			i2c_bus_num = bus;
-		else
-			return ret;
-	}
-#else
 	if (bus >= CONFIG_SYS_MAX_I2C_BUS)
 		return -1;
 	i2c_bus_num = bus;
-#endif
 	return 0;
 }
 

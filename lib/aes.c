@@ -2,23 +2,7 @@
  * Copyright (c) 2011 The Chromium OS Authors.
  * (C) Copyright 2011 NVIDIA Corporation www.nvidia.com
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -38,7 +22,11 @@
  * REDISTRIBUTION OF THIS SOFTWARE.
 */
 
+#ifndef USE_HOSTCC
 #include <common.h>
+#else
+#include <string.h>
+#endif
 #include "aes.h"
 
 /* forward s-box */
@@ -595,4 +583,75 @@ void aes_decrypt(u8 *in, u8 *expkey, u8 *out)
 	}
 
 	memcpy(out, state, sizeof(state));
+}
+
+static void debug_print_vector(char *name, u32 num_bytes, u8 *data)
+{
+#ifdef DEBUG
+	printf("%s [%d] @0x%08x", name, num_bytes, (u32)data);
+	print_buffer(0, data, 1, num_bytes, 16);
+#endif
+}
+
+void aes_apply_cbc_chain_data(u8 *cbc_chain_data, u8 *src, u8 *dst)
+{
+	int i;
+
+	for (i = 0; i < AES_KEY_LENGTH; i++)
+		*dst++ = *src++ ^ *cbc_chain_data++;
+}
+
+void aes_cbc_encrypt_blocks(u8 *key_exp, u8 *src, u8 *dst, u32 num_aes_blocks)
+{
+	u8 zero_key[AES_KEY_LENGTH] = { 0 };
+	u8 tmp_data[AES_KEY_LENGTH];
+	/* Convenient array of 0's for IV */
+	u8 *cbc_chain_data = zero_key;
+	u32 i;
+
+	for (i = 0; i < num_aes_blocks; i++) {
+		debug("encrypt_object: block %d of %d\n", i, num_aes_blocks);
+		debug_print_vector("AES Src", AES_KEY_LENGTH, src);
+
+		/* Apply the chain data */
+		aes_apply_cbc_chain_data(cbc_chain_data, src, tmp_data);
+		debug_print_vector("AES Xor", AES_KEY_LENGTH, tmp_data);
+
+		/* Encrypt the AES block */
+		aes_encrypt(tmp_data, key_exp, dst);
+		debug_print_vector("AES Dst", AES_KEY_LENGTH, dst);
+
+		/* Update pointers for next loop. */
+		cbc_chain_data = dst;
+		src += AES_KEY_LENGTH;
+		dst += AES_KEY_LENGTH;
+	}
+}
+
+void aes_cbc_decrypt_blocks(u8 *key_exp, u8 *src, u8 *dst, u32 num_aes_blocks)
+{
+	u8 tmp_data[AES_KEY_LENGTH], tmp_block[AES_KEY_LENGTH];
+	/* Convenient array of 0's for IV */
+	u8 cbc_chain_data[AES_KEY_LENGTH] = { 0 };
+	u32 i;
+
+	for (i = 0; i < num_aes_blocks; i++) {
+		debug("encrypt_object: block %d of %d\n", i, num_aes_blocks);
+		debug_print_vector("AES Src", AES_KEY_LENGTH, src);
+
+		memcpy(tmp_block, src, AES_KEY_LENGTH);
+
+		/* Decrypt the AES block */
+		aes_decrypt(src, key_exp, tmp_data);
+		debug_print_vector("AES Xor", AES_KEY_LENGTH, tmp_data);
+
+		/* Apply the chain data */
+		aes_apply_cbc_chain_data(cbc_chain_data, tmp_data, dst);
+		debug_print_vector("AES Dst", AES_KEY_LENGTH, dst);
+
+		/* Update pointers for next loop. */
+		memcpy(cbc_chain_data, tmp_block, AES_KEY_LENGTH);
+		src += AES_KEY_LENGTH;
+		dst += AES_KEY_LENGTH;
+	}
 }

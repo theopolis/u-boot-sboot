@@ -3,23 +3,7 @@
  * Copyright (C) 2004-2007, 2012 Freescale Semiconductor, Inc.
  * TsiChung Liew (Tsi-Chung.Liew@freescale.com)
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -114,28 +98,28 @@ int get_clocks(void)
 			    ((in_be32(&pll->pcr) & 0xFF000000) >> 24) *
 			    CONFIG_SYS_INPUT_CLKSRC;
 		}
-		gd->vco_clk = vco;	/* Vco clock */
+		gd->arch.vco_clk = vco;	/* Vco clock */
 	} else if (bootmode == 3) {
 		/* serial mode */
 		vco = ((in_be32(&pll->pcr) & 0xFF000000) >> 24) * CONFIG_SYS_INPUT_CLKSRC;
-		gd->vco_clk = vco;	/* Vco clock */
+		gd->arch.vco_clk = vco;	/* Vco clock */
 	}
 
 	if ((in_be16(&ccm->ccr) & CCM_MISCCR_LIMP) == CCM_MISCCR_LIMP) {
 		/* Limp mode */
 	} else {
-		gd->inp_clk = CONFIG_SYS_INPUT_CLKSRC;	/* Input clock */
+		gd->arch.inp_clk = CONFIG_SYS_INPUT_CLKSRC; /* Input clock */
 
 		temp = (in_be32(&pll->pcr) & PLL_PCR_OUTDIV1_MASK) + 1;
 		gd->cpu_clk = vco / temp;	/* cpu clock */
 
 		temp = ((in_be32(&pll->pcr) & PLL_PCR_OUTDIV2_MASK) >> 4) + 1;
-		gd->flb_clk = vco / temp;	/* flexbus clock */
-		gd->bus_clk = gd->flb_clk;
+		gd->arch.flb_clk = vco / temp;	/* flexbus clock */
+		gd->bus_clk = gd->arch.flb_clk;
 	}
 
-#ifdef CONFIG_FSL_I2C
-	gd->i2c1_clk = gd->bus_clk;
+#ifdef CONFIG_SYS_I2C_FSL
+	gd->arch.i2c1_clk = gd->bus_clk;
 #endif
 
 	return (0);

@@ -3,23 +3,15 @@
  *			<armlinux@phytec.de>
  * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301, USA.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef __MACH_MXS_IOMUX_H__
 #define __MACH_MXS_IOMUX_H__
+
+#ifndef __ASSEMBLY__
+
+#include <asm/types.h>
 
 /*
  * IOMUX/PAD Bit field definitions
@@ -67,7 +59,11 @@ typedef u32 iomux_cfg_t;
 #define PAD_16MA		3
 
 #define PAD_1V8			0
+#if defined(CONFIG_MX28)
 #define PAD_3V3			1
+#else
+#define PAD_3V3			0
+#endif
 
 #define PAD_NOPULL		0
 #define PAD_PULLUP		1
@@ -165,4 +161,5 @@ int mxs_iomux_setup_pad(iomux_cfg_t pad);
  */
 int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count);
 
+#endif /* __ASSEMBLY__ */
 #endif /* __MACH_MXS_IOMUX_H__*/

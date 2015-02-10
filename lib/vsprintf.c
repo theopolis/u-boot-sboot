@@ -25,20 +25,6 @@
 #include <div64.h>
 #define noinline __attribute__((noinline))
 
-/* some reluctance to put this into a new limits.h, so it is here */
-#define INT_MAX		((int)(~0U>>1))
-
-static const char hex_asc[] = "0123456789abcdef";
-#define hex_asc_lo(x)   hex_asc[((x) & 0x0f)]
-#define hex_asc_hi(x)   hex_asc[((x) & 0xf0) >> 4]
-
-static inline char *pack_hex_byte(char *buf, u8 byte)
-{
-	*buf++ = hex_asc_hi(byte);
-	*buf++ = hex_asc_lo(byte);
-	return buf;
-}
-
 unsigned long simple_strtoul(const char *cp, char **endp,
 				unsigned int base)
 {
@@ -106,6 +92,29 @@ long simple_strtol(const char *cp, char **endp, unsigned int base)
 unsigned long ustrtoul(const char *cp, char **endp, unsigned int base)
 {
 	unsigned long result = simple_strtoul(cp, endp, base);
+	switch (**endp) {
+	case 'G':
+		result *= 1024;
+		/* fall through */
+	case 'M':
+		result *= 1024;
+		/* fall through */
+	case 'K':
+	case 'k':
+		result *= 1024;
+		if ((*endp)[1] == 'i') {
+			if ((*endp)[2] == 'B')
+				(*endp) += 3;
+			else
+				(*endp) += 2;
+		}
+	}
+	return result;
+}
+
+unsigned long long ustrtoull(const char *cp, char **endp, unsigned int base)
+{
+	unsigned long long result = simple_strtoull(cp, endp, base);
 	switch (**endp) {
 	case 'G':
 		result *= 1024;
@@ -258,7 +267,7 @@ static char *put_dec_full(char *buf, unsigned q)
 	return buf;
 }
 /* No inlining helps gcc to use registers better */
-static noinline char *put_dec(char *buf, u64 num)
+static noinline char *put_dec(char *buf, uint64_t num)
 {
 	while (1) {
 		unsigned rem;
@@ -411,6 +420,17 @@ static char *string(char *buf, char *end, char *s, int field_width,
 }
 
 #ifdef CONFIG_CMD_NET
+static const char hex_asc[] = "0123456789abcdef";
+#define hex_asc_lo(x)	hex_asc[((x) & 0x0f)]
+#define hex_asc_hi(x)	hex_asc[((x) & 0xf0) >> 4]
+
+static inline char *pack_hex_byte(char *buf, u8 byte)
+{
+	*buf++ = hex_asc_hi(byte);
+	*buf++ = hex_asc_lo(byte);
+	return buf;
+}
+
 static char *mac_address_string(char *buf, char *end, u8 *addr, int field_width,
 				int precision, int flags)
 {
@@ -495,6 +515,8 @@ static char *ip4_addr_string(char *buf, char *end, u8 *addr, int field_width,
 static char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 		int field_width, int precision, int flags)
 {
+	u64 num = (uintptr_t)ptr;
+
 	/*
 	 * Being a boot loader, we explicitly allow pointers to
 	 * (physical) address null.
@@ -507,6 +529,17 @@ static char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 
 #ifdef CONFIG_CMD_NET
 	switch (*fmt) {
+	case 'a':
+		flags |= SPECIAL | ZEROPAD;
+
+		switch (fmt[1]) {
+		case 'p':
+		default:
+			field_width = sizeof(phys_addr_t) * 2 + 2;
+			num = *(phys_addr_t *)ptr;
+			break;
+		}
+		break;
 	case 'm':
 		flags |= SPECIAL;
 		/* Fallthrough */
@@ -532,8 +565,7 @@ static char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 		field_width = 2*sizeof(void *);
 		flags |= ZEROPAD;
 	}
-	return number(buf, end, (unsigned long)ptr, 16, field_width,
-		      precision, flags);
+	return number(buf, end, num, 16, field_width, precision, flags);
 }
 
 static int vsnprintf_internal(char *buf, size_t size, const char *fmt,
@@ -727,6 +759,7 @@ repeat:
 		ADDCH(str, '\0');
 		if (str > end)
 			end[-1] = '\0';
+		--str;
 	}
 #else
 	*str = '\0';
@@ -846,4 +879,20 @@ char *simple_itoa(ulong i)
 		i /= 10;
 	} while (i > 0);
 	return p + 1;
+}
+
+/* We don't seem to have %'d in U-Boot */
+void print_grouped_ull(unsigned long long int_val, int digits)
+{
+	char str[21], *s;
+	int grab = 3;
+
+	digits = (digits + 2) / 3;
+	sprintf(str, "%*llu", digits * 3, int_val);
+	for (s = str; *s; s += grab) {
+		if (s != str)
+			putc(s[-1] != ' ' ? ',' : ' ');
+		printf("%.*s", grab, s);
+		grab = 3;
+	}
 }

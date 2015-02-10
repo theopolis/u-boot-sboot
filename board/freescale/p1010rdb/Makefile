@@ -1,46 +1,30 @@
 #
 # Copyright 2010-2011 Freescale Semiconductor, Inc.
 #
-# See file CREDITS for list of people who contributed to this
-# project.
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307 USA
+# SPDX-License-Identifier:	GPL-2.0+
 #
 
-include $(TOPDIR)/config.mk
+MINIMAL=
 
-LIB	= $(obj)lib$(BOARD).o
+ifdef CONFIG_SPL_BUILD
+ifdef CONFIG_SPL_INIT_MINIMAL
+MINIMAL=y
+endif
+endif
 
-COBJS-y	+= $(BOARD).o
-COBJS-y	+= ddr.o
-COBJS-y	+= law.o
-COBJS-y	+= tlb.o
+ifdef MINIMAL
 
-SRCS	:= $(SOBJS:.o=.S) $(COBJS-y:.o=.c)
-OBJS	:= $(addprefix $(obj),$(COBJS-y))
-SOBJS	:= $(addprefix $(obj),$(SOBJS))
+obj-y	+= spl_minimal.o tlb.o law.o
 
-$(LIB):	$(obj).depend $(OBJS) $(SOBJS)
-	$(call cmd_link_o_target, $(OBJS))
+else
 
-#########################################################################
+ifdef CONFIG_SPL_BUILD
+obj-y += spl.o
+endif
 
-# defines $(obj).depend target
-include $(SRCTREE)/rules.mk
+obj-y	+= p1010rdb.o
+obj-y	+= ddr.o
+obj-y	+= law.o
+obj-y	+= tlb.o
 
-sinclude $(obj).depend
-
-#########################################################################
+endif

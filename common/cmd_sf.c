@@ -2,31 +2,21 @@
  * Command for accessing SPI flash.
  *
  * Copyright (C) 2008 Atmel Corporation
- * Licensed under the GPL-2 or later.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#include <div64.h>
 #include <common.h>
+#include <div64.h>
+#include <dm.h>
 #include <malloc.h>
+#include <spi.h>
 #include <spi_flash.h>
 
 #include <asm/io.h>
-
-#ifndef CONFIG_SF_DEFAULT_SPEED
-# define CONFIG_SF_DEFAULT_SPEED	1000000
-#endif
-#ifndef CONFIG_SF_DEFAULT_MODE
-# define CONFIG_SF_DEFAULT_MODE		SPI_MODE_3
-#endif
-#ifndef CONFIG_SF_DEFAULT_CS
-# define CONFIG_SF_DEFAULT_CS		0
-#endif
-#ifndef CONFIG_SF_DEFAULT_BUS
-# define CONFIG_SF_DEFAULT_BUS		0
-#endif
+#include <dm/device-internal.h>
 
 static struct spi_flash *flash;
-
 
 /*
  * This function computes the length argument for the erase command.
@@ -80,9 +70,9 @@ static ulong bytes_per_second(unsigned int len, ulong start_ms)
 {
 	/* less accurate but avoids overflow */
 	if (len >= ((unsigned int) -1) / 1024)
-		return len / (max(get_timer(start_ms) / 1024, 1));
+		return len / (max(get_timer(start_ms) / 1024, 1UL));
 	else
-		return 1024 * len / max(get_timer(start_ms), 1);
+		return 1024 * len / max(get_timer(start_ms), 1UL);
 }
 
 static int do_spi_flash_probe(int argc, char * const argv[])
@@ -92,7 +82,12 @@ static int do_spi_flash_probe(int argc, char * const argv[])
 	unsigned int speed = CONFIG_SF_DEFAULT_SPEED;
 	unsigned int mode = CONFIG_SF_DEFAULT_MODE;
 	char *endp;
+#ifdef CONFIG_DM_SPI_FLASH
+	struct udevice *new, *bus_dev;
+	int ret;
+#else
 	struct spi_flash *new;
+#endif
 
 	if (argc >= 2) {
 		cs = simple_strtoul(argv[1], &endp, 0);
@@ -120,6 +115,23 @@ static int do_spi_flash_probe(int argc, char * const argv[])
 			return -1;
 	}
 
+#ifdef CONFIG_DM_SPI_FLASH
+	/* Remove the old device, otherwise probe will just be a nop */
+	ret = spi_find_bus_and_cs(bus, cs, &bus_dev, &new);
+	if (!ret) {
+		device_remove(new);
+		device_unbind(new);
+	}
+	flash = NULL;
+	ret = spi_flash_probe_bus_cs(bus, cs, speed, mode, &new);
+	if (ret) {
+		printf("Failed to initialize SPI flash at %u:%u (error %d)\n",
+		       bus, cs, ret);
+		return 1;
+	}
+
+	flash = new->uclass_priv;
+#else
 	new = spi_flash_probe(bus, cs, speed, mode);
 	if (!new) {
 		printf("Failed to initialize SPI flash at %u:%u\n", bus, cs);
@@ -129,6 +141,7 @@ static int do_spi_flash_probe(int argc, char * const argv[])
 	if (flash)
 		spi_flash_free(flash);
 	flash = new;
+#endif
 
 	return 0;
 }
@@ -151,19 +164,31 @@ static const char *spi_flash_update_block(struct spi_flash *flash, u32 offset,
 		size_t len, const char *buf, char *cmp_buf, size_t *skipped)
 {
 	debug("offset=%#x, sector_size=%#x, len=%#zx\n",
-		offset, flash->sector_size, len);
-	if (spi_flash_read(flash, offset, len, cmp_buf))
+	      offset, flash->sector_size, len);
+	/* Read the entire sector so to allow for rewriting */
+	if (spi_flash_read(flash, offset, flash->sector_size, cmp_buf))
 		return "read";
+	/* Compare only what is meaningful (len) */
 	if (memcmp(cmp_buf, buf, len) == 0) {
 		debug("Skip region %x size %zx: no change\n",
-			offset, len);
+		      offset, len);
 		*skipped += len;
 		return NULL;
 	}
-	if (spi_flash_erase(flash, offset, len))
+	/* Erase the entire sector */
+	if (spi_flash_erase(flash, offset, flash->sector_size))
 		return "erase";
+	/* Write the initial part of the block from the source */
 	if (spi_flash_write(flash, offset, len, buf))
 		return "write";
+	/* If it's a partial sector, rewrite the existing part */
+	if (len != flash->sector_size) {
+		/* Rewrite the original data to the end of the sector */
+		if (spi_flash_write(flash, offset + len,
+				    flash->sector_size - len, &cmp_buf[len]))
+			return "write";
+	}
+
 	return NULL;
 }
 
@@ -197,10 +222,10 @@ static int spi_flash_update(struct spi_flash *flash, u32 offset,
 		ulong last_update = get_timer(0);
 
 		for (; buf < end && !err_oper; buf += todo, offset += todo) {
-			todo = min(end - buf, flash->sector_size);
+			todo = min_t(size_t, end - buf, flash->sector_size);
 			if (get_timer(last_update) > 100) {
 				printf("   \rUpdating, %zu%% %lu B/s",
-					100 - (end - buf) / scale,
+				       100 - (end - buf) / scale,
 					bytes_per_second(buf - start_buf,
 							 start_time));
 				last_update = get_timer(0);
@@ -220,9 +245,9 @@ static int spi_flash_update(struct spi_flash *flash, u32 offset,
 
 	delta = get_timer(start_time);
 	printf("%zu bytes written, %zu bytes skipped", len - skipped,
-		skipped);
+	       skipped);
 	printf(" in %ld.%lds, speed %ld B/s\n",
-		delta / 1000, delta % 1000, bytes_per_second(len, start_time));
+	       delta / 1000, delta % 1000, bytes_per_second(len, start_time));
 
 	return 0;
 }
@@ -234,7 +259,7 @@ static int do_spi_flash_read_write(int argc, char * const argv[])
 	unsigned long len;
 	void *buf;
 	char *endp;
-	int ret;
+	int ret = 1;
 
 	if (argc < 4)
 		return -1;
@@ -252,7 +277,7 @@ static int do_spi_flash_read_write(int argc, char * const argv[])
 	/* Consistency checking */
 	if (offset + len > flash->size) {
 		printf("ERROR: attempting %s past flash size (%#x)\n",
-			argv[0], flash->size);
+		       argv[0], flash->size);
 		return 1;
 	}
 
@@ -262,21 +287,25 @@ static int do_spi_flash_read_write(int argc, char * const argv[])
 		return 1;
 	}
 
-	if (strcmp(argv[0], "update") == 0)
+	if (strcmp(argv[0], "update") == 0) {
 		ret = spi_flash_update(flash, offset, len, buf);
-	else if (strcmp(argv[0], "read") == 0)
-		ret = spi_flash_read(flash, offset, len, buf);
-	else
-		ret = spi_flash_write(flash, offset, len, buf);
+	} else if (strncmp(argv[0], "read", 4) == 0 ||
+			strncmp(argv[0], "write", 5) == 0) {
+		int read;
+
+		read = strncmp(argv[0], "read", 4) == 0;
+		if (read)
+			ret = spi_flash_read(flash, offset, len, buf);
+		else
+			ret = spi_flash_write(flash, offset, len, buf);
+
+		printf("SF: %zu bytes @ %#x %s: %s\n", (size_t)len, (u32)offset,
+		       read ? "Read" : "Written", ret ? "ERROR" : "OK");
+	}
 
 	unmap_physmem(buf, len);
 
-	if (ret) {
-		printf("SPI flash %s failed\n", argv[0]);
-		return 1;
-	}
-
-	return 0;
+	return ret == 0 ? 0 : 1;
 }
 
 static int do_spi_flash_erase(int argc, char * const argv[])
@@ -300,17 +329,15 @@ static int do_spi_flash_erase(int argc, char * const argv[])
 	/* Consistency checking */
 	if (offset + len > flash->size) {
 		printf("ERROR: attempting %s past flash size (%#x)\n",
-			argv[0], flash->size);
+		       argv[0], flash->size);
 		return 1;
 	}
 
 	ret = spi_flash_erase(flash, offset, len);
-	if (ret) {
-		printf("SPI flash %s failed\n", argv[0]);
-		return 1;
-	}
+	printf("SF: %zu bytes @ %#x Erased: %s\n", (size_t)len, (u32)offset,
+	       ret ? "ERROR" : "OK");
 
-	return 0;
+	return ret == 0 ? 0 : 1;
 }
 
 #ifdef CONFIG_CMD_SF_TEST
@@ -343,7 +370,8 @@ static void show_time(struct test_info *test, int stage)
 	int bps;	/* Bits per second */
 
 	speed = (long long)test->bytes * 1000;
-	do_div(speed, test->time_ms[stage] * 1024);
+	if (test->time_ms[stage])
+		do_div(speed, test->time_ms[stage] * 1024);
 	bps = speed * 8;
 
 	printf("%d %s: %d ticks, %d KiB/s %d.%03d Mbps\n", stage,
@@ -369,8 +397,8 @@ static void spi_test_next_stage(struct test_info *test)
  * @param vbuf		Verification buffer
  * @return 0 if ok, -1 on error
  */
-static int spi_flash_test(struct spi_flash *flash, char *buf, ulong len,
-			   ulong offset, char *vbuf)
+static int spi_flash_test(struct spi_flash *flash, uint8_t *buf, ulong len,
+			   ulong offset, uint8_t *vbuf)
 {
 	struct test_info test;
 	int i;
@@ -392,7 +420,8 @@ static int spi_flash_test(struct spi_flash *flash, char *buf, ulong len,
 	for (i = 0; i < len; i++) {
 		if (vbuf[i] != 0xff) {
 			printf("Check failed at %d\n", i);
-			print_buffer(i, vbuf + i, 1, min(len - i, 0x40), 0);
+			print_buffer(i, vbuf + i, 1,
+				     min_t(uint, len - i, 0x40), 0);
 			return -1;
 		}
 	}
@@ -414,9 +443,11 @@ static int spi_flash_test(struct spi_flash *flash, char *buf, ulong len,
 	for (i = 0; i < len; i++) {
 		if (buf[i] != vbuf[i]) {
 			printf("Verify failed at %d, good data:\n", i);
-			print_buffer(i, buf + i, 1, min(len - i, 0x40), 0);
+			print_buffer(i, buf + i, 1,
+				     min_t(uint, len - i, 0x40), 0);
 			printf("Bad data:\n");
-			print_buffer(i, vbuf + i, 1, min(len - i, 0x40), 0);
+			print_buffer(i, vbuf + i, 1,
+				     min_t(uint, len - i, 0x40), 0);
 			return -1;
 		}
 	}
@@ -431,11 +462,13 @@ static int do_spi_flash_test(int argc, char * const argv[])
 {
 	unsigned long offset;
 	unsigned long len;
-	char *buf = (char *)CONFIG_SYS_TEXT_BASE;
+	uint8_t *buf, *from;
 	char *endp;
-	char *vbuf;
+	uint8_t *vbuf;
 	int ret;
 
+	if (argc < 3)
+		return -1;
 	offset = simple_strtoul(argv[1], &endp, 16);
 	if (*argv[1] == 0 || *endp != 0)
 		return -1;
@@ -445,17 +478,18 @@ static int do_spi_flash_test(int argc, char * const argv[])
 
 	vbuf = malloc(len);
 	if (!vbuf) {
-		printf("Cannot allocate memory\n");
+		printf("Cannot allocate memory (%lu bytes)\n", len);
 		return 1;
 	}
 	buf = malloc(len);
 	if (!buf) {
 		free(vbuf);
-		printf("Cannot allocate memory\n");
+		printf("Cannot allocate memory (%lu bytes)\n", len);
 		return 1;
 	}
 
-	memcpy(buf, (char *)CONFIG_SYS_TEXT_BASE, len);
+	from = map_sysmem(CONFIG_SYS_TEXT_BASE, 0);
+	memcpy(buf, from, len);
 	ret = spi_flash_test(flash, buf, len, offset, vbuf);
 	free(vbuf);
 	free(buf);
@@ -468,7 +502,8 @@ static int do_spi_flash_test(int argc, char * const argv[])
 }
 #endif /* CONFIG_CMD_SF_TEST */
 
-static int do_spi_flash(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+static int do_spi_flash(cmd_tbl_t *cmdtp, int flag, int argc,
+			char * const argv[])
 {
 	const char *cmd;
 	int ret;
@@ -524,7 +559,7 @@ U_BOOT_CMD(
 	"SPI flash sub-system",
 	"probe [[bus:]cs] [hz] [mode]	- init flash device on given SPI bus\n"
 	"				  and chip select\n"
-	"sf read addr offset len 	- read `len' bytes starting at\n"
+	"sf read addr offset len	- read `len' bytes starting at\n"
 	"				  `offset' to memory at `addr'\n"
 	"sf write addr offset len	- write `len' bytes from memory\n"
 	"				  at `addr' to flash at `offset'\n"

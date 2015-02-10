@@ -1,23 +1,7 @@
 /*
  * Copyright (C) 2009 Texas Instruments Incorporated
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #ifndef _GPIO_DEFS_H_
 #define _GPIO_DEFS_H_
@@ -67,7 +51,14 @@ struct davinci_gpio_bank {
 
 #define gpio_status()		gpio_info()
 #define GPIO_NAME_SIZE		20
+#if defined(CONFIG_SOC_DM644X)
+/* GPIO0 to GPIO53, omit the V3.3 volts one */
+#define MAX_NUM_GPIOS		70
+#elif defined(CONFIG_SOC_DA8XX) && !defined(CONFIG_SOC_DA850)
+#define MAX_NUM_GPIOS		128
+#else
 #define MAX_NUM_GPIOS		144
+#endif
 #define GPIO_BANK(gp)		(davinci_gpio_bank01 + ((gp) >> 5))
 #define GPIO_BIT(gp)		((gp) & 0x1F)
 

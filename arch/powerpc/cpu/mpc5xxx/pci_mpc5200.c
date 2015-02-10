@@ -2,23 +2,7 @@
  * (C) Copyright 2000-2003
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -49,21 +33,7 @@ static int mpc5200_read_config_dword(struct pci_controller *hose,
 	*(volatile u32 *)MPC5XXX_PCI_CAR = (1 << 31) | dev | offset;
 	eieio();
 	udelay(10);
-#if (defined CONFIG_PF5200 || defined CONFIG_CPCI5200)
-	if (dev & 0x00ff0000) {
-		u32 val;
-		val  = in_le16((volatile u16 *)(CONFIG_PCI_IO_PHYS+2));
-		udelay(10);
-		val = val << 16;
-		val |= in_le16((volatile u16 *)(CONFIG_PCI_IO_PHYS+0));
-		*value = val;
-	} else {
-		*value = in_le32((volatile u32 *)CONFIG_PCI_IO_PHYS);
-	}
-	udelay(10);
-#else
 	*value = in_le32((volatile u32 *)CONFIG_PCI_IO_PHYS);
-#endif
 	eieio();
 	*(volatile u32 *)MPC5XXX_PCI_CAR = 0;
 	udelay(10);

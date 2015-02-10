@@ -4,23 +4,7 @@
  * Copyright (C) 2011 Marek Vasut <marek.vasut@gmail.com>
  * on behalf of DENX Software Engineering GmbH
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
@@ -43,20 +27,24 @@ DECLARE_GLOBAL_DATA_PTR;
 int board_early_init_f(void)
 {
 	/* IO0 clock at 480MHz */
-	mx28_set_ioclk(MXC_IOCLK0, 480000);
+	mxs_set_ioclk(MXC_IOCLK0, 480000);
 	/* IO1 clock at 480MHz */
-	mx28_set_ioclk(MXC_IOCLK1, 480000);
+	mxs_set_ioclk(MXC_IOCLK1, 480000);
 
 	/* SSP0 clock at 96MHz */
-	mx28_set_sspclk(MXC_SSPCLK0, 96000, 0);
+	mxs_set_sspclk(MXC_SSPCLK0, 96000, 0);
 	/* SSP2 clock at 160MHz */
-	mx28_set_sspclk(MXC_SSPCLK2, 160000, 0);
+	mxs_set_sspclk(MXC_SSPCLK2, 160000, 0);
 
 #ifdef	CONFIG_CMD_USB
 	mxs_iomux_setup_pad(MX28_PAD_SSP2_SS1__USB1_OVERCURRENT);
 	mxs_iomux_setup_pad(MX28_PAD_AUART3_TX__GPIO_3_13 |
 			MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP);
 	gpio_direction_output(MX28_PAD_AUART3_TX__GPIO_3_13, 0);
+
+	mxs_iomux_setup_pad(MX28_PAD_AUART3_RX__GPIO_3_12 |
+			MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP);
+	gpio_direction_output(MX28_PAD_AUART3_RX__GPIO_3_12, 0);
 #endif
 
 	return 0;
@@ -93,7 +81,7 @@ int board_mmc_init(bd_t *bis)
 	/* Turn on the power to the card. */
 	gpio_direction_output(MX28_PAD_PWM3__GPIO_3_28, 0);
 
-	return mxsmmc_initialize(bis, 0, m28_mmc_wp);
+	return mxsmmc_initialize(bis, 0, m28_mmc_wp, NULL);
 }
 #endif
 
@@ -128,6 +116,8 @@ int board_eth_init(bd_t *bis)
 	int ret;
 
 	ret = cpu_eth_init(bis);
+	if (ret)
+		return ret;
 
 	clrsetbits_le32(&clkctrl_regs->hw_clkctrl_enet,
 		CLKCTRL_ENET_TIME_SEL_MASK | CLKCTRL_ENET_CLK_OUT_EN,

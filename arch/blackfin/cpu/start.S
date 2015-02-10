@@ -11,31 +11,15 @@
  * (c) 1995, Dionne & Associates
  * (c) 1995, DKG Display Tech.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
- * MA 02110-1301 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <config.h>
 #include <asm/blackfin.h>
+#include <asm/mach-common/bits/watchdog.h>
 #include <asm/mach-common/bits/core.h>
 #include <asm/mach-common/bits/pll.h>
-
-#include "serial.h"
+#include <asm/serial.h>
 
 /* It may seem odd that we make calls to functions even though we haven't
  * relocated ourselves yet out of {flash,ram,wherever}.  This is OK because
@@ -65,18 +49,29 @@ ENTRY(_start)
 	p5.h = HI(COREMMR_BASE);
 
 #ifdef CONFIG_HW_WATCHDOG
-# ifndef CONFIG_HW_WATCHDOG_TIMEOUT_START
-#  define CONFIG_HW_WATCHDOG_TIMEOUT_START 5000
-# endif
-	/* Program the watchdog with an initial timeout of ~5 seconds.
+	/* Program the watchdog with default timeout of ~5 seconds.
 	 * That should be long enough to bootstrap ourselves up and
 	 * then the common u-boot code can take over.
 	 */
+	r1 = WDDIS;
+# ifdef __ADSPBF60x__
+	[p4 + (WDOG_CTL - SYSMMR_BASE)] = r1;
+# else
+	W[p4 + (WDOG_CTL - SYSMMR_BASE)] = r1;
+# endif
+	SSYNC;
 	r0 = 0;
-	r0.h = HI(MSEC_TO_SCLK(CONFIG_HW_WATCHDOG_TIMEOUT_START));
+	r0.h = HI(MSEC_TO_SCLK(CONFIG_WATCHDOG_TIMEOUT_MSECS));
 	[p4 + (WDOG_CNT - SYSMMR_BASE)] = r0;
+	SSYNC;
+	r1 = WDEN;
 	/* fire up the watchdog - R0.L above needs to be 0x0000 */
-	W[p4 + (WDOG_CTL - SYSMMR_BASE)] = r0;
+# ifdef __ADSPBF60x__
+	[p4 + (WDOG_CTL - SYSMMR_BASE)] = r1;
+# else
+	W[p4 + (WDOG_CTL - SYSMMR_BASE)] = r1;
+# endif
+	SSYNC;
 #endif
 
 	/* Turn on the serial for debugging the init process */
@@ -195,19 +190,19 @@ ENTRY(_start)
 	call _memcpy_ASM;
 #endif
 
+.Lnorelocate:
 	/* Initialize BSS section ... we know that memset() does not
 	 * use the BSS, so it is safe to call here.  The bootrom LDR
 	 * takes care of clearing things for us.
 	 */
 	serial_early_puts("Zero BSS");
-	r0.l = __bss_vma;
-	r0.h = __bss_vma;
+	r0.l = __bss_start;
+	r0.h = __bss_start;
 	r1 = 0 (x);
 	r2.l = __bss_len;
 	r2.h = __bss_len;
 	call _memset;
 
-.Lnorelocate:
 
 	/* Setup the actual stack in external memory */
 	sp.h = HI(CONFIG_STACKBASE);
@@ -256,3 +251,13 @@ LENTRY(_get_pc)
 #endif
 	rts;
 ENDPROC(_get_pc)
+
+ENTRY(_relocate_code)
+	/* Fake relocate code. Setup the new stack only */
+	sp = r0;
+	fp = sp;
+	r0 = p3;
+	r1.h = 0x2000;
+	r1.l = 0x10;
+	jump.l _board_init_r
+ENDPROC(_relocate_code)

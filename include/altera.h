@@ -2,24 +2,7 @@
  * (C) Copyright 2002
  * Rich Ireland, Enterasys Networks, rireland@enterasys.com.
  *
- * See file CREDITS for list of people who contributed to this
- * project.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <fpga.h>
@@ -27,52 +10,59 @@
 #ifndef _ALTERA_H_
 #define _ALTERA_H_
 
-/* Altera Model definitions
- *********************************************************************/
-#define CONFIG_SYS_ACEX1K		CONFIG_SYS_FPGA_DEV( 0x1 )
-#define CONFIG_SYS_CYCLON2		CONFIG_SYS_FPGA_DEV( 0x2 )
-#define CONFIG_SYS_STRATIX_II		CONFIG_SYS_FPGA_DEV( 0x4 )
+enum altera_iface {
+	/* insert all new types after this */
+	min_altera_iface_type,
+	/* serial data and external clock */
+	passive_serial,
+	/* parallel data */
+	passive_parallel_synchronous,
+	/* parallel data */
+	passive_parallel_asynchronous,
+	/* serial data w/ internal clock (not used) */
+	passive_serial_asynchronous,
+	/* jtag/tap serial (not used ) */
+	altera_jtag_mode,
+	/* fast passive parallel (FPP) */
+	fast_passive_parallel,
+	/* fast passive parallel with security (FPPS) */
+	fast_passive_parallel_security,
+	/* insert all new types before this */
+	max_altera_iface_type,
+};
 
-#define CONFIG_SYS_ALTERA_ACEX1K	(CONFIG_SYS_FPGA_ALTERA | CONFIG_SYS_ACEX1K)
-#define CONFIG_SYS_ALTERA_CYCLON2	(CONFIG_SYS_FPGA_ALTERA | CONFIG_SYS_CYCLON2)
-#define CONFIG_SYS_ALTERA_STRATIX_II	(CONFIG_SYS_FPGA_ALTERA | CONFIG_SYS_STRATIX_II)
-/* Add new models here */
+enum altera_family {
+	/* insert all new types after this */
+	min_altera_type,
+	/* ACEX1K Family */
+	Altera_ACEX1K,
+	/* CYCLONII Family */
+	Altera_CYC2,
+	/* StratixII Family */
+	Altera_StratixII,
+	/* SoCFPGA Family */
+	Altera_SoCFPGA,
 
-/* Altera Interface definitions
- *********************************************************************/
-#define CONFIG_SYS_ALTERA_IF_PS	CONFIG_SYS_FPGA_IF( 0x1 )	/* passive serial */
-#define CONFIG_SYS_ALTERA_IF_FPP	CONFIG_SYS_FPGA_IF( 0x2 )	/* fast passive parallel */
-/* Add new interfaces here */
+	/* Add new models here */
 
-typedef enum {				/* typedef Altera_iface */
-	min_altera_iface_type,		/* insert all new types after this */
-	passive_serial,			/* serial data and external clock */
-	passive_parallel_synchronous,	/* parallel data */
-	passive_parallel_asynchronous,	/* parallel data */
-	passive_serial_asynchronous,	/* serial data w/ internal clock (not used)	*/
-	altera_jtag_mode,		/* jtag/tap serial (not used ) */
-	fast_passive_parallel,		/* fast passive parallel (FPP) */
-	fast_passive_parallel_security,	/* fast passive parallel with security (FPPS) */
-	max_altera_iface_type		/* insert all new types before this */
-} Altera_iface;				/* end, typedef Altera_iface */
+	/* insert all new types before this */
+	max_altera_type,
+};
 
-typedef enum {			/* typedef Altera_Family */
-	min_altera_type,	/* insert all new types after this */
-	Altera_ACEX1K,		/* ACEX1K Family */
-	Altera_CYC2,		/* CYCLONII Family */
-	Altera_StratixII,	/* StratixII Familiy */
-/* Add new models here */
-	max_altera_type		/* insert all new types before this */
-} Altera_Family;		/* end, typedef Altera_Family */
-
-typedef struct {		/* typedef Altera_desc */
-	Altera_Family	family;	/* part type */
-	Altera_iface	iface;	/* interface type */
-	size_t		size;	/* bytes of data part can accept */
-	void *		iface_fns;/* interface function table */
-	void *		base;	/* base interface address */
-	int		cookie;	/* implementation specific cookie */
-} Altera_desc;			/* end, typedef Altera_desc */
+typedef struct {
+	/* part type */
+	enum altera_family	family;
+	/* interface type */
+	enum altera_iface	iface;
+	/* bytes of data part can accept */
+	size_t			size;
+	/* interface function table */
+	void			*iface_fns;
+	/* base interface address */
+	void			*base;
+	/* implementation specific cookie */
+	int			cookie;
+} Altera_desc;
 
 /* Generic Altera Functions
  *********************************************************************/
@@ -102,5 +92,9 @@ typedef struct {
 	Altera_abort_fn abort;
 	Altera_post_fn post;
 } altera_board_specific_func;
+
+#ifdef CONFIG_FPGA_SOCFPGA
+int socfpga_load(Altera_desc *desc, const void *rbf_data, size_t rbf_size);
+#endif
 
 #endif /* _ALTERA_H_ */

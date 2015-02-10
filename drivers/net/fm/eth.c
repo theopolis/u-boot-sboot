@@ -2,20 +2,7 @@
  * Copyright 2009-2012 Freescale Semiconductor, Inc.
  *	Dave Liu <daveliu@freescale.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
 #include <asm/io.h>
@@ -52,9 +39,14 @@ static void dtsec_configure_serdes(struct fm_eth *priv)
 	u32 value;
 	struct mii_dev bus;
 	bus.priv = priv->mac->phyregs;
+	bool sgmii_2500 = (priv->enet_if ==
+			PHY_INTERFACE_MODE_SGMII_2500) ? true : false;
 
-	/* SGMII IF mode + AN enable */
-	value = PHY_SGMII_IF_MODE_AN | PHY_SGMII_IF_MODE_SGMII;
+	/* SGMII IF mode + AN enable only for 1G SGMII, not for 2.5G */
+	value = PHY_SGMII_IF_MODE_SGMII;
+	if (!sgmii_2500)
+		value |= PHY_SGMII_IF_MODE_AN;
+
 	memac_mdio_write(&bus, 0, MDIO_DEVAD_NONE, 0x14, value);
 
 	/* Dev ability according to SGMII specification */
@@ -67,7 +59,9 @@ static void dtsec_configure_serdes(struct fm_eth *priv)
 	memac_mdio_write(&bus, 0, MDIO_DEVAD_NONE, 0x12, 0xd40);
 
 	/* Restart AN */
-	value = PHY_SGMII_CR_DEF_VAL | PHY_SGMII_CR_RESET_AN;
+	value = PHY_SGMII_CR_DEF_VAL;
+	if (!sgmii_2500)
+		value |= PHY_SGMII_CR_RESET_AN;
 	memac_mdio_write(&bus, 0, MDIO_DEVAD_NONE, 0, value);
 #else
 	struct dtsec *regs = priv->mac->base;
@@ -96,7 +90,8 @@ static void dtsec_init_phy(struct eth_device *dev)
 	out_be32(&regs->tbipa, CONFIG_SYS_TBIPA_VALUE);
 #endif
 
-	if (fm_eth->enet_if == PHY_INTERFACE_MODE_SGMII)
+	if (fm_eth->enet_if == PHY_INTERFACE_MODE_SGMII ||
+	    fm_eth->enet_if == PHY_INTERFACE_MODE_SGMII_2500)
 		dtsec_configure_serdes(fm_eth);
 }
 
@@ -354,7 +349,9 @@ static int fm_eth_startup(struct fm_eth *fm_eth)
 	mac->init_mac(mac);
 
 	/* For some reason we need to set SPEED_100 */
-	if ((fm_eth->enet_if == PHY_INTERFACE_MODE_SGMII) && mac->set_if_mode)
+	if (((fm_eth->enet_if == PHY_INTERFACE_MODE_SGMII) ||
+	     (fm_eth->enet_if == PHY_INTERFACE_MODE_QSGMII)) &&
+	      mac->set_if_mode)
 		mac->set_if_mode(mac, fm_eth->enet_if, SPEED_100);
 
 	/* init bmi rx port, IM mode and disable */
@@ -413,10 +410,15 @@ static int fm_eth_open(struct eth_device *dev, bd_t *bd)
 	fmc_tx_port_graceful_stop_disable(fm_eth);
 
 #ifdef CONFIG_PHYLIB
-	ret = phy_startup(fm_eth->phydev);
-	if (ret) {
-		printf("%s: Could not initialize\n", fm_eth->phydev->dev->name);
-		return ret;
+	if (fm_eth->phydev) {
+		ret = phy_startup(fm_eth->phydev);
+		if (ret) {
+			printf("%s: Could not initialize\n",
+			       fm_eth->phydev->dev->name);
+			return ret;
+		}
+	} else {
+		return 0;
 	}
 #else
 	fm_eth->phydev->speed = SPEED_1000;
@@ -450,7 +452,8 @@ static void fm_eth_halt(struct eth_device *dev)
 	/* disable bmi Rx port */
 	bmi_rx_port_disable(fm_eth->rx_port);
 
-	phy_shutdown(fm_eth->phydev);
+	if (fm_eth->phydev)
+		phy_shutdown(fm_eth->phydev);
 }
 
 static int fm_eth_send(struct eth_device *dev, void *buf, int len)
@@ -568,6 +571,19 @@ static int fm_eth_init_mac(struct fm_eth *fm_eth, struct ccsr_fman *reg)
 	num = fm_eth->num;
 
 #ifdef CONFIG_SYS_FMAN_V3
+#ifndef CONFIG_FSL_FM_10GEC_REGULAR_NOTATION
+	if (fm_eth->type == FM_ETH_10G_E) {
+		/* 10GEC1/10GEC2 use mEMAC9/mEMAC10 on T2080/T4240.
+		 * 10GEC3/10GEC4 use mEMAC1/mEMAC2 on T2080.
+		 * 10GEC1 uses mEMAC1 on T1024.
+		 * so it needs to change the num.
+		 */
+		if (fm_eth->num >= 2)
+			num -= 2;
+		else
+			num += 8;
+	}
+#endif
 	base = &reg->memac[num].fm_memac;
 	phyregs = &reg->memac[num].fm_memac_mdio;
 #else
@@ -615,11 +631,12 @@ static int init_phy(struct eth_device *dev)
 	if (fm_eth->bus) {
 		phydev = phy_connect(fm_eth->bus, fm_eth->phyaddr, dev,
 					fm_eth->enet_if);
-	}
-
-	if (!phydev) {
-		printf("Failed to connect\n");
-		return -1;
+		if (!phydev) {
+			printf("Failed to connect\n");
+			return -1;
+		}
+	} else {
+		return 0;
 	}
 
 	if (fm_eth->type == FM_ETH_1G_E) {
@@ -701,8 +718,7 @@ int fm_eth_initialize(struct ccsr_fman *reg, struct fm_eth_info *info)
 	if (!fm_eth_startup(fm_eth))
 		return 0;
 
-	if (init_phy(dev))
-		return 0;
+	init_phy(dev);
 
 	/* clear the ethernet address */
 	for (i = 0; i < 6; i++)

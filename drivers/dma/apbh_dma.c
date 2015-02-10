@@ -7,19 +7,7 @@
  * Based on code from LTIB:
  * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <linux/list.h>
@@ -31,7 +19,8 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/sys_proto.h>
-#include <asm/arch/dma.h>
+#include <asm/imx-common/dma.h>
+#include <asm/imx-common/regs-apbh.h>
 
 static struct mxs_dma_chan mxs_dma_channels[MXS_MAX_DMA_CHANNELS];
 
@@ -223,13 +212,19 @@ static int mxs_dma_reset(int channel)
 	struct mxs_apbh_regs *apbh_regs =
 		(struct mxs_apbh_regs *)MXS_APBH_BASE;
 	int ret;
+#if defined(CONFIG_MX23)
+	uint32_t setreg = (uint32_t)(&apbh_regs->hw_apbh_ctrl0_set);
+	uint32_t offset = APBH_CTRL0_RESET_CHANNEL_OFFSET;
+#elif (defined(CONFIG_MX28) || defined(CONFIG_MX6))
+	uint32_t setreg = (uint32_t)(&apbh_regs->hw_apbh_channel_ctrl_set);
+	uint32_t offset = APBH_CHANNEL_CTRL_RESET_CHANNEL_OFFSET;
+#endif
 
 	ret = mxs_dma_validate_chan(channel);
 	if (ret)
 		return ret;
 
-	writel(1 << (channel + APBH_CHANNEL_CTRL_RESET_CHANNEL_OFFSET),
-		&apbh_regs->hw_apbh_channel_ctrl_set);
+	writel(1 << (channel + offset), setreg);
 
 	return 0;
 }
@@ -547,6 +542,28 @@ int mxs_dma_go(int chan)
 	mxs_dma_disable(chan);
 
 	return ret;
+}
+
+/*
+ * Execute a continuously running circular DMA descriptor.
+ * NOTE: This is not intended for general use, but rather
+ *	 for the LCD driver in Smart-LCD mode. It allows
+ *	 continuous triggering of the RUN bit there.
+ */
+void mxs_dma_circ_start(int chan, struct mxs_dma_desc *pdesc)
+{
+	struct mxs_apbh_regs *apbh_regs =
+		(struct mxs_apbh_regs *)MXS_APBH_BASE;
+
+	mxs_dma_flush_desc(pdesc);
+
+	mxs_dma_enable_irq(chan, 1);
+
+	writel(mxs_dma_cmd_address(pdesc),
+		&apbh_regs->ch[chan].hw_apbh_ch_nxtcmdar);
+	writel(1, &apbh_regs->ch[chan].hw_apbh_ch_sema);
+	writel(1 << (chan + APBH_CTRL0_CLKGATE_CHANNEL_OFFSET),
+		&apbh_regs->hw_apbh_ctrl0_clr);
 }
 
 /*

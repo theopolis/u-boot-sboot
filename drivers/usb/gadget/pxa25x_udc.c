@@ -8,19 +8,7 @@
  * Copyright (C) 2003 Joshua Wise
  * Copyright (C) 2012 Lukasz Dalek <luk0104@gmail.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * SPDX-License-Identifier:	GPL-2.0+
  *
  * MODULE_AUTHOR("Frank Becker, Robert Schwebel, David Brownell");
  */
@@ -314,7 +302,8 @@ static int pxa25x_ep_enable(struct usb_ep *_ep,
 	if (!_ep || !desc || ep->desc || _ep->name == ep0name
 			|| desc->bDescriptorType != USB_DT_ENDPOINT
 			|| ep->bEndpointAddress != desc->bEndpointAddress
-			|| ep->fifo_size < le16_to_cpu(desc->wMaxPacketSize)) {
+			|| ep->fifo_size <
+			   le16_to_cpu(get_unaligned(&desc->wMaxPacketSize))) {
 		printf("%s, bad ep or descriptor\n", __func__);
 		return -EINVAL;
 	}
@@ -329,9 +318,9 @@ static int pxa25x_ep_enable(struct usb_ep *_ep,
 
 	/* hardware _could_ do smaller, but driver doesn't */
 	if ((desc->bmAttributes == USB_ENDPOINT_XFER_BULK
-				&& le16_to_cpu(desc->wMaxPacketSize)
+			&& le16_to_cpu(get_unaligned(&desc->wMaxPacketSize))
 						!= BULK_FIFO_SIZE)
-			|| !desc->wMaxPacketSize) {
+			|| !get_unaligned(&desc->wMaxPacketSize)) {
 		printf("%s, bad %s maxpacket\n", __func__, _ep->name);
 		return -ERANGE;
 	}
@@ -345,7 +334,7 @@ static int pxa25x_ep_enable(struct usb_ep *_ep,
 	ep->desc = desc;
 	ep->stopped = 0;
 	ep->pio_irqs = 0;
-	ep->ep.maxpacket = le16_to_cpu(desc->wMaxPacketSize);
+	ep->ep.maxpacket = le16_to_cpu(get_unaligned(&desc->wMaxPacketSize));
 
 	/* flush fifo (mostly for OUT buffers) */
 	pxa25x_ep_fifo_flush(_ep);
@@ -485,7 +474,7 @@ write_fifo(struct pxa25x_ep *ep, struct pxa25x_request *req)
 {
 	unsigned max;
 
-	max = le16_to_cpu(ep->desc->wMaxPacketSize);
+	max = le16_to_cpu(get_unaligned(&ep->desc->wMaxPacketSize));
 	do {
 		unsigned count;
 		int is_last, is_short;
@@ -766,7 +755,7 @@ pxa25x_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 	 */
 	if (unlikely(ep->bmAttributes == USB_ENDPOINT_XFER_ISOC
 			&& req->req.length >
-			le16_to_cpu(ep->desc->wMaxPacketSize)))
+			le16_to_cpu(get_unaligned(&ep->desc->wMaxPacketSize))))
 		return -EMSGSIZE;
 
 	debug_cond(NOISY, "%s queue req %p, len %d buf %p\n",
@@ -1961,10 +1950,10 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 	dev->watchdog.period = 5000 * CONFIG_SYS_HZ / 1000000; /* 5 ms */
 	dev->watchdog.function = udc_watchdog;
 
+	dev->mach = &mach_info;
+
 	udc_disable(dev);
 	udc_reinit(dev);
-
-	dev->mach = &mach_info;
 
 	dev->gadget.name = "pxa2xx_udc";
 	retval = driver->bind(&dev->gadget);
